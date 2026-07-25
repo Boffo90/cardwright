@@ -8,9 +8,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import customtkinter as ctk
+import tkinter as tk
 from tkinter import filedialog, messagebox
 import numpy as np
-from PIL import Image as PILImage, ImageDraw as PILDraw
+from PIL import Image as PILImage, ImageDraw as PILDraw, ImageTk as PILImageTk
 
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -782,6 +783,12 @@ class ImportDialog(ctk.CTkToplevel):
 # --------------------------------------------------------------------------
 _PAGE_MM = {"Letter": (215.9, 279.4), "A4": (210.0, 297.0)}
 
+
+def _hex_rgb(h):
+    """'#rrggbb' -> (r, g, b) for PIL fills."""
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
 # Cards are kept at WORK_SIZE in memory: big enough for the detector to
 # behave as it will at print resolution and for the loupe to magnify, small
 # enough to redraw the whole sheet instantly.
@@ -811,16 +818,27 @@ class ExportDialog(ctk.CTkToplevel):
         self._thumbs = {}          # path -> raw thumbnail
         self._thumbs_raw = {}      # path -> (working-size flat image, mask)
         self._work_b = {}          # path -> working-size treated image
-        self._hover = None         # cursor position inside the preview image
-        self._base_preview = None  # preview without the loupe drawn on it
         self._thumbs_b = {}        # path -> thumbnail with the border treated
         self._border_modes = {}    # path -> "auto" | "on" | "off"
         self._slots = []           # preview hit-boxes: (x0, y0, x1, y1, path)
         self._prev_job = None
-        self._preview_img = None
-        self._page = 0             # which sheet the preview is showing
+        self._page = 0             # sheet the ◀▶ nav is pointing at
         self._excluded = set()     # paths dropped from the export
         self._custom_back = None   # chosen card back for non-DFC cards
+        self._tall = None          # full multi-sheet preview image
+        self._tallphoto = None     # its PhotoImage (kept from GC)
+        self._img_xoff = 0         # x offset of the image inside the canvas
+        self._sheet_tops = []      # y of each sheet inside the tall image
+        self._drag = None          # in-progress card drag
+        self._loupe_item = None    # canvas id of the magnifier overlay
+        self._drag_item = None     # canvas id of the dragged thumbnail
+        self._showing_backs = False
+
+        # explicit print order (the source of truth for the PDF); backs follow
+        # their front via _back_of. Drag-and-drop reorders _order.
+        fronts0, backs0 = self._pairs()
+        self._order = list(fronts0)
+        self._back_of = {f: b for f, b in zip(fronts0, backs0)}
 
         s = load_settings()
 
@@ -985,7 +1003,8 @@ class ExportDialog(ctk.CTkToplevel):
         right.grid_columnconfigure(0, weight=1)
         right.grid_rowconfigure(1, weight=1)
         head = ctk.CTkFrame(right, fg_color="transparent")
-        head.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 2))
+        head.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10,
+                  pady=(10, 2))
         head.grid_columnconfigure(1, weight=1)
         self.prev_page_btn = ctk.CTkButton(head, text="◀", width=30, height=24,
                                            fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
@@ -1006,17 +1025,27 @@ class ExportDialog(ctk.CTkToplevel):
             text_color="#d7dbe4")
         self.side_btn.set("Fronts")
         self.side_btn.grid(row=0, column=3, sticky="e", padx=(8, 0))
-        self.preview_label = ctk.CTkLabel(right, text="Loading preview...",
-                                          text_color=MUTED)
-        self.preview_label.grid(row=1, column=0, pady=(0, 10))
-        self.preview_label.bind("<Button-1>", self._preview_click)
-        self.preview_label.bind("<Button-3>", self._preview_rclick)
-        self.preview_label.bind("<Motion>", self._preview_motion)
-        self.preview_label.bind("<Leave>", self._preview_leave)
-        ctk.CTkLabel(right, text="Hover to magnify · left-click cycles the black "
-                     "border · right-click drops a card from the PDF",
+        self.canvas = tk.Canvas(right, bg=PANEL, highlightthickness=0, bd=0)
+        self.canvas.grid(row=1, column=0, sticky="nsew", padx=(10, 0),
+                         pady=(0, 6))
+        self.vbar = ctk.CTkScrollbar(right, command=self.canvas.yview)
+        self.vbar.grid(row=1, column=1, sticky="ns", padx=(2, 8), pady=(0, 6))
+        self.canvas.configure(yscrollcommand=self.vbar.set)
+        self.canvas.bind("<ButtonPress-1>", self._on_press)
+        self.canvas.bind("<B1-Motion>", self._on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        self.canvas.bind("<Button-3>", self._preview_rclick)
+        self.canvas.bind("<Motion>", self._preview_motion)
+        self.canvas.bind("<Leave>", self._preview_leave)
+        self.canvas.bind("<MouseWheel>",
+                         lambda e: self.canvas.yview_scroll(
+                             int(-e.delta / 120), "units"))
+        self.canvas.bind("<Configure>", self._recenter_preview)
+        ctk.CTkLabel(right, text="Scroll through every sheet · drag a card to "
+                     "reorder · left-click cycles the black border · "
+                     "right-click drops a card",
                      text_color=MUTED, font=("Segoe UI", 11)).grid(
-            row=2, column=0, pady=(0, 8))
+            row=2, column=0, columnspan=2, pady=(0, 8))
 
         # ------------------------------------------------ bottom buttons
         btns = ctk.CTkFrame(self, fg_color="transparent")
@@ -1108,18 +1137,16 @@ class ExportDialog(ctk.CTkToplevel):
         def keep(f):
             return not drop_excluded or str(f) not in self._excluded
 
+        fronts = [f for f in self._order if keep(f)]
         if self.backs.get() != BACKS_MODES[0]:
-            fronts, backs = self._pairs()
             default = self._custom_back or find_back_image()
-            pairs = [(f, b) for f, b in zip(fronts, backs) if keep(f)]
-            fronts = [f for f, _ in pairs]
-            backs = [b or default for _, b in pairs]
+            backs = [self._back_of.get(f) or default for f in fronts]
             return fronts, backs
-        return [p for p in self.images if keep(p)], None
+        return fronts, None
 
     def _load_thumbs(self):
         fronts, backs = self._sheet_images()
-        wanted = list(fronts[:12]) + [b for b in (backs or [])[:12] if b]
+        wanted = list(fronts) + [b for b in (backs or []) if b]
         for p in wanted:
             key = str(p)
             if key in self._thumbs:
@@ -1169,6 +1196,8 @@ class ExportDialog(ctk.CTkToplevel):
         threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._prev_job = self.after(200, self._draw_preview)
 
+    _SHEET_GAP = 34             # vertical space between stacked sheets
+
     def _draw_preview(self):
         # a slider can leave a redraw queued; the dialog may be gone by then
         if not self.winfo_exists():
@@ -1180,11 +1209,8 @@ class ExportDialog(ctk.CTkToplevel):
             pw, ph = ph, pw
         s = min(self._PREVIEW_BOX[0] / pw, self._PREVIEW_BOX[1] / ph)
         W, H = int(pw * s), int(ph * s)
-        img = PILImage.new("RGB", (W, H), (255, 255, 255))
-        d = PILDraw.Draw(img)
 
         per_page = cols * rows
-        self._slots = []
         border_on = self.border.get() != BORDER_MODES[0]
         # preview keeps excluded cards visible (shown crossed out); the export
         # count below uses the dropped-excluded list
@@ -1192,6 +1218,7 @@ class ExportDialog(ctk.CTkToplevel):
         exp_fronts, _ = self._sheet_images(drop_excluded=True)
         duplex = backs is not None
         showing_backs = duplex and self.side_btn.get() == "Backs"
+        self._showing_backs = showing_backs
         page_items = backs if showing_backs else fronts
         eb = self._edge_bleed()
         g = 2 * eb
@@ -1207,22 +1234,27 @@ class ExportDialog(ctk.CTkToplevel):
 
         bleed_fill = {"Black": (10, 10, 10), "White": (250, 250, 250)}.get(
             self.bleed_color.get(), (10, 10, 10))
-
+        gc = {"White": (255, 255, 255), "Black": (0, 0, 0),
+              "Gray": (120, 120, 120), "None": None}.get(self.guides.get())
         cw, ch = X(left + 63) - X(left), X(top + 88) - X(top)
-
         sheets = max(1, -(-len(fronts) // per_page))
         self._page = max(0, min(self._page, sheets - 1))
-        base_i = self._page * per_page       # first card index on this sheet
 
-        # bleed frames + cards
-        for idx in range(per_page):
-            col, rw = idx % cols, idx // cols
-            # backs print column-mirrored so they land behind their front
-            local = rw * cols + (cols - 1 - col) if showing_backs else idx
-            slot = base_i + local
-            x = left + col * (63 + g)
-            y = top + rw * (88 + g)
-            if slot < len(page_items):
+        def render_sheet(page):
+            """One sheet as a (W,H) image plus its local card hit-boxes."""
+            img = PILImage.new("RGB", (W, H), (255, 255, 255))
+            d = PILDraw.Draw(img)
+            slots = []
+            base_i = page * per_page
+            for idx in range(per_page):
+                col, rw = idx % cols, idx // cols
+                # backs print column-mirrored so they land behind their front
+                local = rw * cols + (cols - 1 - col) if showing_backs else idx
+                slot = base_i + local
+                x = left + col * (63 + g)
+                y = top + rw * (88 + g)
+                if slot >= len(page_items):
+                    continue
                 if eb > 0:
                     d.rectangle([X(x - eb), X(y - eb),
                                  X(x + 63 + eb), X(y + 88 + eb)],
@@ -1235,9 +1267,8 @@ class ExportDialog(ctk.CTkToplevel):
                 t = (pool.get(key) or self._thumbs.get(key)) if key else None
                 if t:
                     img.paste(t.resize((cw, ch)), (X(x), X(y)))
-                    self._slots.append((X(x), X(y), X(x + 63), X(y + 88), key))
+                    slots.append((X(x), X(y), X(x + 63), X(y + 88), key))
                     if key in self._excluded:
-                        # dropped from the export: dim it and cross it out
                         ov = PILImage.new("RGBA", (cw, ch), (20, 20, 25, 150))
                         img.paste(ov, (X(x), X(y)), ov)
                         d.line([X(x), X(y), X(x + 63), X(y + 88)],
@@ -1245,9 +1276,9 @@ class ExportDialog(ctk.CTkToplevel):
                         d.line([X(x + 63), X(y), X(x), X(y + 88)],
                                fill=(220, 70, 70), width=3)
                     elif mode != "auto":
-                        col = (90, 190, 110) if mode == "on" else (210, 110, 110)
+                        bc = (90, 190, 110) if mode == "on" else (210, 110, 110)
                         d.rectangle([X(x) + 3, X(y) + 3, X(x) + 36, X(y) + 18],
-                                    fill=col)
+                                    fill=bc)
                         d.text((X(x) + 8, X(y) + 5),
                                "ON" if mode == "on" else "OFF", fill=(15, 15, 20))
                 else:
@@ -1257,43 +1288,55 @@ class ExportDialog(ctk.CTkToplevel):
                         d.text((X(x) + cw // 2 - 26, X(y) + ch // 2),
                                "back.png\nmissing", fill=(190, 120, 120))
 
-        # guide crosses
-        gc = {"White": (255, 255, 255), "Black": (0, 0, 0),
-              "Gray": (120, 120, 120), "None": None}.get(self.guides.get())
-        xs, ys = set(), set()
-        for c_ in range(cols):
-            xs.add(left + c_ * (63 + g)); xs.add(left + c_ * (63 + g) + 63)
-        for c_ in range(rows):
-            ys.add(top + c_ * (88 + g)); ys.add(top + c_ * (88 + g) + 88)
-        if gc:
+            xs, ys = set(), set()
+            for c_ in range(cols):
+                xs.add(left + c_ * (63 + g)); xs.add(left + c_ * (63 + g) + 63)
+            for c_ in range(rows):
+                ys.add(top + c_ * (88 + g)); ys.add(top + c_ * (88 + g) + 88)
+            if gc:
+                for x in xs:
+                    for y in ys:
+                        d.line([X(x), X(max(y - 4, top)),
+                                X(x), X(min(y + 4, top + bh))], fill=gc, width=1)
+                        d.line([X(max(x - 4, left)), X(y),
+                                X(min(x + 4, left + bw)), X(y)], fill=gc, width=1)
             for x in xs:
-                for y in ys:
-                    d.line([X(x), X(max(y - 4, top)), X(x), X(min(y + 4, top + bh))],
-                           fill=gc, width=1)
-                    d.line([X(max(x - 4, left)), X(y), X(min(x + 4, left + bw)), X(y)],
-                           fill=gc, width=1)
+                d.line([X(x), X(top - 5), X(x), X(top - 1)], fill=(120, 125, 135))
+                d.line([X(x), X(top + bh + 1), X(x), X(top + bh + 5)],
+                       fill=(120, 125, 135))
+            for y in ys:
+                d.line([X(left - 5), X(y), X(left - 1), X(y)], fill=(120, 125, 135))
+                d.line([X(left + bw + 1), X(y), X(left + bw + 5), X(y)],
+                       fill=(120, 125, 135))
+            d.rectangle([0, 0, W - 1, H - 1], outline=(185, 190, 200))
+            return img, slots
 
-        # margin ticks
-        for x in xs:
-            d.line([X(x), X(top - 5), X(x), X(top - 1)], fill=(120, 125, 135))
-            d.line([X(x), X(top + bh + 1), X(x), X(top + bh + 5)], fill=(120, 125, 135))
-        for y in ys:
-            d.line([X(left - 5), X(y), X(left - 1), X(y)], fill=(120, 125, 135))
-            d.line([X(left + bw + 1), X(y), X(left + bw + 5), X(y)], fill=(120, 125, 135))
+        # stack every sheet into one tall image the canvas scrolls through
+        gap = self._SHEET_GAP
+        tall_h = sheets * H + (sheets + 1) * gap
+        tall = PILImage.new("RGB", (W, tall_h), _hex_rgb(PANEL))
+        td = PILDraw.Draw(tall)
+        self._slots = []
+        self._sheet_tops = []
+        side = "backs, mirrored" if showing_backs else "fronts"
+        y = gap
+        for p in range(sheets):
+            si, slots = render_sheet(p)
+            tall.paste(si, (0, y))
+            for (x0, y0, x1, y1, key) in slots:
+                self._slots.append((x0, y0 + y, x1, y1 + y, key))
+            self._sheet_tops.append(y)
+            td.text((4, y - 15), f"Sheet {p + 1} of {sheets} — {side}",
+                    fill=(150, 156, 170))
+            y += H + gap
 
-        d.rectangle([0, 0, W - 1, H - 1], outline=(185, 190, 200))
-
-        self._base_preview = img
-        self._scale_mm = s
-        self._render_preview()
+        self._tall = tall
+        self._blit_tall()
 
         pages = sheets * 2 if duplex else sheets      # PDF pages
-        side = "backs, mirrored" if showing_backs else "fronts"
         self.preview_title.configure(
-            text=f"Sheet {self._page + 1} of {sheets} — {side}")
-        self.prev_page_btn.configure(state="normal" if self._page > 0 else "disabled")
-        self.next_page_btn.configure(
-            state="normal" if self._page < sheets - 1 else "disabled")
+            text=f"{sheets} sheet(s) · {pages} PDF page(s)")
+        self._update_nav(sheets)
         self.side_btn.configure(state="normal" if duplex else "disabled")
         if not duplex:
             self.side_btn.set("Fronts")
@@ -1316,20 +1359,44 @@ class ExportDialog(ctk.CTkToplevel):
             self._prev_job = None
         super().destroy()
 
-    def _render_preview(self):
-        """Show the cached sheet, with the magnifier drawn on top if hovering."""
-        base = self._base_preview
-        if base is None or not self.winfo_exists():
+    def _blit_tall(self):
+        """Put the stacked-sheets image on the canvas, keeping scroll position."""
+        if self._tall is None or not self.winfo_exists():
             return
-        img = base
-        if self._hover:
-            lens = self._loupe(*self._hover)
-            if lens is not None:
-                img = base.copy()
-                img.paste(lens[0], lens[1])
-        self._preview_img = ctk.CTkImage(light_image=img, dark_image=img,
-                                         size=img.size)
-        self.preview_label.configure(image=self._preview_img, text="")
+        frac = self.canvas.yview()[0]
+        self._tallphoto = PILImageTk.PhotoImage(self._tall)
+        self.canvas.delete("all")
+        self._loupe_item = self._drag_item = None
+        cw = self.canvas.winfo_width()
+        tw, th = self._tall.size
+        self._img_xoff = max(0, (cw - tw) // 2)
+        self.canvas.create_image(self._img_xoff, 0, anchor="nw",
+                                 image=self._tallphoto, tags="sheet")
+        self.canvas.configure(scrollregion=(0, 0, max(tw, cw), th))
+        self.canvas.yview_moveto(frac)
+
+    def _recenter_preview(self, _event=None):
+        """Keep the sheets horizontally centred when the canvas resizes."""
+        if self._tall is None:
+            return
+        cw = self.canvas.winfo_width()
+        tw, th = self._tall.size
+        xoff = max(0, (cw - tw) // 2)
+        if xoff != self._img_xoff:
+            self.canvas.move("sheet", xoff - self._img_xoff, 0)
+            self._img_xoff = xoff
+        self.canvas.configure(scrollregion=(0, 0, max(tw, cw), th))
+
+    def _event_xy(self, event):
+        """Cursor position in tall-image coordinates (scroll- and centre-aware)."""
+        return (self.canvas.canvasx(event.x) - self._img_xoff,
+                self.canvas.canvasy(event.y))
+
+    def _key_at(self, cx, cy):
+        for x0, y0, x1, y1, key in self._slots:
+            if key and x0 <= cx <= x1 and y0 <= cy <= y1:
+                return key
+        return None
 
     def _loupe(self, px, py):
         """Magnified crop of the card under the cursor, plus where to paste."""
@@ -1361,30 +1428,35 @@ class ExportDialog(ctk.CTkToplevel):
                     LOUPE_PX // 2], fill=(212, 160, 23))
             d.line([LOUPE_PX // 2, LOUPE_PX // 2 - 6, LOUPE_PX // 2,
                     LOUPE_PX // 2 + 6], fill=(212, 160, 23))
-            # place it clear of the cursor, kept inside the sheet
-            W, H = self._base_preview.size
+            # place it clear of the cursor, kept inside the tall image
+            W, H = self._tall.size
             lx = px + 18 if px < W // 2 else px - LOUPE_PX - 18
-            ly = py + 18 if py < H // 2 else py - LOUPE_PX - 18
+            ly = py + 18
             lx = min(max(lx, 0), W - LOUPE_PX)
             ly = min(max(ly, 0), H - LOUPE_PX)
             return lens, (lx, ly)
         return None
 
     def _preview_motion(self, event):
-        if not self._preview_img:
+        if self._drag:                       # dragging a card, no magnifier
             return
-        iw, ih = self._preview_img.cget("size")
-        ox = max(0, (self.preview_label.winfo_width() - iw) // 2)
-        oy = max(0, (self.preview_label.winfo_height() - ih) // 2)
-        pos = (event.x - ox, event.y - oy)
-        if pos != self._hover:
-            self._hover = pos
-            self._render_preview()
+        cx, cy = self._event_xy(event)
+        lens = self._loupe(cx, cy)
+        self.canvas.delete("loupe")
+        self._loupe_item = None
+        if lens is None:
+            self._loupephoto = None
+            return
+        img, (lx, ly) = lens
+        self._loupephoto = PILImageTk.PhotoImage(img)
+        self._loupe_item = self.canvas.create_image(
+            lx + self._img_xoff, ly, anchor="nw", image=self._loupephoto,
+            tags="loupe")
 
     def _preview_leave(self, _event=None):
-        if self._hover:
-            self._hover = None
-            self._render_preview()
+        self.canvas.delete("loupe")
+        self._loupe_item = None
+        self._loupephoto = None
 
     def _back_label(self):
         if self._custom_back:
@@ -1419,35 +1491,100 @@ class ExportDialog(ctk.CTkToplevel):
         threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._draw_preview()
 
+    def _update_nav(self, sheets):
+        self._page = max(0, min(self._page, sheets - 1))
+        self.prev_page_btn.configure(
+            state="normal" if self._page > 0 else "disabled")
+        self.next_page_btn.configure(
+            state="normal" if self._page < sheets - 1 else "disabled")
+
     def _flip_page(self, delta):
-        self._page += delta
-        self._hover = None
-        self._draw_preview()
+        """Scroll the canvas so the previous/next sheet lands at the top."""
+        if not self._sheet_tops or self._tall is None:
+            return
+        self._page = max(0, min(self._page + delta, len(self._sheet_tops) - 1))
+        y = self._sheet_tops[self._page] - self._SHEET_GAP
+        self.canvas.yview_moveto(max(0, y) / max(1, self._tall.size[1]))
+        self._update_nav(len(self._sheet_tops))
 
-    def _slot_at(self, event):
-        """Return the card key under the cursor, or None."""
-        if not self._preview_img:
-            return None
-        iw, ih = self._preview_img.cget("size")        # image is centred
-        ox = max(0, (self.preview_label.winfo_width() - iw) // 2)
-        oy = max(0, (self.preview_label.winfo_height() - ih) // 2)
-        px, py = event.x - ox, event.y - oy
-        for x0, y0, x1, y1, key in self._slots:
-            if key and x0 <= px <= x1 and y0 <= py <= y1:
-                return key
-        return None
+    # ---------------------------------------------------- drag to reorder
+    _DRAG_THRESH = 6
 
-    def _preview_click(self, event):
-        """Cycle one card's black border: auto -> force off -> force on."""
-        key = self._slot_at(event)
+    def _on_press(self, event):
+        self._drag = None
+        cx, cy = self._event_xy(event)
+        key = self._key_at(cx, cy)
         if key:
+            self._drag = {"key": key, "x": event.x, "y": event.y, "moved": False}
+
+    def _on_drag(self, event):
+        d = self._drag
+        if not d:
+            return
+        if not d["moved"]:
+            if abs(event.x - d["x"]) + abs(event.y - d["y"]) < self._DRAG_THRESH:
+                return
+            if self._showing_backs:      # reordering is a fronts-view action
+                self._drag = None
+                return
+            d["moved"] = True
+            self.canvas.delete("loupe")
+            self._start_drag_ghost(d["key"])
+        if self._drag_item is not None:
+            self.canvas.coords(self._drag_item,
+                               self.canvas.canvasx(event.x) + 12,
+                               self.canvas.canvasy(event.y) + 12)
+        # let the user drag onto any sheet by auto-scrolling at the edges
+        h = self.canvas.winfo_height()
+        if event.y < 24:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.y > h - 24:
+            self.canvas.yview_scroll(1, "units")
+
+    def _start_drag_ghost(self, key):
+        thumb = self._thumbs.get(key)
+        if thumb is None:
+            return
+        ghost = thumb.resize((thumb.size[0] // 2, thumb.size[1] // 2))
+        self._ghostphoto = PILImageTk.PhotoImage(ghost)
+        self._drag_item = self.canvas.create_image(
+            0, 0, anchor="nw", image=self._ghostphoto, tags="ghost")
+
+    def _on_release(self, event):
+        d = self._drag
+        self._drag = None
+        self.canvas.delete("ghost")
+        self._drag_item = None
+        if not d:
+            return
+        if not d["moved"]:
+            # a plain click cycles the black border: auto -> off -> on
+            key = d["key"]
             nxt = {"auto": "off", "off": "on", "on": "auto"}
             self._border_modes[key] = nxt[self._border_modes.get(key, "auto")]
             self._draw_preview()
+            return
+        cx, cy = self._event_xy(event)
+        self._reorder(d["key"], self._key_at(cx, cy))
+
+    def _reorder(self, src_key, tgt_key):
+        """Move the dragged card to sit just before the card it was dropped on."""
+        if not tgt_key or tgt_key == src_key:
+            return
+        src = next((f for f in self._order if str(f) == src_key), None)
+        tgt = next((f for f in self._order if str(f) == tgt_key), None)
+        if src is None or tgt is None:
+            return
+        order = list(self._order)
+        order.remove(src)
+        order.insert(order.index(tgt), src)
+        self._order = order
+        self._draw_preview()
 
     def _preview_rclick(self, event):
         """Drop / restore the card under the cursor from the export."""
-        key = self._slot_at(event)
+        cx, cy = self._event_xy(event)
+        key = self._key_at(cx, cy)
         if not key:
             return
         if key in self._excluded:

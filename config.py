@@ -2,6 +2,14 @@ import json
 import sys
 from pathlib import Path
 
+# Card sources (Scryfall / Gatherer / MPC Autofill on Google Drive) are chosen
+# by the user and can be very large — MPC art tops 190M pixels, above Pillow's
+# ~178M "decompression bomb" guard. The sources are trusted, so lift the cap
+# once here; this is a process-wide attribute, so importing config disables it
+# everywhere before any image is decoded.
+from PIL import Image as _PILImage
+_PILImage.MAX_IMAGE_PIXELS = None
+
 # ==========================================
 # PATHS
 # ==========================================

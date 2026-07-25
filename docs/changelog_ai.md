@@ -2,6 +2,13 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.7.0 — interactive preview: scroll all sheets, drag to reorder
+- Export preview is now a scrollable canvas showing every sheet stacked.
+- Drag a card to reorder it (before the card you drop on); order = PDF order.
+- Left-click still cycles the black border; right-click still drops a card.
+- Fix: lifted Pillow's `MAX_IMAGE_PIXELS` cap (config.py) — huge MPC images
+  (~190M px) no longer fail with "decompression bomb"; they now reach export.
+
 ## v2.6.0 — full preview, card selection, custom backs
 - Preview de todas las hojas (◀▶), no solo la primera.
 - Clic derecho descarta/restaura carta del PDF (X roja); conteos se recalculan.

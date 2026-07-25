@@ -8,5 +8,10 @@
 - Code signing pending (Azure Trusted Signing ~US$10/mo) → SmartScreen warns "unknown publisher".
 
 ## Next steps
-- Publish release v2.6.0 (upload ProxyForge.exe FIRST, then installer/ProxyForge_Setup-2.6.0.exe; tag v2.6.0).
+- Publish release v2.7.0 (upload ProxyForge.exe FIRST, then installer/ProxyForge_Setup-2.7.0.exe; tag v2.7.0).
 - r/mtgproxies promotion when the user wants.
+
+## Backlog (interactive preview, later phases)
+- Drag whole sheets to reorder them (only cards reorder today).
+- Add cards from the preview — needs the upscaling pipeline inside ExportDialog (cross-module; deferred).
+- Big decks: the preview loads every card's working image + renders all sheets each redraw; consider lazy/visible-only rendering if it lags.
