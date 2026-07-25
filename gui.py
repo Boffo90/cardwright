@@ -818,6 +818,9 @@ class ExportDialog(ctk.CTkToplevel):
         self._slots = []           # preview hit-boxes: (x0, y0, x1, y1, path)
         self._prev_job = None
         self._preview_img = None
+        self._page = 0             # which sheet the preview is showing
+        self._excluded = set()     # paths dropped from the export
+        self._custom_back = None   # chosen card back for non-DFC cards
 
         s = load_settings()
 
@@ -931,6 +934,24 @@ class ExportDialog(ctk.CTkToplevel):
         section("Duplex backs")
         self.backs = row("Card backs", BACKS_MODES,
                          s.get("backs", BACKS_MODES[0]))
+
+        # chosen card back for every non-DFC card (DFCs keep their own back)
+        ctk.CTkLabel(left, text="Back image", anchor="w").grid(
+            row=self._r, column=0, sticky="w", padx=(12, 8), pady=4)
+        backfr = ctk.CTkFrame(left, fg_color="transparent")
+        backfr.grid(row=self._r, column=1, sticky="w", pady=4)
+        self._r += 1
+        self.back_lbl = ctk.CTkLabel(backfr, text=self._back_label(),
+                                     text_color=MUTED, font=("Segoe UI", 11),
+                                     width=110, anchor="w")
+        self.back_lbl.pack(side="left")
+        ctk.CTkButton(backfr, text="File…", width=52, height=26,
+                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                      command=self._choose_back_file).pack(side="left", padx=2)
+        ctk.CTkButton(backfr, text="MPC…", width=52, height=26,
+                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                      command=self._choose_back_mpc).pack(side="left", padx=2)
+
         self.back_dx = entry_row("Back offset X (mm)", "back_dx", 0.0)
         self.back_dy = entry_row("Back offset Y (mm)", "back_dy", 0.0)
         self.back_bleed = entry_row("Back bleed (mm)", "back_bleed", 1.5,
@@ -965,10 +986,18 @@ class ExportDialog(ctk.CTkToplevel):
         right.grid_rowconfigure(1, weight=1)
         head = ctk.CTkFrame(right, fg_color="transparent")
         head.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 2))
-        head.grid_columnconfigure(0, weight=1)
+        head.grid_columnconfigure(1, weight=1)
+        self.prev_page_btn = ctk.CTkButton(head, text="◀", width=30, height=24,
+                                           fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                                           command=lambda: self._flip_page(-1))
+        self.prev_page_btn.grid(row=0, column=0, sticky="w")
         self.preview_title = ctk.CTkLabel(head, text="Preview",
                                           text_color=MUTED, font=("Segoe UI", 12))
-        self.preview_title.grid(row=0, column=0)
+        self.preview_title.grid(row=0, column=1)
+        self.next_page_btn = ctk.CTkButton(head, text="▶", width=30, height=24,
+                                           fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                                           command=lambda: self._flip_page(1))
+        self.next_page_btn.grid(row=0, column=2, sticky="e")
         self.side_btn = ctk.CTkSegmentedButton(
             head, values=["Fronts", "Backs"], height=24,
             font=("Segoe UI", 11), command=lambda _v: self._draw_preview(),
@@ -976,15 +1005,16 @@ class ExportDialog(ctk.CTkToplevel):
             selected_color=GOLD, selected_hover_color=GOLD_HOVER,
             text_color="#d7dbe4")
         self.side_btn.set("Fronts")
-        self.side_btn.grid(row=0, column=1, sticky="e")
+        self.side_btn.grid(row=0, column=3, sticky="e", padx=(8, 0))
         self.preview_label = ctk.CTkLabel(right, text="Loading preview...",
                                           text_color=MUTED)
         self.preview_label.grid(row=1, column=0, pady=(0, 10))
         self.preview_label.bind("<Button-1>", self._preview_click)
+        self.preview_label.bind("<Button-3>", self._preview_rclick)
         self.preview_label.bind("<Motion>", self._preview_motion)
         self.preview_label.bind("<Leave>", self._preview_leave)
-        ctk.CTkLabel(right, text="Hover to magnify · click a card to cycle its "
-                     "black border: auto → off → on",
+        ctk.CTkLabel(right, text="Hover to magnify · left-click cycles the black "
+                     "border · right-click drops a card from the PDF",
                      text_color=MUTED, font=("Segoe UI", 11)).grid(
             row=2, column=0, pady=(0, 8))
 
@@ -1067,18 +1097,25 @@ class ExportDialog(ctk.CTkToplevel):
     # ------------------------------------------------------------- preview
     _PREVIEW_BOX = (470, 560)   # max preview pixels (w, h)
 
-    def _sheet_images(self):
+    def _sheet_images(self, drop_excluded=True):
         """
-        What actually goes on the sheets, matching the export exactly:
-        (fronts, backs) with backs=None when duplex is off. In duplex mode a
-        card's own back face stops being a front of its own.
+        What goes on the sheets: (fronts, backs), backs=None when duplex is
+        off. In duplex a card's own back face stops being a front. A chosen
+        card back overrides back.png. When drop_excluded is True the cards the
+        user right-clicked out are removed (the export view); when False they
+        are kept so the preview can still show and restore them.
         """
+        def keep(f):
+            return not drop_excluded or str(f) not in self._excluded
+
         if self.backs.get() != BACKS_MODES[0]:
             fronts, backs = self._pairs()
-            default = find_back_image()
-            backs = [b or default for b in backs]
+            default = self._custom_back or find_back_image()
+            pairs = [(f, b) for f, b in zip(fronts, backs) if keep(f)]
+            fronts = [f for f, _ in pairs]
+            backs = [b or default for _, b in pairs]
             return fronts, backs
-        return list(self.images), None
+        return [p for p in self.images if keep(p)], None
 
     def _load_thumbs(self):
         fronts, backs = self._sheet_images()
@@ -1149,7 +1186,10 @@ class ExportDialog(ctk.CTkToplevel):
         per_page = cols * rows
         self._slots = []
         border_on = self.border.get() != BORDER_MODES[0]
-        fronts, backs = self._sheet_images()
+        # preview keeps excluded cards visible (shown crossed out); the export
+        # count below uses the dropped-excluded list
+        fronts, backs = self._sheet_images(drop_excluded=False)
+        exp_fronts, _ = self._sheet_images(drop_excluded=True)
         duplex = backs is not None
         showing_backs = duplex and self.side_btn.get() == "Backs"
         page_items = backs if showing_backs else fronts
@@ -1170,11 +1210,16 @@ class ExportDialog(ctk.CTkToplevel):
 
         cw, ch = X(left + 63) - X(left), X(top + 88) - X(top)
 
+        sheets = max(1, -(-len(fronts) // per_page))
+        self._page = max(0, min(self._page, sheets - 1))
+        base_i = self._page * per_page       # first card index on this sheet
+
         # bleed frames + cards
         for idx in range(per_page):
             col, rw = idx % cols, idx // cols
             # backs print column-mirrored so they land behind their front
-            slot = rw * cols + (cols - 1 - col) if showing_backs else idx
+            local = rw * cols + (cols - 1 - col) if showing_backs else idx
+            slot = base_i + local
             x = left + col * (63 + g)
             y = top + rw * (88 + g)
             if slot < len(page_items):
@@ -1191,7 +1236,15 @@ class ExportDialog(ctk.CTkToplevel):
                 if t:
                     img.paste(t.resize((cw, ch)), (X(x), X(y)))
                     self._slots.append((X(x), X(y), X(x + 63), X(y + 88), key))
-                    if mode != "auto":
+                    if key in self._excluded:
+                        # dropped from the export: dim it and cross it out
+                        ov = PILImage.new("RGBA", (cw, ch), (20, 20, 25, 150))
+                        img.paste(ov, (X(x), X(y)), ov)
+                        d.line([X(x), X(y), X(x + 63), X(y + 88)],
+                               fill=(220, 70, 70), width=3)
+                        d.line([X(x + 63), X(y), X(x), X(y + 88)],
+                               fill=(220, 70, 70), width=3)
+                    elif mode != "auto":
                         col = (90, 190, 110) if mode == "on" else (210, 110, 110)
                         d.rectangle([X(x) + 3, X(y) + 3, X(x) + 36, X(y) + 18],
                                     fill=col)
@@ -1234,18 +1287,25 @@ class ExportDialog(ctk.CTkToplevel):
         self._scale_mm = s
         self._render_preview()
 
-        sheets = -(-len(fronts) // per_page)          # sheets of paper
         pages = sheets * 2 if duplex else sheets      # PDF pages
         side = "backs, mirrored" if showing_backs else "fronts"
-        self.preview_title.configure(text=f"Sheet 1 of {sheets} — {side}")
+        self.preview_title.configure(
+            text=f"Sheet {self._page + 1} of {sheets} — {side}")
+        self.prev_page_btn.configure(state="normal" if self._page > 0 else "disabled")
+        self.next_page_btn.configure(
+            state="normal" if self._page < sheets - 1 else "disabled")
         self.side_btn.configure(state="normal" if duplex else "disabled")
         if not duplex:
             self.side_btn.set("Fronts")
 
-        extra = f" ({len(self.images)} files, backs paired)" if duplex else ""
+        # export counts use the dropped-excluded list
+        exp_sheets = max(1, -(-len(exp_fronts) // per_page)) if exp_fronts else 0
+        exp_pages = exp_sheets * 2 if duplex else exp_sheets
+        dropped = len(fronts) - len(exp_fronts)
+        drop = f", {dropped} dropped" if dropped else ""
         self.summary.configure(
-            text=f"{len(fronts)} card(s) from the {self.source}{extra} -> "
-                 f"{sheets} sheet(s), {pages} PDF page(s)")
+            text=f"{len(exp_fronts)} card(s) from the {self.source}{drop} -> "
+                 f"{exp_sheets} sheet(s), {exp_pages} PDF page(s)")
 
     def destroy(self):
         if self._prev_job:
@@ -1326,20 +1386,76 @@ class ExportDialog(ctk.CTkToplevel):
             self._hover = None
             self._render_preview()
 
-    def _preview_click(self, event):
-        """Cycle one card's black border: auto -> force off -> force on."""
+    def _back_label(self):
+        if self._custom_back:
+            return Path(self._custom_back).name[:16]
+        return "back.png (default)" if find_back_image() else "none set"
+
+    def _choose_back_file(self):
+        f = filedialog.askopenfilename(
+            parent=self, title="Choose a card back image",
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
+        if f:
+            self._custom_back = f
+            self._after_back_change()
+
+    def _choose_back_mpc(self):
+        MPCDialog(self, on_pick=self._back_from_mpc)
+
+    def _back_from_mpc(self, card):
+        # download the chosen MPC image now so it can be used as the back
+        try:
+            dest = scryfall.TEMP_FOLDER / "_chosen_back.png"
+            mpcfill.download(card, dest)
+            self._custom_back = str(dest)
+            self._after_back_change()
+        except Exception as e:
+            messagebox.showerror("Card back", str(e), parent=self)
+
+    def _after_back_change(self):
+        self.back_lbl.configure(text=self._back_label())
+        if self.backs.get() == BACKS_MODES[0]:      # turn duplex on for them
+            self.backs.set(BACKS_MODES[1])
+        threading.Thread(target=self._load_thumbs, daemon=True).start()
+        self._draw_preview()
+
+    def _flip_page(self, delta):
+        self._page += delta
+        self._hover = None
+        self._draw_preview()
+
+    def _slot_at(self, event):
+        """Return the card key under the cursor, or None."""
         if not self._preview_img:
-            return
+            return None
         iw, ih = self._preview_img.cget("size")        # image is centred
         ox = max(0, (self.preview_label.winfo_width() - iw) // 2)
         oy = max(0, (self.preview_label.winfo_height() - ih) // 2)
         px, py = event.x - ox, event.y - oy
-        nxt = {"auto": "off", "off": "on", "on": "auto"}
         for x0, y0, x1, y1, key in self._slots:
             if key and x0 <= px <= x1 and y0 <= py <= y1:
-                self._border_modes[key] = nxt[self._border_modes.get(key, "auto")]
-                self._draw_preview()
-                return
+                return key
+        return None
+
+    def _preview_click(self, event):
+        """Cycle one card's black border: auto -> force off -> force on."""
+        key = self._slot_at(event)
+        if key:
+            nxt = {"auto": "off", "off": "on", "on": "auto"}
+            self._border_modes[key] = nxt[self._border_modes.get(key, "auto")]
+            self._draw_preview()
+
+    def _preview_rclick(self, event):
+        """Drop / restore the card under the cursor from the export."""
+        key = self._slot_at(event)
+        if not key:
+            return
+        if key in self._excluded:
+            self._excluded.discard(key)
+        else:
+            self._excluded.add(key)
+        threading.Thread(target=self._load_thumbs, daemon=True).start()
+        self._draw_preview()
 
     # ------------------------------------------------------------- actions
     def _export(self):
@@ -1355,11 +1471,13 @@ class ExportDialog(ctk.CTkToplevel):
         self._persist()
         self.export_btn.configure(state="disabled", text="Exporting...")
 
-        duplex = self.backs.get() != BACKS_MODES[0]
-        if duplex:
-            images, backs = self._pairs()
-        else:
-            images, backs = self.images, None
+        # honours dropped cards, the chosen card back and DFC pairing
+        images, backs = self._sheet_images(drop_excluded=True)
+        if not images:
+            self.export_btn.configure(state="normal", text="Export")
+            messagebox.showwarning("Nothing to export",
+                                   "Every card is dropped.", parent=self)
+            return
 
         args = dict(
             layout=self.layout.get(),
