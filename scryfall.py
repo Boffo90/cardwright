@@ -468,8 +468,19 @@ def resolve_decklist(text: str, status_callback=None):
 
 
 def download_to_temp(basename: str, url: str) -> Path:
-    """Download a resolved PNG url into TEMP_FOLDER as <basename>.png."""
-    return _download(url, TEMP_FOLDER / f"{basename}.png")
+    """Download a resolved image url into TEMP_FOLDER as <basename>.png.
+
+    Handles Scryfall PNGs and Google Drive downloads (MPC images, ~12 MB),
+    so it uses a generous timeout and follows redirects.
+    """
+    target = TEMP_FOLDER / f"{basename}.png"
+    time.sleep(SCRYFALL_DELAY)
+    r = requests.get(url, headers={"User-Agent": SCRYFALL_HEADERS["User-Agent"]},
+                     timeout=120, allow_redirects=True)
+    if r.status_code != 200 or len(r.content) < 2000:
+        raise ScryfallError(f"Download failed ({r.status_code})")
+    target.write_bytes(r.content)
+    return target
 
 
 # ==========================================================================

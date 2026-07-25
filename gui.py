@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import shutil
@@ -52,6 +53,7 @@ from config import (
 )
 from upscale import upscale
 import scryfall
+import mpcfill
 import print_sheet
 import bootstrap
 import update as app_update
@@ -331,7 +333,10 @@ class App(_Root):
                       command=self._add_files).grid(row=0, column=2, padx=4, pady=12)
         ctk.CTkButton(bar, text="Import list…", width=110, height=40,
                       fg_color=BLUE, hover_color=BLUE_HOVER,
-                      command=self._open_import).grid(row=0, column=3, padx=(4, 12), pady=12)
+                      command=self._open_import).grid(row=0, column=3, padx=4, pady=12)
+        ctk.CTkButton(bar, text="MPC search…", width=110, height=40,
+                      fg_color=BLUE, hover_color=BLUE_HOVER,
+                      command=self._open_mpc).grid(row=0, column=4, padx=(4, 12), pady=12)
 
     # ----------------------------------------------------------------- queue
     def _build_queue(self):
@@ -475,6 +480,19 @@ class App(_Root):
         if self.running:
             return
         ImportDialog(self, on_resolved=self._add_resolved_cards)
+
+    def _open_mpc(self):
+        if self.running:
+            return
+        MPCDialog(self, on_pick=self._add_mpc_card)
+
+    def _add_mpc_card(self, card):
+        # MPC images are Google-Drive downloads with a bleed edge; reuse the
+        # "card" path (download then upscale), the bleed trim handles the edge
+        base = f"{card['name']}  [{card['source']}]"
+        safe = re.sub(r'[<>:"/\\|?*]', "", base)
+        self._add_item(base, "card",
+                       downloads=[(safe, card["download"])], label=base)
 
     def _add_resolved_cards(self, cards):
         for c in cards:
@@ -1562,3 +1580,133 @@ class SetupDialog(ctk.CTkToplevel):
             "Setup failed",
             f"Could not download required components:\n\n{e}\n\n"
             "Check your internet connection and restart the app to retry.")
+
+
+# --------------------------------------------------------------------------
+# MPC Autofill search dialog
+# --------------------------------------------------------------------------
+class MPCDialog(ctk.CTkToplevel):
+    """Search mpcfill.com and pick a card version to add to the queue."""
+
+    COLS = 4
+    THUMB = (150, 209)
+
+    def __init__(self, master, on_pick):
+        super().__init__(master)
+        self.on_pick = on_pick
+        self.title("Search MPC Autofill")
+        self.geometry("720x640")
+        self.transient(master)
+        self.after(60, self.grab_set)
+        self.configure(fg_color=BG)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+        self._thumbs = {}          # keep CTkImage refs alive
+        self._token = 0            # ignore stale search threads
+
+        ctk.CTkLabel(self, text="Search MPC Autofill",
+                     font=("Georgia", 18, "bold"), text_color=GOLD).grid(
+            row=0, column=0, sticky="w", padx=20, pady=(16, 2))
+
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.grid(row=1, column=0, sticky="ew", padx=16, pady=6)
+        bar.grid_columnconfigure(0, weight=1)
+        self.entry = ctk.CTkEntry(bar, height=38, fg_color=PANEL,
+                                  border_color=GRAY_BTN,
+                                  placeholder_text="Card name (e.g. Sol Ring)")
+        self.entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        self.entry.bind("<Return>", lambda e: self._search())
+        self.search_btn = ctk.CTkButton(bar, text="Search", width=100, height=38,
+                                        fg_color=GOLD, hover_color=GOLD_HOVER,
+                                        text_color=GOLD_TEXT,
+                                        font=("Segoe UI", 13, "bold"),
+                                        command=self._search)
+        self.search_btn.grid(row=0, column=1)
+
+        self.grid_frame = ctk.CTkScrollableFrame(self, fg_color=PANEL,
+                                                 corner_radius=10)
+        self.grid_frame.grid(row=2, column=0, sticky="nsew", padx=16, pady=8)
+        for c in range(self.COLS):
+            self.grid_frame.grid_columnconfigure(c, weight=1)
+
+        self.status = ctk.CTkLabel(self, text="Type a card name and hit Search.",
+                                   text_color=MUTED, font=("Segoe UI", 12))
+        self.status.grid(row=3, column=0, sticky="w", padx=20, pady=(0, 12))
+
+    def _search(self):
+        query = self.entry.get().strip()
+        if not query:
+            return
+        self._token += 1
+        token = self._token
+        for w in self.grid_frame.winfo_children():
+            w.destroy()
+        self._thumbs.clear()
+        self.status.configure(text=f"Searching “{query}”…", text_color=MUTED)
+        self.search_btn.configure(state="disabled")
+
+        def work():
+            try:
+                cards = mpcfill.search(query)
+                self.after(0, lambda: self._show(cards, token))
+            except Exception as e:
+                self.after(0, lambda: self._failed(e))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _failed(self, e):
+        self.search_btn.configure(state="normal")
+        self.status.configure(text=f"Search failed: {e}", text_color="#fca5a5")
+
+    def _show(self, cards, token):
+        if token != self._token:
+            return
+        self.search_btn.configure(state="normal")
+        if not cards:
+            self.status.configure(text="No matches on MPC Autofill.",
+                                  text_color="#fca5a5")
+            return
+        self.status.configure(
+            text=f"{len(cards)} version(s). Click one to add it to the queue.",
+            text_color=MUTED)
+        for i, card in enumerate(cards):
+            self._card_tile(card, i // self.COLS, i % self.COLS, token)
+
+    def _card_tile(self, card, r, c, token):
+        tile = ctk.CTkFrame(self.grid_frame, fg_color=ROW, corner_radius=8)
+        tile.grid(row=r, column=c, padx=6, pady=6, sticky="n")
+        ph = ctk.CTkLabel(tile, text="…", width=self.THUMB[0],
+                          height=self.THUMB[1], text_color=MUTED)
+        ph.pack(padx=6, pady=(6, 2))
+        name = card["name"]
+        short = name if len(name) <= 26 else name[:25] + "…"
+        ctk.CTkLabel(tile, text=short, font=("Segoe UI", 11),
+                     wraplength=self.THUMB[0]).pack(padx=6)
+        ctk.CTkLabel(tile, text=f"{card['source']} · {card['dpi']}dpi",
+                     font=("Segoe UI", 10), text_color=MUTED).pack(padx=6)
+        add = ctk.CTkButton(tile, text="Add", width=70, height=26,
+                            fg_color=GOLD, hover_color=GOLD_HOVER,
+                            text_color=GOLD_TEXT, font=("Segoe UI", 11, "bold"),
+                            command=lambda ca=card: self._pick(ca))
+        add.pack(padx=6, pady=(2, 8))
+
+        def load():
+            data = mpcfill.fetch_thumb(card["thumb"])
+            if not data or token != self._token:
+                return
+            try:
+                im = PILImage.open(io.BytesIO(data)).convert("RGB").resize(
+                    self.THUMB)
+                cimg = ctk.CTkImage(light_image=im, dark_image=im,
+                                    size=self.THUMB)
+                self._thumbs[id(tile)] = cimg
+                self.after(0, lambda: ph.winfo_exists()
+                           and ph.configure(image=cimg, text=""))
+            except (OSError, ValueError, RuntimeError):
+                pass
+
+        threading.Thread(target=load, daemon=True).start()
+
+    def _pick(self, card):
+        self.on_pick(card)
+        self.status.configure(text=f"Added: {card['name']}", text_color=GOLD)
