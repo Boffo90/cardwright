@@ -47,6 +47,9 @@ Auto-update (3 iteraciones: PID→imagename, timeout sin consola, START no funci
 - Email a Moxfield NO reintentar (rechazado: WotC les objetó tools de proxies).
 - Difusión r/mtgproxies cuando el usuario quiera.
 
+## Convención de idioma
+**Todo lo del proyecto va en inglés** (app global): UI, código, comentarios, docs, README, changelog y títulos/descripciones de release en GitHub. El chat con el usuario es en español, pero cualquier entregable que viva en el repo o se muestre al usuario final es en inglés.
+
 ## NO volver a intentar
 - **Moxfield API**: rechazado por su soporte (WotC). No reintentar ni scrapear.
 - **Integrar venta con la app / mencionar ventas**: prohibido por el usuario.
