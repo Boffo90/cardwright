@@ -121,6 +121,7 @@ BORDER_BREAK_FRAC = 0.02     # gap that ends the frame, fraction of width
 # 43. Without this, a dark uniform artwork forms its own histogram peak and
 # gets crushed to black.
 BORDER_MAX_CHROMA = 14       # max(RGB)-min(RGB) allowed for frame pixels
+BORDER_SIDE_COVERAGE = 0.88  # a side needs this much frame, or it is art
 
 
 def _smooth_profile(profile: np.ndarray, k: int = BORDER_SMOOTH) -> np.ndarray:
@@ -299,6 +300,13 @@ def _deepen_black_border(im: Image.Image, opaque=None, amount: float = 1.0,
         depth = np.argmax(ends, axis=0).astype(np.float32)
         depth[~ends.any(axis=0)] = n
         depth[depth < BORDER_MIN_DEPTH] = 0.0
+        # A real black frame runs the whole length of its side; dark artwork
+        # only looks like a frame in patches. If most of this side is NOT
+        # frame, it is art reaching the cut edge (extended-art borders), so
+        # drop the whole side rather than blacken those patches. Measured:
+        # true frames cover >=96% of the side, art sides 30-71%.
+        if (depth > 0).mean() < BORDER_SIDE_COVERAGE:
+            depth[:] = 0.0
         return _smooth_profile(depth, max(3, BORDER_SMOOTH // step))
 
     def expand(profile, size):

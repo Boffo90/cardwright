@@ -95,6 +95,20 @@ CARD_HEIGHT_PX = 4160
 # When False, the native upscaled resolution is kept (DPI metadata still set).
 FIT_TO_CARD_DEFAULT = True
 
+# --- MPC bleed trim -------------------------------------------------------
+# MPC / MPC-Autofill card images carry a full-bleed edge: a poker card is
+# 822x1122 px at 300 DPI, of which 36 px per side is bleed, leaving a
+# 750x1050 card. That is an aspect ratio of ~0.733 vs a plain MTG card's
+# ~0.716, so bleed images are recognisable by proportion — Scryfall/Gatherer
+# scans (0.716) are never touched. The card area is the centred 91.24% x
+# 93.58% of the image.
+MPC_TRIM_DEFAULT = True
+
+MPC_BLEED_RATIO_MIN = 0.725   # w/h above this (and below max) -> has bleed
+MPC_BLEED_RATIO_MAX = 0.745
+MPC_CARD_W_FRAC = 0.9124      # card area within the bleed image
+MPC_CARD_H_FRAC = 0.9358
+
 # Accepted input extensions (anything else is converted to PNG first)
 SUPPORTED_INPUT = {
     ".png", ".jpg", ".jpeg", ".webp", ".bmp",

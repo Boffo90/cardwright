@@ -256,45 +256,48 @@ def _gatherer_parse(ref: str):
 
 
 def _fetch_gatherer(g: dict, status_callback=None):
+    """
+    A Gatherer link always yields the GATHERER image — that is the whole
+    point of pasting one. Scryfall is consulted only for the multiverse id
+    (needed to fetch the image) and for naming / Auto-mode metadata; its
+    own image is never used here.
+    """
     if status_callback:
         status_callback("Resolving Gatherer link...")
 
     card = None
-    if "mid" in g:
-        r = _get(f"{SCRYFALL_API}/cards/multiverse/{g['mid']}")
+    mid = g.get("mid")
+    if mid is not None:
+        r = _get(f"{SCRYFALL_API}/cards/multiverse/{mid}")
         if r.status_code == 200:
             card = r.json()
     else:
+        # new-style link (set/lang/number): ask Scryfall for the printing so
+        # we can read its multiverse id, then pull that image from Gatherer
         url = f"{SCRYFALL_API}/cards/{g['set']}/{g['number']}"
         if g["lang"] and g["lang"] != "en":
             url += f"/{g['lang']}"
         r = _get(url)
         if r.status_code == 200:
             card = r.json()
+            mids = card.get("multiverse_ids") or []
+            mid = mids[0] if mids else None
+
+    if mid is None:
+        raise ScryfallError(
+            "Could not find a Gatherer image id for that link "
+            "(the card may not be on Gatherer).")
 
     if card:
-        try:
-            return _download_card(card, status_callback)
-        except ScryfallError:
-            # Scryfall knows the card but has no image -> try Gatherer's
-            mids = card.get("multiverse_ids") or []
-            if "mid" in g:
-                mids = [g["mid"]] + mids
-            if mids:
-                base = f"{_slug(card['name'])}-{card.get('set','')}-{card.get('collector_number','')}"
-                if card.get("lang") and card["lang"] != "en":
-                    base += f"-{card['lang']}"
-                paths = _gatherer_image(mids[0], base, status_callback)
-                return paths, {"released_at": card.get("released_at"),
-                               "set": card.get("set")}
-            raise
+        base = f"{_slug(card['name'])}-{card.get('set','')}-{card.get('collector_number','')}"
+        if card.get("lang") and card["lang"] != "en":
+            base += f"-{card['lang']}"
+        meta = {"released_at": card.get("released_at"), "set": card.get("set")}
+    else:
+        base = f"gatherer-{mid}"
+        meta = {"released_at": None, "set": None}
 
-    # Scryfall doesn't know this printing at all
-    if "mid" in g:
-        paths = _gatherer_image(g["mid"], f"gatherer-{g['mid']}", status_callback)
-        return paths, {"released_at": None, "set": None}
-
-    raise ScryfallError("Card not found on Scryfall for that Gatherer link")
+    return _gatherer_image(mid, base, status_callback), meta
 
 
 def _gatherer_image(mid: int, base: str, status_callback=None) -> list[Path]:

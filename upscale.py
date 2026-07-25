@@ -33,6 +33,10 @@ from config import (
     CARD_WIDTH_PX,
     CARD_HEIGHT_PX,
     FIT_TO_CARD_DEFAULT,
+    MPC_BLEED_RATIO_MIN,
+    MPC_BLEED_RATIO_MAX,
+    MPC_CARD_W_FRAC,
+    MPC_CARD_H_FRAC,
 )
 
 # Prevents the Windows console window from flashing.
@@ -55,12 +59,46 @@ def generate_output_name(file: Path) -> str:
     return f"{fullname}-{setcode}-{number}.png"
 
 
-def _normalize_input(file: Path, status_callback=None) -> Path:
+def _has_mpc_bleed(im) -> bool:
+    """True if the image's proportions match an MPC full-bleed card."""
+    w, h = im.size
+    if h == 0:
+        return False
+    ratio = w / h
+    return MPC_BLEED_RATIO_MIN <= ratio <= MPC_BLEED_RATIO_MAX
+
+
+def _crop_mpc_bleed(im):
+    """Return the centred card area of an MPC full-bleed image."""
+    w, h = im.size
+    cw, ch = w * MPC_CARD_W_FRAC, h * MPC_CARD_H_FRAC
+    x0 = round((w - cw) / 2)
+    y0 = round((h - ch) / 2)
+    return im.crop((x0, y0, round(x0 + cw), round(y0 + ch)))
+
+
+def _normalize_input(file: Path, trim_bleed: bool = False,
+                     status_callback=None) -> Path:
     """
     Real-ESRGAN reads png/jpg/webp. Anything else (or images with odd modes)
-    is converted to a temporary PNG first.
+    is converted to a temporary PNG first. If trim_bleed is set and the image
+    looks like an MPC full-bleed card, its bleed is cropped off first.
     """
-    if file.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+    plain = file.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
+
+    if trim_bleed:
+        im = Image.open(file)
+        if _has_mpc_bleed(im):
+            if status_callback:
+                status_callback("Trimming MPC bleed...")
+            if im.mode not in ("RGB", "RGBA"):
+                im = im.convert("RGBA")
+            out = _crop_mpc_bleed(im)
+            temp = TEMP_FOLDER / (file.stem + "_trim.png")
+            out.save(temp)
+            return temp
+
+    if plain:
         return file
 
     if status_callback:
@@ -92,6 +130,7 @@ def upscale(
     released_at: str | None = None,
     set_code: str | None = None,
     ai: bool = True,
+    trim_bleed: bool = False,
     progress_callback=None,
     status_callback=None,
 ):
@@ -117,7 +156,7 @@ def upscale(
         # No compatible GPU (or engine missing): plain high-quality resize.
         # Still yields a correctly sized 1200 DPI file, just without the AI
         # detail reconstruction.
-        source = _normalize_input(file, status_callback)
+        source = _normalize_input(file, trim_bleed, status_callback)
         out_name = generate_output_name(file) if rename else file.stem + ".png"
         output = OUTPUT_FOLDER / out_name
         if status_callback:
@@ -157,7 +196,7 @@ def upscale(
 
     model_name, scale = MODELS.get(model_label, MODELS[AUTO_SCAN_MODEL])
 
-    source = _normalize_input(file, status_callback)
+    source = _normalize_input(file, trim_bleed, status_callback)
 
     out_name = generate_output_name(file) if rename else file.stem + ".png"
     output = OUTPUT_FOLDER / out_name

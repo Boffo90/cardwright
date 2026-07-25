@@ -27,6 +27,7 @@ from config import (
     OUTPUT_FOLDER,
     SUPPORTED_INPUT,
     FIT_TO_CARD_DEFAULT,
+    MPC_TRIM_DEFAULT,
     PARALLEL_JOBS,
     PDF_PAGE_SIZES,
     PDF_DEFAULT_PAGE,
@@ -370,7 +371,7 @@ class App(_Root):
     def _build_footer(self):
         opts = ctk.CTkFrame(self, fg_color="transparent")
         opts.grid(row=3, column=0, sticky="ew", padx=24, pady=(4, 0))
-        opts.grid_columnconfigure(3, weight=1)
+        opts.grid_columnconfigure(4, weight=1)
 
         ctk.CTkLabel(opts, text="Model:").grid(row=0, column=0, padx=(0, 6))
         self.model_menu = ctk.CTkOptionMenu(
@@ -383,14 +384,19 @@ class App(_Root):
             self.fit_switch.select()
         self.fit_switch.grid(row=0, column=2, padx=8)
 
+        self.trim_switch = ctk.CTkSwitch(opts, text="Trim MPC bleed")
+        if MPC_TRIM_DEFAULT:
+            self.trim_switch.select()
+        self.trim_switch.grid(row=0, column=3, padx=8)
+
         self.pdf_btn = ctk.CTkButton(opts, text="Export PDF…", width=120,
                                      fg_color=BLUE, hover_color=BLUE_HOVER,
                                      command=self._export_pdf)
-        self.pdf_btn.grid(row=0, column=4, padx=2)
+        self.pdf_btn.grid(row=0, column=5, padx=2)
 
         ctk.CTkButton(opts, text="Open output folder", width=140,
                       fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._open_output).grid(row=0, column=5, padx=(2, 0))
+                      command=self._open_output).grid(row=0, column=6, padx=(2, 0))
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.grid(row=4, column=0, sticky="ew", padx=24, pady=(8, 20))
@@ -536,6 +542,7 @@ class App(_Root):
     def _worker(self):
         model = self.model_menu.get()
         fit = bool(self.fit_switch.get())
+        trim = bool(self.trim_switch.get())
         pending = [it for it in self.items if it.status != "done"]
         total = len(pending)
         state = {"done": 0, "errors": 0}
@@ -543,7 +550,7 @@ class App(_Root):
 
         def process(item):
             try:
-                self._process_item(item, model, fit)
+                self._process_item(item, model, fit, trim)
             except Exception as e:
                 with lock:
                     state["errors"] += 1
@@ -559,7 +566,7 @@ class App(_Root):
 
         self.after(0, lambda: self._finish(total, state["errors"]))
 
-    def _process_item(self, item, model, fit):
+    def _process_item(self, item, model, fit, trim):
         self._ui(item.set_status, "processing", "Preparing…", 0)
         item.outputs = []
 
@@ -593,6 +600,7 @@ class App(_Root):
                 released_at=item.released_at,
                 set_code=item.set_code,
                 ai=self.ai_ok,
+                trim_bleed=trim,
                 progress_callback=lambda v, it=item: self._ui(
                     it.set_status, "processing", None, v),
                 status_callback=lambda s, it=item: self._ui(
