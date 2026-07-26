@@ -1097,7 +1097,7 @@ class ExportDialog(ctk.CTkToplevel):
         self.canvas.bind("<Configure>", self._recenter_preview)
         ctk.CTkLabel(right, text="Scroll through every sheet · drag a card to "
                      "reorder · left-click cycles the black border · "
-                     "right-click: remove / delete a card",
+                     "right-click: duplicate / remove / delete a card",
                      text_color=MUTED, font=("Segoe UI", 11)).grid(
             row=2, column=0, columnspan=2, pady=(0, 8))
 
@@ -1840,6 +1840,8 @@ class ExportDialog(ctk.CTkToplevel):
         if not key:
             return
         menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Duplicate",
+                         command=lambda k=key: self._duplicate_card(k))
         menu.add_command(label="Remove from PDF",
                          command=lambda k=key: self._remove_card(k))
         menu.add_command(label="Delete from output folder…",
@@ -1848,6 +1850,31 @@ class ExportDialog(ctk.CTkToplevel):
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
+
+    def _duplicate_card(self, key):
+        """Add another copy of the card right after it. A physical copy
+        ('name (2).png') is made so the copy has its own identity in the
+        preview and its own file for the PDF (same as quantity copies)."""
+        src = next((f for f in self._order if str(f) == key), None)
+        if src is None:
+            return
+        src = Path(src)
+        n = 2
+        while True:
+            dst = src.with_name(f"{src.stem} ({n}){src.suffix}")
+            if not dst.exists() and all(str(f) != str(dst) for f in self._order):
+                break
+            n += 1
+        try:
+            shutil.copy2(src, dst)
+        except OSError as e:
+            messagebox.showerror("Duplicate", str(e), parent=self)
+            return
+        idx = next(i for i, f in enumerate(self._order) if str(f) == key)
+        self._order.insert(idx + 1, dst)
+        self._back_of[dst] = self._back_of.get(src)
+        threading.Thread(target=self._load_thumbs, daemon=True).start()
+        self._draw_preview()
 
     def _remove_card(self, key):
         """Take the card out of the working set entirely (the sheets recompact);

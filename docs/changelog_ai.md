@@ -29,8 +29,9 @@ Registro por versión. Actualizar en cada release.
   output folder or anywhere) straight into a PDF, no queue needed.
 - Sheet selection: a "Sheets" box (e.g. 1 or 1-3,5) prints only those sheets;
   unselected sheets show "(not printed)" in the preview.
-- Direct card management in the export: right-click a card → "Remove from PDF"
-  (file kept) or "Delete from output folder…" (removes the PNG from disk, with
+- Direct card management in the export: right-click a card → "Duplicate"
+  (makes a 'name (2).png' copy right after it), "Remove from PDF" (file kept)
+  or "Delete from output folder…" (removes the PNG from disk, with
   confirmation); plus an "Add cards…" button to append more. Replaces the old
   exclude-with-an-X toggle.
 - Fix: preview no longer caps thumbnails at the first 12 cards — cards on
