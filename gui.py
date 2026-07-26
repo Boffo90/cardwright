@@ -400,7 +400,7 @@ class App(_Root):
                                      command=self._export_pdf)
         self.pdf_btn.grid(row=0, column=5, padx=2)
 
-        ctk.CTkButton(opts, text="PDF from files…", width=130,
+        ctk.CTkButton(opts, text="From files…", width=110,
                       fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
                       command=self._export_pdf_files).grid(row=0, column=6, padx=2)
 

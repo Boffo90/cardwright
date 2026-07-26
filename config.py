@@ -288,6 +288,6 @@ def save_settings(data: dict):
 
 from version import APP_NAME as WINDOW_TITLE  # noqa: E402
 
-WINDOW_WIDTH = 1040
+WINDOW_WIDTH = 1120
 
 WINDOW_HEIGHT = 720
