@@ -798,6 +798,7 @@ LOUPE_PX = 148              # size of the magnifier window, in pixels
 LOUPE_MM = 12               # how much of the card it shows (~6x zoom)
 
 GUIDE_CHOICES = ["White", "Black", "Gray", "None"]
+GUIDE_STYLE_CHOICES = ["Cross", "Corner"]
 BLEED_COLOR_CHOICES = ["Black", "White"]
 
 
@@ -910,6 +911,12 @@ class ExportDialog(ctk.CTkToplevel):
                                s.get("bleed_color", "Black"))
         self.guides = row("Cut guides", GUIDE_CHOICES,
                           s.get("guides", "White"))
+        self.guide_style = row("Guide style", GUIDE_STYLE_CHOICES,
+                               s.get("guide_style", "Cross"))
+        self.guide_len = entry_row("Guide length (mm)", "guide_len", 4.0)
+        self.guide_thick = entry_row("Guide thickness (pt)", "guide_thick", 0.4)
+        self.corner_radius = entry_row("Corner radius (mm)", "corner_radius",
+                                       0.0, "0 = square")
         self.shift_down = entry_row("Shift down (mm)", "shift_down", 0.0,
                                     "late paper feed")
 
@@ -972,6 +979,8 @@ class ExportDialog(ctk.CTkToplevel):
 
         self.back_dx = entry_row("Back offset X (mm)", "back_dx", 0.0)
         self.back_dy = entry_row("Back offset Y (mm)", "back_dy", 0.0)
+        self.back_rot = entry_row("Back rotation (°)", "back_rot", 0.0,
+                                  "corrects angular drift")
         self.back_bleed = entry_row("Back bleed (mm)", "back_bleed", 1.5,
                                     "covers duplex drift")
 
@@ -990,6 +999,11 @@ class ExportDialog(ctk.CTkToplevel):
             fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
             command=self._shadow_test)
         self.shadow_btn.pack(side="left")
+        self.duplex_btn = ctk.CTkButton(
+            tests, text="Duplex align...", width=120,
+            fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+            command=self._duplex_test)
+        self.duplex_btn.pack(side="left", padx=(8, 0))
 
         self.status = ctk.CTkLabel(left, text="", text_color=MUTED,
                                    font=("Segoe UI", 11))
@@ -1095,6 +1109,18 @@ class ExportDialog(ctk.CTkToplevel):
     def _edge_bleed(self):
         return self._float(self.edge_bleed, 0.0, 0.0, 2.0)
 
+    def _back_rot(self):
+        return self._float(self.back_rot, 0.0, -5.0, 5.0)
+
+    def _guide_len(self):
+        return self._float(self.guide_len, 4.0, 0.0, 20.0)
+
+    def _guide_thick(self):
+        return self._float(self.guide_thick, 0.4, 0.1, 3.0)
+
+    def _corner_radius(self):
+        return self._float(self.corner_radius, 0.0, 0.0, 6.0)
+
     def _persist(self):
         dx, dy = self._offsets()
         s = load_settings()
@@ -1112,10 +1138,15 @@ class ExportDialog(ctk.CTkToplevel):
             "backs": self.backs.get(),
             "back_dx": dx,
             "back_dy": dy,
+            "back_rot": self._back_rot(),
             "back_bleed": self._bleed(),
             "edge_bleed": self._edge_bleed(),
             "bleed_color": self.bleed_color.get(),
             "guides": self.guides.get(),
+            "guide_style": self.guide_style.get(),
+            "guide_len": self._guide_len(),
+            "guide_thick": self._guide_thick(),
+            "corner_radius": self._corner_radius(),
             "shift_down": self._shift(),
         })
         save_settings(s)
@@ -1240,6 +1271,16 @@ class ExportDialog(ctk.CTkToplevel):
         sheets = max(1, -(-len(fronts) // per_page))
         self._page = max(0, min(self._page, sheets - 1))
 
+        guide_len = self._guide_len()
+        guide_style = self.guide_style.get()
+        corner_r = self._corner_radius()
+        corner_mask = None
+        if corner_r > 0:
+            r = max(1, int(corner_r * cw / 63))
+            corner_mask = PILImage.new("L", (cw, ch), 0)
+            PILDraw.Draw(corner_mask).rounded_rectangle(
+                [0, 0, cw - 1, ch - 1], radius=r, fill=255)
+
         def render_sheet(page):
             """One sheet as a (W,H) image plus its local card hit-boxes."""
             img = PILImage.new("RGB", (W, H), (255, 255, 255))
@@ -1266,7 +1307,7 @@ class ExportDialog(ctk.CTkToplevel):
                 pool = self._thumbs_b if treated else self._thumbs
                 t = (pool.get(key) or self._thumbs.get(key)) if key else None
                 if t:
-                    img.paste(t.resize((cw, ch)), (X(x), X(y)))
+                    img.paste(t.resize((cw, ch)), (X(x), X(y)), corner_mask)
                     slots.append((X(x), X(y), X(x + 63), X(y + 88), key))
                     if key in self._excluded:
                         ov = PILImage.new("RGBA", (cw, ch), (20, 20, 25, 150))
@@ -1294,12 +1335,21 @@ class ExportDialog(ctk.CTkToplevel):
             for c_ in range(rows):
                 ys.add(top + c_ * (88 + g)); ys.add(top + c_ * (88 + g) + 88)
             if gc:
+                gap = 0.9 if guide_style == "Corner" else 0.0
                 for x in xs:
                     for y in ys:
-                        d.line([X(x), X(max(y - 4, top)),
-                                X(x), X(min(y + 4, top + bh))], fill=gc, width=1)
-                        d.line([X(max(x - 4, left)), X(y),
-                                X(min(x + 4, left + bw)), X(y)], fill=gc, width=1)
+                        d.line([X(x), X(min(y + gap, top + bh)),
+                                X(x), X(min(y + guide_len, top + bh))],
+                               fill=gc, width=1)
+                        d.line([X(x), X(max(y - gap, top)),
+                                X(x), X(max(y - guide_len, top))],
+                               fill=gc, width=1)
+                        d.line([X(min(x + gap, left + bw)), X(y),
+                                X(min(x + guide_len, left + bw)), X(y)],
+                               fill=gc, width=1)
+                        d.line([X(max(x - gap, left)), X(y),
+                                X(max(x - guide_len, left)), X(y)],
+                               fill=gc, width=1)
             for x in xs:
                 d.line([X(x), X(top - 5), X(x), X(top - 1)], fill=(120, 125, 135))
                 d.line([X(x), X(top + bh + 1), X(x), X(top + bh + 5)],
@@ -1631,9 +1681,14 @@ class ExportDialog(ctk.CTkToplevel):
             backs=backs,
             back_offset=self._offsets(),
             back_bleed_mm=self._bleed(),
+            back_rotation_deg=self._back_rot(),
             edge_bleed_mm=self._edge_bleed(),
             bleed_color=self.bleed_color.get(),
             guide_color=self.guides.get(),
+            guide_len_mm=self._guide_len(),
+            guide_thick=self._guide_thick(),
+            guide_style=self.guide_style.get(),
+            corner_radius_mm=self._corner_radius(),
             shift_down_mm=self._shift(),
         )
 
@@ -1761,6 +1816,49 @@ class ExportDialog(ctk.CTkToplevel):
     def _shadow_failed(self, e):
         self.shadow_btn.configure(state="normal", text="Shadow test...")
         messagebox.showerror("Shadow test failed", str(e), parent=self)
+
+    def _duplex_test(self):
+        target = filedialog.asksaveasfilename(
+            parent=self,
+            defaultextension=".pdf",
+            initialdir=OUTPUT_FOLDER,
+            initialfile="duplex-align.pdf",
+            filetypes=[("PDF", "*.pdf")])
+        if not target:
+            return
+        self.duplex_btn.configure(state="disabled", text="Building...")
+        args = dict(
+            page_name=self.page.get(),
+            layout=self.layout.get(),
+            back_offset=self._offsets(),
+            back_rotation_deg=self._back_rot(),
+            edge_bleed_mm=self._edge_bleed(),
+            shift_down_mm=self._shift(),
+        )
+
+        def build():
+            try:
+                print_sheet.build_duplex_test(
+                    target, status_callback=self._set_status, **args)
+                self.after(0, lambda: self._duplex_done(target))
+            except Exception as e:
+                self.after(0, lambda: self._duplex_failed(e))
+
+        threading.Thread(target=build, daemon=True).start()
+
+    def _duplex_done(self, target):
+        self.duplex_btn.configure(state="normal", text="Duplex align...")
+        self._set_status("")
+        messagebox.showinfo(
+            "Duplex alignment test ready",
+            "Print it DOUBLE-SIDED at 100% scale, then hold the page to the "
+            "light. Where the back grid doesn't sit on top of the front grid, "
+            "adjust 'Back offset X/Y' and 'Back rotation' and print again.\n\n"
+            f"{target}", parent=self)
+
+    def _duplex_failed(self, e):
+        self.duplex_btn.configure(state="normal", text="Duplex align...")
+        messagebox.showerror("Duplex test failed", str(e), parent=self)
 
 
 # --------------------------------------------------------------------------

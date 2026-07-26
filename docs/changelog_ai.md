@@ -11,6 +11,15 @@ Registro por versión. Actualizar en cada release.
 - Skip AI upscale when the (trimmed) source is already >= card size — MPC /
   pre-rendered / reprocessed cards no longer balloon to ~16x pixels; just
   fit-to-card + DPI. Faster, and safe even if "Fit to card" is off.
+- Backside rotation (Duplex backs): corrects angular duplex drift by rotating
+  the back page about its centre, instead of only hiding drift with back bleed.
+- Duplex alignment test ("Duplex align..."): 2-page front/back registration
+  grid PDF to dial in back offset + rotation by holding it to the light.
+- Cut-guide detail: Guide style (Cross / Corner crop-marks), length (mm) and
+  thickness (pt). Reflected in the preview.
+- Rounded corners (Corner radius mm): rounds every printed card's corners
+  (transparent, drawn over paper/bleed). Reflected in the preview.
+- Ideas adapted from Malacath-92/Proxy-PDF-Maker.
 
 ## v2.6.0 — full preview, card selection, custom backs
 - Preview de todas las hojas (◀▶), no solo la primera.

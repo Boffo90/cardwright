@@ -17,7 +17,7 @@ Print-time adjustments (masters on disk stay untouched):
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageDraw
 from reportlab import rl_config
 
 # store image streams as raw binary Flate instead of ASCII85 (25% smaller,
@@ -384,14 +384,30 @@ def _apply_border(im, arr, w, h, lum, black,
     return Image.fromarray(arr, "RGB")
 
 
+def _round_corners(im: Image.Image, radius_mm: float) -> Image.Image:
+    """Return an RGBA copy with the card's corners rounded to transparency,
+    so the paper (or bleed frame) shows through when drawn with mask='auto'."""
+    r = int(radius_mm * im.width / 63.0)     # 63 mm = card width
+    if r <= 0:
+        return im.convert("RGBA")
+    im = im.convert("RGBA")
+    mask = Image.new("L", im.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, im.width - 1, im.height - 1], radius=r, fill=255)
+    im.putalpha(mask)
+    return im
+
+
 def _flatten(png_path: Path, jpeg_quality, profile=None, sharpen=None,
              shadow=0, deepen_border=False, border_amount=1.0,
-             border_width=0.0, suffix="_sheet") -> Path:
+             border_width=0.0, corner_radius_mm=0.0, suffix="_sheet") -> Path:
     """
     Flatten transparent rounded corners onto black, apply the print-time
     adjustments, and write the temp file the PDF will embed.
 
     jpeg_quality None -> PNG (Flate, pixel-identical apart from adjustments)
+    corner_radius_mm > 0 rounds the output corners to transparency (forces
+    PNG so the alpha survives; drawn over paper/bleed with mask='auto').
     """
     im = Image.open(png_path).convert("RGBA")
     alpha = im.split()[3]
@@ -409,7 +425,10 @@ def _flatten(png_path: Path, jpeg_quality, profile=None, sharpen=None,
         opaque = np.asarray(alpha) > 250
         bg = _deepen_black_border(bg, opaque, border_amount, border_width)
 
-    if jpeg_quality is None:
+    if corner_radius_mm > 0:
+        out = TEMP_FOLDER / (png_path.stem + suffix + ".png")
+        _round_corners(bg, corner_radius_mm).save(out, "PNG", dpi=(1200, 1200))
+    elif jpeg_quality is None:
         out = TEMP_FOLDER / (png_path.stem + suffix + ".png")
         bg.save(out, "PNG", dpi=(1200, 1200))
     else:
@@ -448,19 +467,29 @@ def _boundaries(origin, size, gutter, count=3):
 
 
 def _draw_marks(c, ox, oy, block_w, block_h, gutter=0.0, guide_rgb=(1, 1, 1),
-                cols=COLS, rows=ROWS):
+                cols=COLS, rows=ROWS, guide_len_mm=4.0, guide_thick=0.4,
+                guide_style="Cross"):
     xs = _boundaries(ox, CARD_W, gutter, cols)
     ys = _boundaries(oy, CARD_H, gutter, rows)
-    tick = 4 * mm
+    tick = guide_len_mm * mm
+    # "Corner" guides leave a gap at the intersection, so the arms sit at the
+    # card corners like crop marks; "Cross" is a solid plus through the corner.
+    gap = 0.9 * mm if guide_style == "Corner" else 0.0
 
-    # short cross ticks at every card corner (over borders / bleed frames)
+    # ticks at every card corner (over borders / bleed frames)
     if guide_rgb is not None:
-        c.setLineWidth(0.4)
+        c.setLineWidth(guide_thick)
         c.setStrokeColorRGB(*guide_rgb)
         for x in xs:
             for y in ys:
-                c.line(x, max(y - tick, oy), x, min(y + tick, oy + block_h))
-                c.line(max(x - tick, ox), y, min(x + tick, ox + block_w), y)
+                # vertical arms (up / down from the corner)
+                c.line(x, min(y + gap, oy + block_h),
+                       x, min(y + tick, oy + block_h))
+                c.line(x, max(y - gap, oy), x, max(y - tick, oy))
+                # horizontal arms (right / left from the corner)
+                c.line(min(x + gap, ox + block_w), y,
+                       min(x + tick, ox + block_w), y)
+                c.line(max(x - gap, ox), y, max(x - tick, ox), y)
 
     # dark tick marks in the margins, aligned to every boundary
     c.setLineWidth(0.4)
@@ -488,8 +517,10 @@ def _card_pos(idx, ox, oy, block_h, gutter=0.0, cols=COLS):
 def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               sharpen_name="Off", profile_id=1, shadow_name="Off",
               pages_per_file=0, backs=None, back_offset=(0.0, 0.0),
-              back_bleed_mm=1.5, shift_down_mm=0.0,
+              back_bleed_mm=1.5, back_rotation_deg=0.0, shift_down_mm=0.0,
               edge_bleed_mm=0.0, bleed_color="Black", guide_color="White",
+              guide_len_mm=4.0, guide_thick=0.4, guide_style="Cross",
+              corner_radius_mm=0.0,
               layout=DEFAULT_LAYOUT, deepen_border=False, border_modes=None,
               border_amount=1.0, border_width=0.0,
               status_callback=None) -> list[Path]:
@@ -508,6 +539,12 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     back_bleed_mm:  backs are drawn oversized by this much on every edge, so
                     duplex drift up to ~that amount never exposes a white
                     sliver when cutting along the FRONT's marks.
+    back_rotation_deg: back pages are rotated by this angle about the page
+                    centre, to correct angular duplex drift (instead of hiding
+                    it with more back bleed). Dial it in with build_duplex_test.
+    guide_len_mm / guide_thick / guide_style: cut-guide length, line width and
+                    "Cross" (solid +) vs "Corner" (gapped crop marks).
+    corner_radius_mm: >0 rounds every card's printed corners.
     edge_bleed_mm:  fronts get a colored bleed frame this wide around each
                     card; cards are separated by a 2x gutter so the cut runs
                     through the frame — small cut drift shows frame color,
@@ -552,6 +589,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     ebleed = edge_bleed_mm * mm
     dx = back_offset[0] * mm
     dy = back_offset[1] * mm
+    img_mask = "auto" if corner_radius_mm > 0 else None
 
     # split the card list into sheets, then sheets into files
     idxs = list(range(len(images)))
@@ -578,7 +616,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         key = (str(img), do_border, width)
         if key not in flat_cache:
             flat_cache[key] = _flatten(img, jpeg_quality, profile, sharpen,
-                                       shadow, do_border, border_amount, width)
+                                       shadow, do_border, border_amount, width,
+                                       corner_radius_mm=corner_radius_mm)
         return flat_cache[key]
 
     placed = 0
@@ -605,13 +644,22 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 if status_callback:
                     status_callback(f"Placing card {placed}/{len(images)}…")
                 x, y = _card_pos(slot, ox, oy, block_h, gutter, cols)
-                c.drawImage(ImageReader(str(flat(images[i]))), x, y, CARD_W, CARD_H)
-            _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb, cols, rows)
+                c.drawImage(ImageReader(str(flat(images[i]))), x, y,
+                            CARD_W, CARD_H, mask=img_mask)
+            _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
+                        cols, rows, guide_len_mm, guide_thick, guide_style)
             c.showPage()
 
             # ---- mirrored back page (duplex, flip on long edge)
             if backs is not None:
                 bleed = back_bleed_mm * mm
+                c.saveState()
+                if back_rotation_deg:
+                    # rotate the whole back layout about the page centre to
+                    # cancel angular duplex drift (marks stay put, drawn after)
+                    c.translate(pw / 2, ph / 2)
+                    c.rotate(back_rotation_deg)
+                    c.translate(-pw / 2, -ph / 2)
                 for slot, i in enumerate(batch):
                     col = slot % cols
                     row = slot // cols
@@ -621,8 +669,11 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     # drift stays covered when cutting along the front
                     c.drawImage(ImageReader(str(flat(backs[i]))),
                                 x + dx - bleed, y + dy - bleed,
-                                CARD_W + 2 * bleed, CARD_H + 2 * bleed)
-                _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb, cols, rows)
+                                CARD_W + 2 * bleed, CARD_H + 2 * bleed,
+                                mask=img_mask)
+                c.restoreState()
+                _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
+                            cols, rows, guide_len_mm, guide_thick, guide_style)
                 c.showPage()
 
         c.save()
@@ -684,6 +735,83 @@ def build_calibration(image_path, out_path, page_name="A4",
         except OSError:
             pass
 
+    return Path(out_path)
+
+
+def build_duplex_test(out_path, page_name="A4", layout=DEFAULT_LAYOUT,
+                      back_offset=(0.0, 0.0), back_rotation_deg=0.0,
+                      edge_bleed_mm=0.0, shift_down_mm=0.0,
+                      status_callback=None) -> Path:
+    """
+    Two-page duplex registration test. Page 1 draws the card grid (outlines +
+    diagonals) for the FRONTS; page 2 draws the same grid for the BACKS with
+    the current back offset and rotation applied (and column-mirrored, exactly
+    like build_pdf). Print double-sided, hold to the light: wherever the front
+    and back grids don't overlap tells you how much offset / rotation to add.
+    """
+    cols, rows, landscape = LAYOUTS.get(layout, LAYOUTS[DEFAULT_LAYOUT])
+    page = PAGES.get(page_name, A4)
+    if landscape:
+        page = (page[1], page[0])
+    pw, ph = page
+    gutter = 2 * edge_bleed_mm * mm
+    block_w = cols * CARD_W + (cols - 1) * gutter
+    block_h = rows * CARD_H + (rows - 1) * gutter
+    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm)
+    dx, dy = back_offset[0] * mm, back_offset[1] * mm
+
+    c = canvas.Canvas(str(out_path), pagesize=page)
+    c.setTitle("ProxyForge duplex alignment test")
+
+    def cell(slot):
+        col, row = slot % cols, slot // cols
+        x = ox + col * (CARD_W + gutter)
+        y = oy + block_h - (row + 1) * CARD_H - row * gutter
+        return x, y
+
+    def grid(mirror):
+        c.setLineWidth(0.5)
+        c.setStrokeColorRGB(0, 0, 0)
+        for slot in range(cols * rows):
+            s = slot
+            if mirror:
+                col, row = slot % cols, slot // cols
+                s = row * cols + (cols - 1 - col)
+            x, y = cell(s)
+            c.rect(x, y, CARD_W, CARD_H, stroke=1, fill=0)
+            c.line(x, y, x + CARD_W, y + CARD_H)
+            c.line(x, y + CARD_H, x + CARD_W, y)
+
+    # page 1: fronts
+    if status_callback:
+        status_callback("Front registration page…")
+    grid(mirror=False)
+    c.setFont("Helvetica", 8)
+    c.setFillColorRGB(0.3, 0.3, 0.3)
+    c.drawCentredString(pw / 2, oy - MARK_LEN - 4 * mm,
+                        "Duplex test FRONT — print double-sided at 100% scale, "
+                        "no printer color correction, then hold to the light.")
+    c.showPage()
+
+    # page 2: backs (column-mirrored + offset + rotation, like build_pdf)
+    if status_callback:
+        status_callback("Back registration page…")
+    c.saveState()
+    if back_rotation_deg:
+        c.translate(pw / 2, ph / 2)
+        c.rotate(back_rotation_deg)
+        c.translate(-pw / 2, -ph / 2)
+    c.translate(dx, dy)
+    grid(mirror=True)
+    c.restoreState()
+    c.setFont("Helvetica", 8)
+    c.setFillColorRGB(0.3, 0.3, 0.3)
+    c.drawCentredString(
+        pw / 2, oy - MARK_LEN - 4 * mm,
+        f"Duplex test BACK — offset {back_offset[0]:+.1f}, {back_offset[1]:+.1f} mm, "
+        f"rotation {back_rotation_deg:+.2f}°. Adjust until it overlaps the front.")
+    c.showPage()
+    c.save()
     return Path(out_path)
 
 
