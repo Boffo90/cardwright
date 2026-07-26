@@ -526,7 +526,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               guide_len_mm=4.0, guide_thick=0.4, guide_style="Cross",
               guide_offset_mm=0.0, corner_radius_mm=0.0,
               layout=DEFAULT_LAYOUT, deepen_border=False, border_modes=None,
-              border_amount=1.0, border_width=0.0,
+              border_amount=1.0, border_width=0.0, sheets_sel=None,
               status_callback=None) -> list[Path]:
     """
     Compose `images` (paths, in order) into one or more print-sheet PDFs.
@@ -598,6 +598,11 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     # split the card list into sheets, then sheets into files
     idxs = list(range(len(images)))
     batches = [idxs[i:i + per_page] for i in range(0, len(idxs), per_page)]
+    if sheets_sel is not None:
+        # keep only the chosen sheets (0-based indices), e.g. "print sheet 1"
+        batches = [b for i, b in enumerate(batches) if i in sheets_sel]
+        if not batches:
+            raise ValueError("The selected sheet range has no sheets")
     if pages_per_file and pages_per_file > 0:
         groups = [batches[i:i + pages_per_file]
                   for i in range(0, len(batches), pages_per_file)]

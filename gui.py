@@ -400,9 +400,13 @@ class App(_Root):
                                      command=self._export_pdf)
         self.pdf_btn.grid(row=0, column=5, padx=2)
 
+        ctk.CTkButton(opts, text="PDF from files…", width=130,
+                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                      command=self._export_pdf_files).grid(row=0, column=6, padx=2)
+
         ctk.CTkButton(opts, text="Open output folder", width=140,
                       fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._open_output).grid(row=0, column=6, padx=(2, 0))
+                      command=self._open_output).grid(row=0, column=7, padx=(2, 0))
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.grid(row=4, column=0, sticky="ew", padx=24, pady=(8, 20))
@@ -542,6 +546,19 @@ class App(_Root):
                                  "No upscaled cards found. Run UPSCALE ALL first.")
             return
         ExportDialog(self, images, source)
+
+    def _export_pdf_files(self):
+        """Pick specific already-upscaled cards (from the output folder or
+        anywhere) and lay just those into a PDF — no queue needed."""
+        if self.running:
+            return
+        files = filedialog.askopenfilenames(
+            title="Choose cards for the PDF",
+            initialdir=OUTPUT_FOLDER,
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
+        if not files:
+            return
+        ExportDialog(self, [Path(f) for f in files], "selected files")
 
     # ================================================================ run
     def _start(self):
@@ -921,6 +938,8 @@ class ExportDialog(ctk.CTkToplevel):
                         s.get("page", PDF_DEFAULT_PAGE))
         self.split = row("File split", list(PAGES_PER_FILE.keys()),
                          s.get("split", PAGES_PER_FILE_DEFAULT))
+        self.sheets_sel = entry_row("Sheets", "sheets_sel", "",
+                                    "blank = all · e.g. 1 or 1-3,5")
         self.edge_bleed = entry_row("Edge bleed (mm)", "edge_bleed", 0.0,
                                     "0 = cards touching")
         self.bleed_color = row("Bleed color", BLEED_COLOR_CHOICES,
@@ -1144,6 +1163,31 @@ class ExportDialog(ctk.CTkToplevel):
 
     def _corner_radius(self):
         return self._float(self.corner_radius, 0.0, 0.0, 6.0)
+
+    def _sheets_sel(self):
+        """Parse the Sheets box ('' / '1' / '1-3' / '1,3,5' / '2-') into a set
+        of 0-based sheet indices, or None for all sheets. Input is 1-based."""
+        txt = self.sheets_sel.get().strip()
+        if not txt:
+            return None
+        out = set()
+        for part in txt.replace(" ", "").split(","):
+            if not part:
+                continue
+            if "-" in part:
+                a, _, b = part.partition("-")
+                try:
+                    lo = int(a) if a else 1
+                    hi = int(b) if b else 9999
+                except ValueError:
+                    continue
+                out.update(n - 1 for n in range(lo, hi + 1))
+            else:
+                try:
+                    out.add(int(part) - 1)
+                except ValueError:
+                    continue
+        return out or None
 
     def _collect_settings(self) -> dict:
         """Every export control as a flat dict — used both to persist the
@@ -1503,16 +1547,21 @@ class ExportDialog(ctk.CTkToplevel):
         self._sheet_geom = (W, H, gap, sheets)
         self._tall_w, self._tall_h = W, total_h
 
+        sel = self._sheets_sel()
         canvas_w = self.canvas.winfo_width()
         self._img_xoff = max(0, (canvas_w - W) // 2)
         self.canvas.delete("all")
         self._sheet_cache = {}
         self._loupe_item = self._drag_item = None
         for p in range(sheets):
+            skipped = sel is not None and p not in sel
+            cap = f"Sheet {p + 1} of {sheets} — {side}"
+            if skipped:
+                cap += "   (not printed)"
             self.canvas.create_text(
                 self._img_xoff + 4, self._sheet_tops[p] - 8, anchor="w",
-                text=f"Sheet {p + 1} of {sheets} — {side}",
-                fill="#969caa", font=("Segoe UI", 8), tags="cap")
+                text=cap, fill="#5c6270" if skipped else "#969caa",
+                font=("Segoe UI", 8), tags="cap")
         self.canvas.configure(scrollregion=(0, 0, max(W, canvas_w), total_h))
         self._render_visible()
 
@@ -1526,6 +1575,8 @@ class ExportDialog(ctk.CTkToplevel):
 
         # export counts use the dropped-excluded list
         exp_sheets = max(1, -(-len(exp_fronts) // per_page)) if exp_fronts else 0
+        if sel is not None:
+            exp_sheets = sum(1 for i in range(exp_sheets) if i in sel)
         exp_pages = exp_sheets * 2 if duplex else exp_sheets
         dropped = len(fronts) - len(exp_fronts)
         drop = f", {dropped} dropped" if dropped else ""
@@ -1825,6 +1876,7 @@ class ExportDialog(ctk.CTkToplevel):
             border_modes=dict(self._border_modes),
             border_amount=self.border_amount.get() / 100.0,
             border_width=self.border_width.get() / 100.0,
+            sheets_sel=self._sheets_sel(),
             pages_per_file=PAGES_PER_FILE.get(self.split.get(), 0),
             backs=backs,
             back_offset=self._offsets(),

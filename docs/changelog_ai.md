@@ -25,6 +25,12 @@ Registro por versión. Actualizar en cada release.
 - Export presets: save/load named configurations (Presets section — Save… /
   Delete) stored in settings.json under `export_presets`.
 - Cut-guide offset (mm): gap between the guide and the card corner.
+- "PDF from files…" button: pick specific already-upscaled cards (from the
+  output folder or anywhere) straight into a PDF, no queue needed.
+- Sheet selection: a "Sheets" box (e.g. 1 or 1-3,5) prints only those sheets;
+  unselected sheets show "(not printed)" in the preview.
+- Fix: preview no longer caps thumbnails at the first 12 cards — cards on
+  sheet 2+ (e.g. Gatherer imports past #12) now render.
 - Ideas adapted from Malacath-92/Proxy-PDF-Maker.
 
 ## v2.6.0 — full preview, card selection, custom backs
