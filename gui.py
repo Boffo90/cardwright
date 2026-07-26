@@ -1098,8 +1098,9 @@ class ExportDialog(ctk.CTkToplevel):
         ctk.CTkLabel(right, text="Scroll through every sheet · drag a card to "
                      "reorder · left-click cycles the black border · "
                      "right-click: duplicate / remove / delete a card",
-                     text_color=MUTED, font=("Segoe UI", 11)).grid(
-            row=2, column=0, columnspan=2, pady=(0, 8))
+                     text_color=MUTED, font=("Segoe UI", 11),
+                     wraplength=self._PREVIEW_BOX[0], justify="center").grid(
+            row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
 
         # ------------------------------------------------ bottom buttons
         btns = ctk.CTkFrame(self, fg_color="transparent")
@@ -1851,13 +1852,10 @@ class ExportDialog(ctk.CTkToplevel):
         finally:
             menu.grab_release()
 
-    def _duplicate_card(self, key):
-        """Add another copy of the card right after it. A physical copy
-        ('name (2).png') is made so the copy has its own identity in the
-        preview and its own file for the PDF (same as quantity copies)."""
-        src = next((f for f in self._order if str(f) == key), None)
-        if src is None:
-            return
+    def _copy_of(self, src):
+        """Make a physical 'name (n).png' copy next to src (a free name) so the
+        copy has its own identity in the preview and its own file for the PDF
+        (same idea as quantity copies). Returns the new Path."""
         src = Path(src)
         n = 2
         while True:
@@ -1865,8 +1863,16 @@ class ExportDialog(ctk.CTkToplevel):
             if not dst.exists() and all(str(f) != str(dst) for f in self._order):
                 break
             n += 1
+        shutil.copy2(src, dst)
+        return dst
+
+    def _duplicate_card(self, key):
+        """Add another copy of the card right after it."""
+        src = next((f for f in self._order if str(f) == key), None)
+        if src is None:
+            return
         try:
-            shutil.copy2(src, dst)
+            dst = self._copy_of(src)
         except OSError as e:
             messagebox.showerror("Duplicate", str(e), parent=self)
             return
@@ -1907,20 +1913,28 @@ class ExportDialog(ctk.CTkToplevel):
         self._remove_card(key)
 
     def _add_cards(self):
-        """Append more already-upscaled cards to the current PDF set."""
+        """Append more already-upscaled cards to the current PDF set. Picking a
+        card that is already in the set adds a duplicate (a physical copy), so
+        'Add cards…' doubles as another way to duplicate."""
         files = filedialog.askopenfilenames(
             parent=self, title="Add cards to the PDF",
             initialdir=OUTPUT_FOLDER,
             filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
+        present = {str(f): f for f in self._order}
         added = False
-        have = {str(f) for f in self._order}
         for f in files:
             p = Path(f)
-            if str(p) in have:
+            try:
+                if str(p) in present:                 # already here -> duplicate
+                    dst = self._copy_of(p)
+                    self._back_of[dst] = self._back_of.get(present[str(p)])
+                    self._order.append(dst)
+                else:
+                    self._order.append(p)
+                    self._back_of.setdefault(p, None)
+            except OSError as e:
+                messagebox.showerror("Add cards", str(e), parent=self)
                 continue
-            self._order.append(p)
-            self._back_of.setdefault(p, None)
-            have.add(str(p))
             added = True
         if added:
             threading.Thread(target=self._load_thumbs, daemon=True).start()

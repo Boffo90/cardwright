@@ -32,8 +32,9 @@ Registro por versión. Actualizar en cada release.
 - Direct card management in the export: right-click a card → "Duplicate"
   (makes a 'name (2).png' copy right after it), "Remove from PDF" (file kept)
   or "Delete from output folder…" (removes the PNG from disk, with
-  confirmation); plus an "Add cards…" button to append more. Replaces the old
-  exclude-with-an-X toggle.
+  confirmation); plus an "Add cards…" button to append more (re-picking a card
+  already in the set adds a duplicate). Replaces the old exclude-with-an-X
+  toggle. The preview help line now wraps instead of clipping.
 - Fix: preview no longer caps thumbnails at the first 12 cards — cards on
   sheet 2+ (e.g. Gatherer imports past #12) now render.
 - Ideas adapted from Malacath-92/Proxy-PDF-Maker.
