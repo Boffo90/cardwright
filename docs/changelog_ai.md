@@ -35,6 +35,8 @@ Registro por versión. Actualizar en cada release.
   confirmation); plus an "Add cards…" button to append more (re-picking a card
   already in the set adds a duplicate). Replaces the old exclude-with-an-X
   toggle. The preview help line now wraps instead of clipping.
+- Loading spinner: cards whose thumbnail is still loading show a small animated
+  spinner instead of a flat grey slot, so it reads as loading, not an error.
 - Fix: preview no longer caps thumbnails at the first 12 cards — cards on
   sheet 2+ (e.g. Gatherer imports past #12) now render.
 - Ideas adapted from Malacath-92/Proxy-PDF-Maker.

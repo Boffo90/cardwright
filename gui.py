@@ -808,6 +808,9 @@ THUMB_SIZE = (200, 279)
 LOUPE_PX = 148              # size of the magnifier window, in pixels
 LOUPE_MM = 12               # how much of the card it shows (~6x zoom)
 
+# frames of the little spinner shown on cards whose thumbnail is still loading
+SPINNER_FRAMES = ["◐", "◓", "◑", "◒"]
+
 GUIDE_CHOICES = ["White", "Black", "Gray", "None"]
 GUIDE_STYLE_CHOICES = ["Cross", "Corner"]
 BLEED_COLOR_CHOICES = ["Black", "White"]
@@ -843,6 +846,10 @@ class ExportDialog(ctk.CTkToplevel):
         self._sheet_geom = None    # (W, H, gap, sheets) of the current layout
         self._sheet_cache = {}     # page -> (PhotoImage, canvas id); lazy
         self._render_sheet = None  # closure that paints one sheet on demand
+        self._loading = True       # thumbnails still coming in
+        self._spin_items = []      # canvas ids of the loading spinners
+        self._spin_job = None      # spinner animation after() id
+        self._spin_frame = 0
         self._tall_w = 0           # sheet width / total stacked height, for
         self._tall_h = 0           #   loupe clamping and scroll math
         self._drag = None          # in-progress card drag
@@ -1327,6 +1334,7 @@ class ExportDialog(ctk.CTkToplevel):
         return fronts, None
 
     def _load_thumbs(self):
+        self._loading = True
         fronts, backs = self._sheet_images()
         wanted = list(fronts) + [b for b in (backs or []) if b]
         for p in wanted:
@@ -1346,6 +1354,7 @@ class ExportDialog(ctk.CTkToplevel):
                 self._thumbs[key] = flat.resize(THUMB_SIZE)
             except (OSError, ValueError):
                 continue
+        self._loading = False
         try:
             self.after(0, self._draw_preview)
         except RuntimeError:
@@ -1589,12 +1598,13 @@ class ExportDialog(ctk.CTkToplevel):
                  f"{exp_sheets} sheet(s), {exp_pages} PDF page(s)")
 
     def destroy(self):
-        if self._prev_job:
-            try:
-                self.after_cancel(self._prev_job)
-            except Exception:
-                pass
-            self._prev_job = None
+        for job in (self._prev_job, self._spin_job):
+            if job:
+                try:
+                    self.after_cancel(job)
+                except Exception:
+                    pass
+        self._prev_job = self._spin_job = None
         super().destroy()
 
     def _on_yscroll(self, first, last):
@@ -1625,6 +1635,47 @@ class ExportDialog(ctk.CTkToplevel):
                                             image=photo, tags="sheet")
             self.canvas.tag_lower(item)          # stay under loupe / ghost
             self._sheet_cache[p] = (photo, item)
+        self._update_spinners(top, bot)
+
+    def _update_spinners(self, top=None, bot=None):
+        """Put an animated spinner on every visible card whose thumbnail is
+        still loading, so a grey slot reads as 'loading', not an error."""
+        self.canvas.delete("spin")
+        self._spin_items = []
+        if self._sheet_geom is None or not self._loading:
+            if self._spin_job:
+                self.after_cancel(self._spin_job)
+                self._spin_job = None
+            return
+        if top is None:
+            top = self.canvas.canvasy(0)
+            bot = top + self.canvas.winfo_height()
+        _, H, _, _ = self._sheet_geom
+        frame = SPINNER_FRAMES[self._spin_frame]
+        for x0, y0, x1, y1, key in self._slots:
+            if key in self._thumbs:          # already loaded -> real image
+                continue
+            if y1 < top - H or y0 > bot + H:
+                continue
+            it = self.canvas.create_text(
+                self._img_xoff + (x0 + x1) // 2, (y0 + y1) // 2,
+                text=frame, fill="#c9cfdb", font=("Segoe UI", 20), tags="spin")
+            self._spin_items.append(it)
+        if self._spin_items and not self._spin_job:
+            self._spin_job = self.after(120, self._animate_spinners)
+
+    def _animate_spinners(self):
+        self._spin_job = None
+        if not self._spin_items or not self.winfo_exists():
+            return
+        self._spin_frame = (self._spin_frame + 1) % len(SPINNER_FRAMES)
+        ch = SPINNER_FRAMES[self._spin_frame]
+        for it in self._spin_items:
+            try:
+                self.canvas.itemconfigure(it, text=ch)
+            except Exception:
+                pass
+        self._spin_job = self.after(120, self._animate_spinners)
 
     def _recenter_preview(self, _event=None):
         """Keep the sheets horizontally centred when the canvas resizes."""
