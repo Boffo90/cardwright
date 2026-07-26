@@ -24,6 +24,11 @@ Settled decisions. Do not re-litigate; add new ones here.
 - `build_duplex_test` is the calibration tool for offset+rotation: page 1 = front grid, page 2 = back grid column-mirrored + offset + rotation (exactly like `build_pdf`), so holding the print to the light shows the real misregistration.
 - Rounded corners use transparency + reportlab `mask='auto'` (forces PNG so alpha survives), so corners show paper/bleed. Not baked onto black. Radius is mm → px via card width (63 mm).
 
+## Export preview performance & presets (v2.7.0)
+- The preview canvas renders **lazily**: `_render_visible` paints only sheets whose rows intersect the viewport (+one sheet of look-ahead), caches each as a PhotoImage, and hooks `yscrollcommand` so scrolling paints new sheets. Treated-border thumbnails (`_treated_thumb`) are built on demand per visible card, not for the whole deck on every slider move. This is what makes 100+ card decks usable.
+- Gotcha (fixed): `render_sheet` is a closure whose layout locals (cw, ch, left, top, X…) are read at *paint* time, which happens after `_draw_preview` returns. Never reuse those names later in `_draw_preview` — a stray `cw = canvas.winfo_width()` clobbered the card-cell width and broke the corner mask. Keep the tail's own locals distinctly named.
+- Export presets: `_collect_settings()` / `_apply_settings()` are the single read/write of every control; `_persist` and the named presets (`settings["export_presets"]`) both go through them. Sliders register a setter in `self._slider_setters` so a preset can update both value and label.
+
 ## Export preview
 - The preview is an editable workspace, not a static image: a scrollable canvas stacks every sheet; the on-screen order IS the PDF order. `self._order` (list of front paths) is the source of truth; drag-and-drop reorders it, `self._back_of` keeps DFC backs paired. Built on a raw `tk.Canvas` (not a CTkLabel) so it can scroll, overlay the loupe, and show a drag ghost.
 

@@ -783,12 +783,6 @@ class ImportDialog(ctk.CTkToplevel):
 # --------------------------------------------------------------------------
 _PAGE_MM = {"Letter": (215.9, 279.4), "A4": (210.0, 297.0)}
 
-
-def _hex_rgb(h):
-    """'#rrggbb' -> (r, g, b) for PIL fills."""
-    h = h.lstrip("#")
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-
 # Cards are kept at WORK_SIZE in memory: big enough for the detector to
 # behave as it will at print resolution and for the loupe to magnify, small
 # enough to redraw the whole sheet instantly.
@@ -816,6 +810,7 @@ class ExportDialog(ctk.CTkToplevel):
         self.after(60, self.grab_set)
         self.configure(fg_color=BG)
 
+        self._slider_setters = {}  # key -> fn(v) that sets slider + its label
         self._thumbs = {}          # path -> raw thumbnail
         self._thumbs_raw = {}      # path -> (working-size flat image, mask)
         self._work_b = {}          # path -> working-size treated image
@@ -826,10 +821,13 @@ class ExportDialog(ctk.CTkToplevel):
         self._page = 0             # sheet the ◀▶ nav is pointing at
         self._excluded = set()     # paths dropped from the export
         self._custom_back = None   # chosen card back for non-DFC cards
-        self._tall = None          # full multi-sheet preview image
-        self._tallphoto = None     # its PhotoImage (kept from GC)
-        self._img_xoff = 0         # x offset of the image inside the canvas
-        self._sheet_tops = []      # y of each sheet inside the tall image
+        self._img_xoff = 0         # x offset of the sheets inside the canvas
+        self._sheet_tops = []      # y of each sheet in canvas coordinates
+        self._sheet_geom = None    # (W, H, gap, sheets) of the current layout
+        self._sheet_cache = {}     # page -> (PhotoImage, canvas id); lazy
+        self._render_sheet = None  # closure that paints one sheet on demand
+        self._tall_w = 0           # sheet width / total stacked height, for
+        self._tall_h = 0           #   loupe clamping and scroll math
         self._drag = None          # in-progress card drag
         self._loupe_item = None    # canvas id of the magnifier overlay
         self._drag_item = None     # canvas id of the dragged thumbnail
@@ -898,6 +896,24 @@ class ExportDialog(ctk.CTkToplevel):
         saved_profile = CALIBRATION_PROFILES.get(s.get("profile", 1),
                                                  CALIBRATION_PROFILES[1])[0]
 
+        section("Presets")
+        prow = ctk.CTkFrame(left, fg_color="transparent")
+        prow.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                  padx=12, pady=4)
+        self._r += 1
+        self.preset_menu = ctk.CTkOptionMenu(
+            prow, values=self._preset_names(), width=180,
+            fg_color=GRAY_BTN, button_color=GRAY_HOVER,
+            command=self._apply_preset)
+        self.preset_menu.set(self._PRESET_NONE)
+        self.preset_menu.pack(side="left")
+        ctk.CTkButton(prow, text="Save…", width=52, height=28,
+                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                      command=self._save_preset).pack(side="left", padx=(6, 2))
+        ctk.CTkButton(prow, text="Delete", width=58, height=28,
+                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                      command=self._delete_preset).pack(side="left")
+
         section("Layout")
         self.layout = row("Card grid", list(print_sheet.LAYOUTS.keys()),
                           s.get("layout", print_sheet.DEFAULT_LAYOUT))
@@ -915,6 +931,8 @@ class ExportDialog(ctk.CTkToplevel):
                                s.get("guide_style", "Cross"))
         self.guide_len = entry_row("Guide length (mm)", "guide_len", 4.0)
         self.guide_thick = entry_row("Guide thickness (pt)", "guide_thick", 0.4)
+        self.guide_offset = entry_row("Guide offset (mm)", "guide_offset", 0.0,
+                                      "gap from the card")
         self.corner_radius = entry_row("Corner radius (mm)", "corner_radius",
                                        0.0, "0 = square")
         self.shift_down = entry_row("Shift down (mm)", "shift_down", 0.0,
@@ -948,6 +966,9 @@ class ExportDialog(ctk.CTkToplevel):
             sl.pack(side="left")
             val.pack(side="left", padx=(6, 0))
             self._r += 1
+            # let presets set the slider AND refresh its numeric label
+            self._slider_setters[key] = lambda v, sl=sl, val=val: (
+                sl.set(v), val.configure(text=fmt.format(v) + unit))
             return sl
 
         self.border_amount = slider_row("Amount", "border_amount",
@@ -1044,7 +1065,7 @@ class ExportDialog(ctk.CTkToplevel):
                          pady=(0, 6))
         self.vbar = ctk.CTkScrollbar(right, command=self.canvas.yview)
         self.vbar.grid(row=1, column=1, sticky="ns", padx=(2, 8), pady=(0, 6))
-        self.canvas.configure(yscrollcommand=self.vbar.set)
+        self.canvas.configure(yscrollcommand=self._on_yscroll)
         self.canvas.bind("<ButtonPress-1>", self._on_press)
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
@@ -1118,13 +1139,17 @@ class ExportDialog(ctk.CTkToplevel):
     def _guide_thick(self):
         return self._float(self.guide_thick, 0.4, 0.1, 3.0)
 
+    def _guide_offset(self):
+        return self._float(self.guide_offset, 0.0, 0.0, 10.0)
+
     def _corner_radius(self):
         return self._float(self.corner_radius, 0.0, 0.0, 6.0)
 
-    def _persist(self):
+    def _collect_settings(self) -> dict:
+        """Every export control as a flat dict — used both to persist the
+        last-used values and to save/load named presets."""
         dx, dy = self._offsets()
-        s = load_settings()
-        s.update({
+        return {
             "layout": self.layout.get(),
             "page": self.page.get(),
             "quality": self.quality.get(),
@@ -1146,10 +1171,88 @@ class ExportDialog(ctk.CTkToplevel):
             "guide_style": self.guide_style.get(),
             "guide_len": self._guide_len(),
             "guide_thick": self._guide_thick(),
+            "guide_offset": self._guide_offset(),
             "corner_radius": self._corner_radius(),
             "shift_down": self._shift(),
-        })
+        }
+
+    def _apply_settings(self, d: dict):
+        """Push a settings dict (a preset) back into every widget."""
+        def om(w, key):
+            if key in d:
+                try:
+                    w.set(d[key])
+                except Exception:
+                    pass
+        om(self.layout, "layout"); om(self.page, "page"); om(self.split, "split")
+        om(self.bleed_color, "bleed_color"); om(self.guides, "guides")
+        om(self.guide_style, "guide_style"); om(self.quality, "quality")
+        om(self.sharpen, "sharpen"); om(self.shadow, "shadow")
+        om(self.border, "border"); om(self.backs, "backs")
+        if "profile" in d:
+            prof = CALIBRATION_PROFILES.get(d["profile"])
+            if prof:
+                self.profile.set(prof[0])
+        for e, key in ((self.edge_bleed, "edge_bleed"),
+                       (self.shift_down, "shift_down"),
+                       (self.guide_len, "guide_len"),
+                       (self.guide_thick, "guide_thick"),
+                       (self.guide_offset, "guide_offset"),
+                       (self.corner_radius, "corner_radius"),
+                       (self.back_dx, "back_dx"), (self.back_dy, "back_dy"),
+                       (self.back_rot, "back_rot"), (self.back_bleed, "back_bleed")):
+            if key in d:
+                e.delete(0, "end"); e.insert(0, str(d[key]))
+        for key in ("border_amount", "border_width"):
+            if key in d and key in self._slider_setters:
+                self._slider_setters[key](float(d[key]))
+        self.back_lbl.configure(text=self._back_label())
+        threading.Thread(target=self._load_thumbs, daemon=True).start()
+        self._draw_preview()
+
+    def _persist(self):
+        s = load_settings()
+        s.update(self._collect_settings())
         save_settings(s)
+
+    # ---------------------------------------------------------- presets
+    _PRESET_NONE = "— presets —"
+
+    def _preset_names(self):
+        presets = load_settings().get("export_presets", {})
+        return [self._PRESET_NONE] + sorted(presets)
+
+    def _apply_preset(self, name):
+        if name == self._PRESET_NONE:
+            return
+        d = load_settings().get("export_presets", {}).get(name)
+        if d:
+            self._apply_settings(d)
+
+    def _save_preset(self):
+        dlg = ctk.CTkInputDialog(text="Preset name:", title="Save export preset")
+        name = (dlg.get_input() or "").strip()
+        if not name:
+            return
+        s = load_settings()
+        presets = s.get("export_presets", {})
+        presets[name] = self._collect_settings()
+        s["export_presets"] = presets
+        save_settings(s)
+        self.preset_menu.configure(values=self._preset_names())
+        self.preset_menu.set(name)
+
+    def _delete_preset(self):
+        name = self.preset_menu.get()
+        if name == self._PRESET_NONE:
+            return
+        s = load_settings()
+        presets = s.get("export_presets", {})
+        if presets.pop(name, None) is not None:
+            s["export_presets"] = presets
+            save_settings(s)
+        self.preset_menu.configure(values=self._preset_names())
+        self.preset_menu.set(self._PRESET_NONE)
 
     def _set_status(self, text):
         self.after(0, lambda: self.status.configure(text=text))
@@ -1193,7 +1296,6 @@ class ExportDialog(ctk.CTkToplevel):
                 opaque = np.asarray(mid.split()[3]) > 250
                 self._thumbs_raw[key] = (flat, opaque)
                 self._thumbs[key] = flat.resize(THUMB_SIZE)
-                self._thumbs_b[key] = self._treated_thumb(key)
             except (OSError, ValueError):
                 continue
         try:
@@ -1202,7 +1304,10 @@ class ExportDialog(ctk.CTkToplevel):
             pass
 
     def _treated_thumb(self, key):
-        """Working-size treated copy (cached for the loupe) plus its thumb."""
+        """Working-size treated copy (cached for the loupe) plus its thumb.
+        Built on demand — only for cards actually painted on a visible sheet."""
+        if key in self._thumbs_b:
+            return self._thumbs_b[key]
         pair = self._thumbs_raw.get(key)
         if not pair:
             return None
@@ -1211,7 +1316,9 @@ class ExportDialog(ctk.CTkToplevel):
             flat, opaque, amount=self.border_amount.get() / 100.0,
             manual_width=0.0)
         self._work_b[key] = work
-        return work.resize(THUMB_SIZE)
+        thumb = work.resize(THUMB_SIZE)
+        self._thumbs_b[key] = thumb
+        return thumb
 
     def _refresh_preview(self, *_):
         if self._prev_job:
@@ -1219,11 +1326,10 @@ class ExportDialog(ctk.CTkToplevel):
                 self.after_cancel(self._prev_job)
             except Exception:
                 pass
-        # sliders change the treated look; duplex changes which files matter
-        for k in list(self._thumbs_raw):
-            t = self._treated_thumb(k)
-            if t is not None:
-                self._thumbs_b[k] = t
+        # sliders change the treated look: drop the cached treated copies so
+        # only the sheets actually on screen pay to rebuild them (lazy).
+        self._thumbs_b.clear()
+        self._work_b.clear()
         threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._prev_job = self.after(200, self._draw_preview)
 
@@ -1273,6 +1379,7 @@ class ExportDialog(ctk.CTkToplevel):
 
         guide_len = self._guide_len()
         guide_style = self.guide_style.get()
+        guide_offset = self._guide_offset()
         corner_r = self._corner_radius()
         corner_mask = None
         if corner_r > 0:
@@ -1304,8 +1411,11 @@ class ExportDialog(ctk.CTkToplevel):
                 key = str(item) if item else None
                 mode = self._border_modes.get(key, "auto")
                 treated = mode == "on" or (mode == "auto" and border_on)
-                pool = self._thumbs_b if treated else self._thumbs
-                t = (pool.get(key) or self._thumbs.get(key)) if key else None
+                if key:
+                    t = self._treated_thumb(key) if treated else None
+                    t = t or self._thumbs.get(key)
+                else:
+                    t = None
                 if t:
                     img.paste(t.resize((cw, ch)), (X(x), X(y)), corner_mask)
                     slots.append((X(x), X(y), X(x + 63), X(y + 88), key))
@@ -1335,7 +1445,10 @@ class ExportDialog(ctk.CTkToplevel):
             for c_ in range(rows):
                 ys.add(top + c_ * (88 + g)); ys.add(top + c_ * (88 + g) + 88)
             if gc:
-                gap = 0.9 if guide_style == "Corner" else 0.0
+                if guide_offset > 0:
+                    gap = guide_offset
+                else:
+                    gap = 0.9 if guide_style == "Corner" else 0.0
                 for x in xs:
                     for y in ys:
                         d.line([X(x), X(min(y + gap, top + bh)),
@@ -1361,27 +1474,47 @@ class ExportDialog(ctk.CTkToplevel):
             d.rectangle([0, 0, W - 1, H - 1], outline=(185, 190, 200))
             return img, slots
 
-        # stack every sheet into one tall image the canvas scrolls through
+        # Lazy multi-sheet canvas: only sheets near the viewport are painted
+        # (see _render_visible). Hit-boxes for every card are cheap, so they
+        # are all computed here for drag / loupe / right-click.
         gap = self._SHEET_GAP
-        tall_h = sheets * H + (sheets + 1) * gap
-        tall = PILImage.new("RGB", (W, tall_h), _hex_rgb(PANEL))
-        td = PILDraw.Draw(tall)
-        self._slots = []
-        self._sheet_tops = []
+        total_h = sheets * H + (sheets + 1) * gap
         side = "backs, mirrored" if showing_backs else "fronts"
-        y = gap
-        for p in range(sheets):
-            si, slots = render_sheet(p)
-            tall.paste(si, (0, y))
-            for (x0, y0, x1, y1, key) in slots:
-                self._slots.append((x0, y0 + y, x1, y1 + y, key))
-            self._sheet_tops.append(y)
-            td.text((4, y - 15), f"Sheet {p + 1} of {sheets} — {side}",
-                    fill=(150, 156, 170))
-            y += H + gap
+        self._sheet_tops = [gap + p * (H + gap) for p in range(sheets)]
 
-        self._tall = tall
-        self._blit_tall()
+        self._slots = []
+        for p in range(sheets):
+            st = self._sheet_tops[p]
+            for idx in range(per_page):
+                col, rw = idx % cols, idx // cols
+                local = rw * cols + (cols - 1 - col) if showing_backs else idx
+                slot = p * per_page + local
+                if slot >= len(page_items):
+                    continue
+                item = page_items[slot]
+                if not item:
+                    continue
+                x = left + col * (63 + g)
+                y = top + rw * (88 + g)
+                self._slots.append((X(x), st + X(y),
+                                    X(x + 63), st + X(y + 88), str(item)))
+
+        self._render_sheet = lambda p: render_sheet(p)[0]
+        self._sheet_geom = (W, H, gap, sheets)
+        self._tall_w, self._tall_h = W, total_h
+
+        canvas_w = self.canvas.winfo_width()
+        self._img_xoff = max(0, (canvas_w - W) // 2)
+        self.canvas.delete("all")
+        self._sheet_cache = {}
+        self._loupe_item = self._drag_item = None
+        for p in range(sheets):
+            self.canvas.create_text(
+                self._img_xoff + 4, self._sheet_tops[p] - 8, anchor="w",
+                text=f"Sheet {p + 1} of {sheets} — {side}",
+                fill="#969caa", font=("Segoe UI", 8), tags="cap")
+        self.canvas.configure(scrollregion=(0, 0, max(W, canvas_w), total_h))
+        self._render_visible()
 
         pages = sheets * 2 if duplex else sheets      # PDF pages
         self.preview_title.configure(
@@ -1409,36 +1542,51 @@ class ExportDialog(ctk.CTkToplevel):
             self._prev_job = None
         super().destroy()
 
-    def _blit_tall(self):
-        """Put the stacked-sheets image on the canvas, keeping scroll position."""
-        if self._tall is None or not self.winfo_exists():
+    def _on_yscroll(self, first, last):
+        """Canvas view changed (drag, wheel, programmatic): keep the scrollbar
+        in sync and paint any sheet that just scrolled into view."""
+        self.vbar.set(first, last)
+        self._render_visible()
+
+    def _render_visible(self):
+        """Paint only the sheets whose rows intersect the viewport (+margin).
+        Each rendered sheet is cached, so scrolling back is instant and a
+        100-card deck never rebuilds every sheet on a slider tweak."""
+        if self._sheet_geom is None or not self.winfo_exists():
             return
-        frac = self.canvas.yview()[0]
-        self._tallphoto = PILImageTk.PhotoImage(self._tall)
-        self.canvas.delete("all")
-        self._loupe_item = self._drag_item = None
-        cw = self.canvas.winfo_width()
-        tw, th = self._tall.size
-        self._img_xoff = max(0, (cw - tw) // 2)
-        self.canvas.create_image(self._img_xoff, 0, anchor="nw",
-                                 image=self._tallphoto, tags="sheet")
-        self.canvas.configure(scrollregion=(0, 0, max(tw, cw), th))
-        self.canvas.yview_moveto(frac)
+        W, H, gap, sheets = self._sheet_geom
+        top = self.canvas.canvasy(0)
+        bot = top + self.canvas.winfo_height()
+        margin = H  # one sheet of look-ahead in each direction
+        for p in range(sheets):
+            sy = self._sheet_tops[p]
+            if sy + H < top - margin or sy > bot + margin:
+                continue
+            if p in self._sheet_cache:
+                continue
+            img = self._render_sheet(p)
+            photo = PILImageTk.PhotoImage(img)
+            item = self.canvas.create_image(self._img_xoff, sy, anchor="nw",
+                                            image=photo, tags="sheet")
+            self.canvas.tag_lower(item)          # stay under loupe / ghost
+            self._sheet_cache[p] = (photo, item)
 
     def _recenter_preview(self, _event=None):
         """Keep the sheets horizontally centred when the canvas resizes."""
-        if self._tall is None:
+        if self._sheet_geom is None:
             return
+        W, H, gap, sheets = self._sheet_geom
         cw = self.canvas.winfo_width()
-        tw, th = self._tall.size
-        xoff = max(0, (cw - tw) // 2)
+        xoff = max(0, (cw - W) // 2)
         if xoff != self._img_xoff:
             self.canvas.move("sheet", xoff - self._img_xoff, 0)
+            self.canvas.move("cap", xoff - self._img_xoff, 0)
             self._img_xoff = xoff
-        self.canvas.configure(scrollregion=(0, 0, max(tw, cw), th))
+        self.canvas.configure(scrollregion=(0, 0, max(W, cw), self._tall_h))
+        self._render_visible()
 
     def _event_xy(self, event):
-        """Cursor position in tall-image coordinates (scroll- and centre-aware)."""
+        """Cursor position in sheet coordinates (scroll- and centre-aware)."""
         return (self.canvas.canvasx(event.x) - self._img_xoff,
                 self.canvas.canvasy(event.y))
 
@@ -1478,8 +1626,8 @@ class ExportDialog(ctk.CTkToplevel):
                     LOUPE_PX // 2], fill=(212, 160, 23))
             d.line([LOUPE_PX // 2, LOUPE_PX // 2 - 6, LOUPE_PX // 2,
                     LOUPE_PX // 2 + 6], fill=(212, 160, 23))
-            # place it clear of the cursor, kept inside the tall image
-            W, H = self._tall.size
+            # place it clear of the cursor, kept inside the stacked sheets
+            W, H = self._tall_w, self._tall_h
             lx = px + 18 if px < W // 2 else px - LOUPE_PX - 18
             ly = py + 18
             lx = min(max(lx, 0), W - LOUPE_PX)
@@ -1550,11 +1698,11 @@ class ExportDialog(ctk.CTkToplevel):
 
     def _flip_page(self, delta):
         """Scroll the canvas so the previous/next sheet lands at the top."""
-        if not self._sheet_tops or self._tall is None:
+        if not self._sheet_tops or not self._tall_h:
             return
         self._page = max(0, min(self._page + delta, len(self._sheet_tops) - 1))
         y = self._sheet_tops[self._page] - self._SHEET_GAP
-        self.canvas.yview_moveto(max(0, y) / max(1, self._tall.size[1]))
+        self.canvas.yview_moveto(max(0, y) / max(1, self._tall_h))
         self._update_nav(len(self._sheet_tops))
 
     # ---------------------------------------------------- drag to reorder
@@ -1688,6 +1836,7 @@ class ExportDialog(ctk.CTkToplevel):
             guide_len_mm=self._guide_len(),
             guide_thick=self._guide_thick(),
             guide_style=self.guide_style.get(),
+            guide_offset_mm=self._guide_offset(),
             corner_radius_mm=self._corner_radius(),
             shift_down_mm=self._shift(),
         )

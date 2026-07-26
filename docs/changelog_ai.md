@@ -19,6 +19,12 @@ Registro por versión. Actualizar en cada release.
   thickness (pt). Reflected in the preview.
 - Rounded corners (Corner radius mm): rounds every printed card's corners
   (transparent, drawn over paper/bleed). Reflected in the preview.
+- Faster preview for big decks: sheets render lazily (only those near the
+  viewport, cached) and treated-border thumbs rebuild only for visible cards,
+  so slider tweaks no longer re-process the whole deck.
+- Export presets: save/load named configurations (Presets section — Save… /
+  Delete) stored in settings.json under `export_presets`.
+- Cut-guide offset (mm): gap between the guide and the card corner.
 - Ideas adapted from Malacath-92/Proxy-PDF-Maker.
 
 ## v2.6.0 — full preview, card selection, custom backs

@@ -468,13 +468,17 @@ def _boundaries(origin, size, gutter, count=3):
 
 def _draw_marks(c, ox, oy, block_w, block_h, gutter=0.0, guide_rgb=(1, 1, 1),
                 cols=COLS, rows=ROWS, guide_len_mm=4.0, guide_thick=0.4,
-                guide_style="Cross"):
+                guide_style="Cross", guide_offset_mm=0.0):
     xs = _boundaries(ox, CARD_W, gutter, cols)
     ys = _boundaries(oy, CARD_H, gutter, rows)
     tick = guide_len_mm * mm
-    # "Corner" guides leave a gap at the intersection, so the arms sit at the
-    # card corners like crop marks; "Cross" is a solid plus through the corner.
-    gap = 0.9 * mm if guide_style == "Corner" else 0.0
+    # The gap between the corner and where each arm starts. "Corner" guides
+    # default to a small gap (crop-mark look); an explicit offset overrides it
+    # for either style. "Cross" with no offset is a solid plus.
+    if guide_offset_mm > 0:
+        gap = guide_offset_mm * mm
+    else:
+        gap = 0.9 * mm if guide_style == "Corner" else 0.0
 
     # ticks at every card corner (over borders / bleed frames)
     if guide_rgb is not None:
@@ -520,7 +524,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               back_bleed_mm=1.5, back_rotation_deg=0.0, shift_down_mm=0.0,
               edge_bleed_mm=0.0, bleed_color="Black", guide_color="White",
               guide_len_mm=4.0, guide_thick=0.4, guide_style="Cross",
-              corner_radius_mm=0.0,
+              guide_offset_mm=0.0, corner_radius_mm=0.0,
               layout=DEFAULT_LAYOUT, deepen_border=False, border_modes=None,
               border_amount=1.0, border_width=0.0,
               status_callback=None) -> list[Path]:
@@ -647,7 +651,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 c.drawImage(ImageReader(str(flat(images[i]))), x, y,
                             CARD_W, CARD_H, mask=img_mask)
             _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
-                        cols, rows, guide_len_mm, guide_thick, guide_style)
+                        cols, rows, guide_len_mm, guide_thick, guide_style,
+                        guide_offset_mm)
             c.showPage()
 
             # ---- mirrored back page (duplex, flip on long edge)
@@ -673,7 +678,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                                 mask=img_mask)
                 c.restoreState()
                 _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
-                            cols, rows, guide_len_mm, guide_thick, guide_style)
+                            cols, rows, guide_len_mm, guide_thick, guide_style,
+                            guide_offset_mm)
                 c.showPage()
 
         c.save()

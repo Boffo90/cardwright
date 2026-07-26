@@ -13,4 +13,9 @@
 ## Backlog (interactive preview, later phases)
 - Drag whole sheets to reorder them (only cards reorder today).
 - Add cards from the preview — needs the upscaling pipeline inside ExportDialog (cross-module; deferred).
-- Big decks: the preview loads every card's working image + renders all sheets each redraw; consider lazy/visible-only rendering if it lags.
+- Preview still loads every card's working image up front (raw thumbs); only the treated copies and sheet painting are lazy now. Fully lazy thumb loading could help 300+ card decks.
+
+## Reference project (Malacath-92/Proxy-PDF-Maker) — not adopted
+- Manual bleed override ("Assume no/full bleed") when MPC auto-detect misfires — worth doing if reported.
+- Custom card size / other TCGs (Lorcana, FaB) — big scope, changes MTG identity.
+- Margin modes, mixed card orientation, base-PDF registration — low value for our fixed grid.
