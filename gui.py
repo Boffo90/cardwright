@@ -875,6 +875,11 @@ class ExportDialog(ctk.CTkToplevel):
         self.summary = ctk.CTkLabel(self, text="", text_color=MUTED,
                                     font=("Segoe UI", 12))
         self.summary.grid(row=0, column=1, sticky="w", padx=8, pady=(20, 2))
+        # progress/status, kept at the top so it stays visible while the left
+        # panel is scrolled
+        self.status = ctk.CTkLabel(self, text="", text_color=GOLD,
+                                   font=("Segoe UI", 12, "bold"))
+        self.status.grid(row=0, column=1, sticky="e", padx=(8, 20), pady=(20, 2))
 
         # ------------------------------------------------ left: controls
         left = ctk.CTkScrollableFrame(self, width=430, fg_color=PANEL,
@@ -1051,12 +1056,6 @@ class ExportDialog(ctk.CTkToplevel):
             fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
             command=self._duplex_test)
         self.duplex_btn.pack(side="left", padx=(8, 0))
-
-        self.status = ctk.CTkLabel(left, text="", text_color=MUTED,
-                                   font=("Segoe UI", 11))
-        self.status.grid(row=self._r, column=0, columnspan=2, sticky="w",
-                         padx=12, pady=(6, 8))
-        self._r += 1
 
         # ------------------------------------------------ right: preview
         right = ctk.CTkFrame(self, fg_color=PANEL, corner_radius=12)
