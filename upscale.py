@@ -2,8 +2,8 @@
 Upscale pipeline.
 
     input image (any format)
-        -> normalize to PNG if needed
-        -> Real-ESRGAN x4 (ncnn / vulkan)
+        -> normalize to PNG if needed (+ optional MPC bleed trim)
+        -> Real-ESRGAN x4 (ncnn / vulkan)   [skipped if already >= card size]
         -> resize to exact MTG card size (optional)
         -> embed 1200 DPI metadata
         -> output PNG
@@ -200,6 +200,27 @@ def upscale(
 
     out_name = generate_output_name(file) if rename else file.stem + ".png"
     output = OUTPUT_FOLDER / out_name
+
+    # Skip the AI when the (trimmed) source already has at least card
+    # resolution. MPC art, pre-rendered high-res and previously-processed
+    # cards gain nothing from x4 — it would only balloon them to ~16x the
+    # pixels (slow preview, heavy PDFs). Just fit to card (if asked) + DPI.
+    with Image.open(source) as probe:
+        w, h = probe.size
+    if w >= CARD_WIDTH_PX and h >= CARD_HEIGHT_PX:
+        if status_callback:
+            status_callback("Already high-res — skipping AI upscale")
+        im = Image.open(source)
+        if im.mode not in ("RGB", "RGBA"):
+            im = im.convert("RGBA")
+        if fit_to_card and im.size != (CARD_WIDTH_PX, CARD_HEIGHT_PX):
+            im = im.resize((CARD_WIDTH_PX, CARD_HEIGHT_PX), Image.LANCZOS)
+        im.save(output, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
+        if progress_callback:
+            progress_callback(1.0)
+        if status_callback:
+            status_callback("Done (no AI needed)")
+        return output
 
     cmd = [
         str(REALESRGAN_EXE),

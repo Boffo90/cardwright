@@ -8,6 +8,9 @@ Registro por versión. Actualizar en cada release.
 - Left-click still cycles the black border; right-click still drops a card.
 - Fix: lifted Pillow's `MAX_IMAGE_PIXELS` cap (config.py) — huge MPC images
   (~190M px) no longer fail with "decompression bomb"; they now reach export.
+- Skip AI upscale when the (trimmed) source is already >= card size — MPC /
+  pre-rendered / reprocessed cards no longer balloon to ~16x pixels; just
+  fit-to-card + DPI. Faster, and safe even if "Fit to card" is off.
 
 ## v2.6.0 — full preview, card selection, custom backs
 - Preview de todas las hojas (◀▶), no solo la primera.
