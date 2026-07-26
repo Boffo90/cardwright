@@ -3,11 +3,10 @@
 ## Pending / possible issues
 - MPC search depends on mpcfill.com API + Google Drive (fragile if they change).
 - Foreign cards Scryfall doesn't know: no multiverse id → can't download from Gatherer.
-- Card exclusion: PDF recompacts (no gaps); preview shows original position with an X.
+- Removing/duplicating a card recompacts the sheets (no gaps) — inherent to not wasting paper.
 - Code signing pending (Azure Trusted Signing ~US$10/mo) → SmartScreen warns "unknown publisher".
 
 ## Next steps
-- Publish release v2.7.0 (upload ProxyForge.exe FIRST, then installer/ProxyForge_Setup-2.7.0.exe; tag v2.7.0).
 - r/mtgproxies promotion when the user wants.
 
 ## Backlog (interactive preview, later phases)
