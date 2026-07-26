@@ -1097,7 +1097,7 @@ class ExportDialog(ctk.CTkToplevel):
         self.canvas.bind("<Configure>", self._recenter_preview)
         ctk.CTkLabel(right, text="Scroll through every sheet · drag a card to "
                      "reorder · left-click cycles the black border · "
-                     "right-click drops a card",
+                     "right-click: remove / delete a card",
                      text_color=MUTED, font=("Segoe UI", 11)).grid(
             row=2, column=0, columnspan=2, pady=(0, 8))
 
@@ -1107,6 +1107,9 @@ class ExportDialog(ctk.CTkToplevel):
                   padx=20, pady=(0, 14))
         ctk.CTkButton(btns, text="Cancel", width=90, fg_color=GRAY_BTN,
                       hover_color=GRAY_HOVER, command=self.destroy).pack(
+            side="left", padx=6)
+        ctk.CTkButton(btns, text="Add cards…", width=110, fg_color=GRAY_BTN,
+                      hover_color=GRAY_HOVER, command=self._add_cards).pack(
             side="left", padx=6)
         self.export_btn = ctk.CTkButton(btns, text="Export", width=130,
                                         fg_color=GOLD, hover_color=GOLD_HOVER,
@@ -1831,17 +1834,70 @@ class ExportDialog(ctk.CTkToplevel):
         self._draw_preview()
 
     def _preview_rclick(self, event):
-        """Drop / restore the card under the cursor from the export."""
+        """Right-click a card: remove it from the PDF, or delete its file."""
         cx, cy = self._event_xy(event)
         key = self._key_at(cx, cy)
         if not key:
             return
-        if key in self._excluded:
-            self._excluded.discard(key)
-        else:
-            self._excluded.add(key)
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Remove from PDF",
+                         command=lambda k=key: self._remove_card(k))
+        menu.add_command(label="Delete from output folder…",
+                         command=lambda k=key: self._delete_card_file(k))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _remove_card(self, key):
+        """Take the card out of the working set entirely (the sheets recompact);
+        the file on disk is untouched. Add it back later with 'Add cards…'."""
+        self._order = [f for f in self._order if str(f) != key]
+        self._excluded.discard(key)
         threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._draw_preview()
+
+    def _delete_card_file(self, key):
+        """Permanently delete the card's PNG (and its DFC back, if any) from the
+        output folder, then drop it from the PDF. Asks first."""
+        front = next((f for f in self._order if str(f) == key), None)
+        if front is None:
+            return
+        files = [Path(key)]
+        back = self._back_of.get(front)
+        if back:
+            files.append(Path(back))
+        names = "\n".join(f.name for f in files)
+        if not messagebox.askyesno(
+                "Delete from output folder",
+                f"Permanently delete from disk?\n\n{names}", parent=self):
+            return
+        for f in files:
+            try:
+                f.unlink()
+            except OSError:
+                pass
+        self._remove_card(key)
+
+    def _add_cards(self):
+        """Append more already-upscaled cards to the current PDF set."""
+        files = filedialog.askopenfilenames(
+            parent=self, title="Add cards to the PDF",
+            initialdir=OUTPUT_FOLDER,
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
+        added = False
+        have = {str(f) for f in self._order}
+        for f in files:
+            p = Path(f)
+            if str(p) in have:
+                continue
+            self._order.append(p)
+            self._back_of.setdefault(p, None)
+            have.add(str(p))
+            added = True
+        if added:
+            threading.Thread(target=self._load_thumbs, daemon=True).start()
+            self._draw_preview()
 
     # ------------------------------------------------------------- actions
     def _export(self):
