@@ -24,6 +24,9 @@ When a lookup is a bare card name, pick the printing with the best image rather 
 - **Restrict to the same `illustration_id`.** Without it, English "Silence" jumps to a Secret Lair by a different artist — an art swap, not a quality upgrade. If no printing in the target language shares the art, the restriction is dropped rather than failing.
 - Shortlist capped (`_BEST_SCAN_CANDIDATES`) so cards with dozens of printings (basic lands) stay to a handful of HEADs.
 
+## Footer options layout
+The options panel keeps each row in its **own frame**. Tk's grid shares column widths across rows, so a wide label in one row silently widens the row above it: adding the Card language row directly to the shared grid pushed the panel from 903 px to 1027 against a 900 px minimum window — reintroducing exactly the clipping v2.12.0 fixed. Measure `winfo_reqwidth()` of the options frame after touching this area; it should stay under 900. Long help text goes on its own row with `wraplength` rebound on `<Configure>`, never inline beside controls.
+
 ## Licensing
 **Source-available** (not MIT): code visible, redistribution/selling/rebranding forbidden.
 

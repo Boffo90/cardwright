@@ -483,11 +483,20 @@ class App(_Root):
         # Second row: row 0 is already at the width budget for the 900 px
         # minimum window, and squeezing a sixth control in there brings back
         # the clipping v2.12.0 fixed.
-        ctk.CTkLabel(opts, text="Card language", font=(UI, theme.TYPE["small"]),
+        #
+        # It lives in its own frame because grid shares column widths across
+        # rows — dropping these straight into `opts` widened columns 0 and 2
+        # and pushed the row above from 903 px to 1027, which is precisely
+        # the clipping this placement was meant to avoid.
+        langrow = ctk.CTkFrame(opts, fg_color="transparent")
+        langrow.grid(row=1, column=0, columnspan=7, sticky="w",
+                     padx=(pad["lg"], 0))
+
+        ctk.CTkLabel(langrow, text="Card language", font=(UI, theme.TYPE["small"]),
                      text_color=TEXT_DIM).grid(
-            row=1, column=0, padx=(pad["lg"], pad["xs"]), pady=(0, pad["md"]))
+            row=0, column=0, padx=(0, pad["xs"]), pady=(0, pad["md"]))
         self.card_lang_menu = ctk.CTkOptionMenu(
-            opts, values=list(CARD_LANGS.keys()), width=186,
+            langrow, values=list(CARD_LANGS.keys()), width=186,
             height=theme.H_INPUT, font=(UI, theme.TYPE["body"]),
             corner_radius=theme.RADIUS_SM,
             fg_color=ROW, button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
@@ -496,23 +505,33 @@ class App(_Root):
             command=self._persist_card_lang)
         self.card_lang_menu.set(
             load_settings().get("card_lang", CARD_LANG_DEFAULT))
-        self.card_lang_menu.grid(row=1, column=1, sticky="w",
+        self.card_lang_menu.grid(row=0, column=1, sticky="w",
                                  pady=(0, pad["md"]))
 
-        self.best_scan_switch = _switch(opts, "Best scan")
+        self.best_scan_switch = _switch(langrow, "Best scan")
         if load_settings().get("best_scan", BEST_SCAN_DEFAULT):
             self.best_scan_switch.select()
         self.best_scan_switch.configure(command=self._persist_best_scan)
-        self.best_scan_switch.grid(row=1, column=2, padx=(pad["md"], 0),
+        self.best_scan_switch.grid(row=0, column=2, padx=(pad["md"], 0),
                                    pady=(0, pad["md"]))
 
-        ctk.CTkLabel(
+        # Its own row, wrapped: the line is too long to sit beside the
+        # controls without being clipped at the 900 px minimum width.
+        self.card_hint = ctk.CTkLabel(
             opts, text="Language applies to card names and decklists; cards "
                        "with no printing in it stay English. Best scan "
-                       "compares printings of a searched name.",
-            font=(UI, theme.TYPE["small"]), text_color=MUTED).grid(
-            row=1, column=3, columnspan=3, sticky="w",
-            padx=(pad["sm"], 0), pady=(0, pad["md"]))
+                       "compares printings of a searched name and takes the "
+                       "sharpest one, keeping the same artwork.",
+            font=(UI, theme.TYPE["small"]), text_color=MUTED,
+            justify="left", anchor="w", wraplength=760)
+        self.card_hint.grid(row=2, column=0, columnspan=7, sticky="ew",
+                            padx=(pad["lg"], pad["lg"]), pady=(0, pad["md"]))
+
+        # Re-wrap with the window instead of pinning one width.
+        opts.bind(
+            "<Configure>",
+            lambda e: self.card_hint.configure(
+                wraplength=max(400, e.width - 2 * pad["lg"])))
 
         # Row 2 — actions
         footer = ctk.CTkFrame(self, fg_color="transparent")
