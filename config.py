@@ -131,7 +131,7 @@ SCRYFALL_API = "https://api.scryfall.com"
 
 # Scryfall asks for a descriptive User-Agent and a small delay between calls.
 SCRYFALL_HEADERS = {
-    "User-Agent": "ProxyForge/2.0 (proxy print studio)",
+    "User-Agent": "Cardwright/2.0 (proxy print studio)",
     "Accept": "application/json",
 }
 

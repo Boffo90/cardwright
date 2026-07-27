@@ -1,4 +1,4 @@
-# ProxyForge — Architecture
+# Cardwright — Architecture
 
 All source in `C:/Users/smyo9/upscaler`.
 

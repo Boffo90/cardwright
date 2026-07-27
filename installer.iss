@@ -1,19 +1,21 @@
-; ProxyForge installer (Inno Setup)
+; Cardwright installer (Inno Setup)
 ;
 ; Per-user install (no admin needed): the app writes settings, models and
 ; output next to its exe, so it must NOT live in Program Files.
-; Build:  ISCC installer.iss   (after building ProxyForge.exe)
+; Build:  ISCC installer.iss   (after building Cardwright.exe)
 
-#define AppName "ProxyForge"
-#define AppVersion "2.7.0"
-#define AppExe "ProxyForge.exe"
+#define AppName "Cardwright"
+#define AppVersion "2.8.0"
+#define AppExe "Cardwright.exe"
 
 [Setup]
-AppId={{C67040F2-FADE-4552-945E-767B7B25618C}
+; New AppId (the app was renamed from ProxyForge): a fresh install lands in
+; its own {localappdata}\Cardwright folder, separate from any old ProxyForge.
+AppId={{FD9711B0-1EBF-49B4-84C6-D7814144F42E}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Boffo90
-AppPublisherURL=https://github.com/Boffo90/proxyforge
+AppPublisherURL=https://github.com/Boffo90/cardwright
 DefaultDirName={localappdata}\{#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -21,7 +23,7 @@ OutputDir=installer
 ; underscore matters: release assets are listed alphabetically by the GitHub
 ; API, and older clients pick the FIRST .exe — "_" sorts after ".exe" so the
 ; bare app exe always comes first
-OutputBaseFilename=ProxyForge_Setup-{#AppVersion}
+OutputBaseFilename={#AppName}_Setup-{#AppVersion}
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 Compression=lzma2

@@ -1,6 +1,14 @@
-# ProxyForge — Changelog
+# Cardwright — Changelog
 
 Registro por versión. Actualizar en cada release.
+
+## v2.8.0 — renamed ProxyForge → Cardwright
+- App and brand renamed to **Cardwright** (ProxyForge was too generic and
+  clashed with other *Forge proxy tools). No functional changes.
+- GitHub repo renamed to `Boffo90/cardwright` (old URL redirects; auto-update
+  for 2.7.0 clients still works via the redirect + the non-installer-exe
+  fallback in update.py).
+- New installer AppId + `Cardwright.exe` / `Cardwright_Setup-2.8.0.exe`.
 
 ## v2.7.0 — interactive preview: scroll all sheets, drag to reorder
 - Export preview is now a scrollable canvas showing every sheet stacked.

@@ -1,4 +1,4 @@
-# ProxyForge
+# Cardwright
 
 Desktop app that turns Magic: The Gathering card images into **true 1200 DPI
 print-ready proxies** using AI upscaling on your own GPU — free, offline
@@ -49,7 +49,7 @@ python main.py
 
 ## Licence
 
-ProxyForge is **free to use** but it is **not open source**. The code is
+Cardwright is **free to use** but it is **not open source**. The code is
 published so anyone can read and audit what the app does — you are welcome
 to study it, build it for your own use, and send bug reports or pull
 requests. You may not redistribute it, publish a modified or rebranded
@@ -71,7 +71,7 @@ version, or sell it. See [LICENSE](LICENSE).
 
 ## Support
 
-Free for the community. If ProxyForge saves you time, donations help keep
+Free for the community. If Cardwright saves you time, donations help keep
 it maintained:
 
 [![Donate](https://img.shields.io/badge/PayPal-Donate-gold?logo=paypal)](https://www.paypal.com/paypalme/warchazzz)

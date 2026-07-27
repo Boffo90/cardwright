@@ -19,7 +19,7 @@ import requests
 from config import ROOT
 from version import APP_VERSION, GITHUB_REPO
 
-_UA = {"User-Agent": f"ProxyForge/{APP_VERSION}",
+_UA = {"User-Agent": f"Cardwright/{APP_VERSION}",
        "Accept": "application/vnd.github+json"}
 
 
@@ -51,7 +51,7 @@ def check_for_update() -> dict | None:
             name = asset.get("name", "").lower()
             if not name.endswith(".exe"):
                 continue
-            if name == "proxyforge.exe":
+            if name == "cardwright.exe":
                 best = asset
                 break
             if "setup" not in name and "install" not in name and best is None:

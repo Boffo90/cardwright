@@ -16,7 +16,7 @@ import requests
 API = "https://mpcfill.com"
 
 _HEADERS = {
-    "User-Agent": "ProxyForge/2.4 (personal proxy tool)",
+    "User-Agent": "Cardwright/2.8 (personal proxy tool)",
     "Content-Type": "application/json",
 }
 
