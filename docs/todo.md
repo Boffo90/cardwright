@@ -1,10 +1,5 @@
 # Cardwright — TODO
 
-## Needs a human pass
-Written during the v2.12.0 revamp and never exercised on real hardware: drag &
-drop in the export preview, the magnifier on hover, and actual GPU upscaling
-(only the skip-AI path was tested). Shipped in 2.12.1 unverified.
-
 ## Pending / possible issues
 - MPC search depends on mpcfill.com API + Google Drive (fragile if they change).
 - Foreign cards Scryfall doesn't know: no multiverse id → can't download from Gatherer.
