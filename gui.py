@@ -99,6 +99,7 @@ BORDER     = theme.BORDER
 BORDER_STRONG = theme.BORDER_STRONG
 
 CONTROL_ALT = theme.SURFACE_HOVER
+SURFACE_INPUT = theme.BG           # inputs sit darker than their panel
 TEXT_MUTED_ = theme.TEXT_MUTED     # section eyebrows
 
 # resolved once the Tk root exists (font families need one) — see App.__init__
@@ -125,10 +126,11 @@ ROW_MODELS = {
 
 # status -> (dot color, text color)
 STATUS_COLORS = {
-    "pending":    ("#6b7280", "#9ca3af"),
-    "processing": ("#3b82f6", "#93c5fd"),
-    "done":       ("#22c55e", "#86efac"),
-    "error":      ("#ef4444", "#fca5a5"),
+    # (dot, caption) — muted while idle, accent while working, semantic at rest
+    "pending":    (theme.TEXT_MUTED, theme.TEXT_MUTED),
+    "processing": (theme.ACCENT, theme.TEXT_DIM),
+    "done":       (theme.SUCCESS, theme.TEXT_MUTED),
+    "error":      (theme.DANGER, theme.DANGER),
 }
 
 
@@ -150,7 +152,8 @@ else:
 class QueueItem(ctk.CTkFrame):
     def __init__(self, master, ref, kind, on_remove, downloads=None, label=None,
                  qty=1, released_at=None, set_code=None, on_status=None):
-        super().__init__(master, corner_radius=10, fg_color=ROW)
+        super().__init__(master, corner_radius=theme.RADIUS_MD, fg_color=ROW,
+                         border_width=1, border_color=BORDER)
         self.ref = ref              # file path or scryfall reference
         self.kind = kind            # "file" | "scryfall" | "card"
         self.downloads = downloads  # for "card": [(basename, png_url), ...]
@@ -164,9 +167,9 @@ class QueueItem(ctk.CTkFrame):
 
         self.grid_columnconfigure(1, weight=1)
 
-        self.dot = ctk.CTkLabel(self, text="●", width=18,
+        self.dot = ctk.CTkLabel(self, text="●", width=14,
                                 text_color=STATUS_COLORS["pending"][0],
-                                font=(UI, 16))
+                                font=(UI, 11))
         self.dot.grid(row=0, column=0, padx=(12, 6), pady=8)
 
         if label is not None:
@@ -176,26 +179,36 @@ class QueueItem(ctk.CTkFrame):
         else:
             label = ref
         self.name = ctk.CTkLabel(self, text=self._trim(label), anchor="w",
-                                 font=(UI, 13))
+                                 text_color=TEXT,
+                                 font=(UI, theme.TYPE["body"]))
         self.name.grid(row=0, column=1, sticky="ew", pady=(8, 0))
 
         self.info = ctk.CTkLabel(self, text="Pending", anchor="w",
                                  text_color=STATUS_COLORS["pending"][1],
-                                 font=(UI, 11))
+                                 font=(UI, theme.TYPE["caption"]))
         self.info.grid(row=1, column=1, sticky="ew", pady=(0, 8))
 
         self.model_menu = ctk.CTkOptionMenu(
-            self, values=list(ROW_MODELS.keys()), width=104, height=26,
-            font=(UI, 11), fg_color=GRAY_BTN, button_color=GRAY_HOVER,
+            self, values=list(ROW_MODELS.keys()), width=104, height=28,
+            font=(UI, theme.TYPE["caption"]), corner_radius=theme.RADIUS_SM,
+            fg_color=SURFACE_INPUT, button_color=CONTROL_ALT,
+            button_hover_color=GRAY_HOVER, text_color=TEXT_DIM,
+            dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+            dropdown_hover_color=GRAY_HOVER,
             command=self._model_changed)
         self.model_menu.set("Auto")
         self.model_menu.grid(row=0, column=2, rowspan=2, padx=(4, 2))
 
-        self.bar = ctk.CTkProgressBar(self, height=6, width=120)
+        self.bar = ctk.CTkProgressBar(self, height=4, width=120,
+                                      corner_radius=2, fg_color=SURFACE_INPUT,
+                                      progress_color=GOLD)
         self.bar.set(0)
         self.bar.grid(row=0, column=3, rowspan=2, padx=8)
 
-        self.remove_btn = ctk.CTkButton(self, text="✕", width=30, height=30,
+        self.remove_btn = ctk.CTkButton(self, text="✕", width=28, height=28,
+                                        corner_radius=theme.RADIUS_SM,
+                                        font=(UI, theme.TYPE["small"]),
+                                        text_color=MUTED,
                                         fg_color="transparent", hover_color=GRAY_HOVER,
                                         command=lambda: on_remove(self))
         self.remove_btn.grid(row=0, column=4, rowspan=2, padx=(0, 10))
@@ -355,7 +368,9 @@ class App(_Root):
         bar.grid_columnconfigure(0, weight=1)
 
         self.ref_entry = ctk.CTkEntry(
-            bar, height=40, fg_color=BG, border_color=GRAY_BTN,
+            bar, height=theme.H_BUTTON_LG, fg_color=SURFACE_INPUT,
+            border_color=BORDER_STRONG, corner_radius=theme.RADIUS_SM,
+            font=(UI, theme.TYPE["body"]), text_color=TEXT,
             placeholder_text="Card name, Scryfall or Gatherer link")
         self.ref_entry.grid(row=0, column=0, sticky="ew", padx=(12, 8), pady=12)
         self.ref_entry.bind("<Return>", lambda e: self._add_scryfall())
@@ -816,9 +831,11 @@ class ImportDialog(ctk.CTkToplevel):
                      font=(UI, theme.TYPE["title"], "bold"), text_color=TEXT).grid(
             row=0, column=0, sticky="w", padx=20, pady=(18, 4))
 
-        self.textbox = ctk.CTkTextbox(self, font=("Consolas", 12), wrap="none",
-                                      fg_color=PANEL, border_color=GRAY_BTN,
-                                      border_width=1)
+        self.textbox = ctk.CTkTextbox(self, font=("Cascadia Mono", 12),
+                                      wrap="none", fg_color=SURFACE_INPUT,
+                                      border_color=BORDER_STRONG, border_width=1,
+                                      corner_radius=theme.RADIUS_SM,
+                                      text_color=TEXT)
         self.textbox.grid(row=1, column=0, sticky="nsew", padx=20, pady=8)
         self.textbox.insert("1.0", self.PLACEHOLDER)
         self.textbox.bind("<FocusIn>", self._clear_placeholder)
@@ -1023,22 +1040,32 @@ class ExportDialog(ctk.CTkToplevel):
             self._r = 0
 
         def row(label, values, initial):
-            ctk.CTkLabel(left, text=label, anchor="w").grid(
-                row=self._r, column=0, sticky="w", padx=(12, 8), pady=4)
-            menu = ctk.CTkOptionMenu(left, values=values, width=220,
-                                     fg_color=GRAY_BTN, button_color=GRAY_HOVER,
-                                     command=self._refresh_preview)
+            ctk.CTkLabel(left, text=label, anchor="w", text_color=TEXT_DIM,
+                         font=(UI, theme.TYPE["small"])).grid(
+                row=self._r, column=0, sticky="w", padx=(12, 8), pady=5)
+            menu = ctk.CTkOptionMenu(
+                left, values=values, width=214, height=30,
+                corner_radius=theme.RADIUS_SM, font=(UI, theme.TYPE["small"]),
+                fg_color=SURFACE_INPUT, button_color=CONTROL_ALT,
+                button_hover_color=GRAY_HOVER, text_color=TEXT,
+                dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+                dropdown_hover_color=GRAY_HOVER,
+                command=self._refresh_preview)
             menu.set(initial if initial in values else values[0])
             menu.grid(row=self._r, column=1, sticky="w", pady=4)
             self._r += 1
             return menu
 
         def entry_row(label, key, default, hint=""):
-            ctk.CTkLabel(left, text=label, anchor="w").grid(
-                row=self._r, column=0, sticky="w", padx=(12, 8), pady=4)
+            ctk.CTkLabel(left, text=label, anchor="w", text_color=TEXT_DIM,
+                         font=(UI, theme.TYPE["small"])).grid(
+                row=self._r, column=0, sticky="w", padx=(12, 8), pady=5)
             fr = ctk.CTkFrame(left, fg_color="transparent")
             fr.grid(row=self._r, column=1, sticky="w", pady=4)
-            e = ctk.CTkEntry(fr, width=56, fg_color=BG, border_color=GRAY_BTN)
+            e = ctk.CTkEntry(fr, width=62, height=30, fg_color=SURFACE_INPUT,
+                             border_color=BORDER_STRONG,
+                             corner_radius=theme.RADIUS_SM,
+                             font=(UI, theme.TYPE["small"]), text_color=TEXT)
             e.insert(0, str(s.get(key, default)))
             e.pack(side="left")
             e.bind("<KeyRelease>", self._refresh_preview)
@@ -1138,8 +1165,9 @@ class ExportDialog(ctk.CTkToplevel):
                           s.get("border", BORDER_DEFAULT))
 
         def slider_row(label, key, default, to, unit, fmt="{:.0f}"):
-            ctk.CTkLabel(left, text=label, anchor="w").grid(
-                row=self._r, column=0, sticky="w", padx=(12, 8), pady=4)
+            ctk.CTkLabel(left, text=label, anchor="w", text_color=TEXT_DIM,
+                         font=(UI, theme.TYPE["small"])).grid(
+                row=self._r, column=0, sticky="w", padx=(12, 8), pady=5)
             fr = ctk.CTkFrame(left, fg_color="transparent")
             fr.grid(row=self._r, column=1, sticky="w", pady=4)
             val = ctk.CTkLabel(fr, text="", width=54, text_color=MUTED,
@@ -2487,7 +2515,9 @@ class SetupDialog(ctk.CTkToplevel):
             justify="left", text_color=MUTED,
             font=(UI, 12)).pack(anchor="w", padx=24)
 
-        self.bar = ctk.CTkProgressBar(self, width=460, progress_color=GOLD)
+        self.bar = ctk.CTkProgressBar(self, width=460, height=6,
+                                      corner_radius=3, fg_color=ROW,
+                                      progress_color=GOLD)
         self.bar.set(0)
         self.bar.pack(padx=24, pady=(16, 4))
         self.status = ctk.CTkLabel(self, text="Starting…", text_color=MUTED,
@@ -2576,20 +2606,25 @@ class CardSearchDialog(ctk.CTkToplevel):
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.grid(row=1, column=0, sticky="ew", padx=16, pady=6)
         bar.grid_columnconfigure(0, weight=1)
-        self.entry = ctk.CTkEntry(bar, height=38, fg_color=PANEL,
-                                  border_color=GRAY_BTN,
+        self.entry = ctk.CTkEntry(bar, height=theme.H_INPUT, fg_color=SURFACE_INPUT,
+                                  border_color=BORDER_STRONG,
+                                  corner_radius=theme.RADIUS_SM,
+                                  font=(UI, theme.TYPE["body"]),
+                                  text_color=TEXT,
                                   placeholder_text=placeholder)
         self.entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
         self.entry.bind("<Return>", lambda e: self._search())
-        self.search_btn = ctk.CTkButton(bar, text="Search", width=100, height=38,
+        self.search_btn = ctk.CTkButton(bar, text="Search", width=96,
+                                        height=theme.H_INPUT,
+                                        corner_radius=theme.RADIUS_SM,
                                         fg_color=GOLD, hover_color=GOLD_HOVER,
                                         text_color=GOLD_TEXT,
-                                        font=(UI, 13, "bold"),
+                                        font=(UI, theme.TYPE["body"], "bold"),
                                         command=self._search)
         self.search_btn.grid(row=0, column=1)
 
         self.grid_frame = ctk.CTkScrollableFrame(self, fg_color=PANEL,
-                                                 corner_radius=10)
+                                                 corner_radius=theme.RADIUS_LG)
         self.grid_frame.grid(row=2, column=0, sticky="nsew", padx=16, pady=8)
         for c in range(self.COLS):
             self.grid_frame.grid_columnconfigure(c, weight=1)
@@ -2638,7 +2673,9 @@ class CardSearchDialog(ctk.CTkToplevel):
             self._card_tile(card, i // self.COLS, i % self.COLS, token)
 
     def _card_tile(self, card, r, c, token):
-        tile = ctk.CTkFrame(self.grid_frame, fg_color=ROW, corner_radius=8)
+        tile = ctk.CTkFrame(self.grid_frame, fg_color=ROW,
+                            corner_radius=theme.RADIUS_MD,
+                            border_width=1, border_color=BORDER)
         tile.grid(row=r, column=c, padx=6, pady=6, sticky="n")
         ph = ctk.CTkLabel(tile, text="…", width=self.THUMB[0],
                           height=self.THUMB[1], text_color=MUTED)
@@ -2652,9 +2689,11 @@ class CardSearchDialog(ctk.CTkToplevel):
             sub = f"{sub} · {card['dpi']}dpi" if sub else f"{card['dpi']}dpi"
         ctk.CTkLabel(tile, text=sub, font=(UI, 10),
                      text_color=MUTED).pack(padx=6)
-        add = ctk.CTkButton(tile, text="Add", width=70, height=26,
+        add = ctk.CTkButton(tile, text="Add", width=72, height=28,
+                            corner_radius=theme.RADIUS_SM,
                             fg_color=GOLD, hover_color=GOLD_HOVER,
-                            text_color=GOLD_TEXT, font=(UI, 11, "bold"),
+                            text_color=GOLD_TEXT,
+                            font=(UI, theme.TYPE["caption"], "bold"),
                             command=lambda ca=card: self._pick(ca))
         add.pack(padx=6, pady=(2, 8))
 

@@ -14,7 +14,12 @@ Registro por versión. Actualizar en cada release.
   accent-coloured switches instead of CustomTkinter's default blue.
 - **Export dialog is now tabbed** — Layout / Image / Backs / Cutting / Tests —
   instead of ~30 controls in one scrolling column. Presets moved above the tabs.
-- Stages 2-3 (queue rows, search/import/setup dialogs) still to come.
+- Queue rows: flat cards with a hairline border, smaller status dot, calmer
+  status palette (muted idle, accent while working, green done, red error),
+  slimmer progress bars.
+- Dialogs: inputs share one height/radius/fill, outlines meet the 3:1 non-text
+  contrast threshold, search-gallery tiles and buttons follow the same
+  hierarchy, decklist box uses Cascadia Mono.
 
 ## v2.11.0 — Yu-Gi-Oh card search (YGOPRODeck)
 - New **"Yu-Gi-Oh…"** search: gallery over the YGOPRODeck API, one entry per
