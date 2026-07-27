@@ -1,5 +1,31 @@
 # Cardwright — TODO
 
+## ▶ START HERE (handoff, 2026-07-27)
+**v2.12.1 is committed and pushed but NOT built or released yet.** Everything
+else is done and documented.
+
+To ship it, follow `release.md`:
+1. Close Cardwright if it's running (the exe can't be replaced while open).
+2. Build with PyInstaller, copy the exe to the repo root, run ISCC, delete the
+   old `installer/Cardwright_Setup-2.12.0.exe`.
+3. `gh release create v2.12.0` → use **v2.12.1**, assets: `Cardwright.exe`
+   FIRST, then `installer/Cardwright_Setup-2.12.1.exe`. gh is installed and
+   authed as Boffo90.
+
+What v2.12.1 fixes: border deepening was crushing the anti-aliasing of the
+white copyright/collector microtext, so it printed with thicker strokes and
+closed letter counters. `BORDER_TONE_MAX` 100 → 58; validated on 5 cards
+(anti-aliasing kept 45-62% → 100%, frame still snaps to black). Details in
+`decisions.md` → "Microtext vs border deepening".
+
+Release notes angle for v2.12.1: it also carries the whole v2.12.0 visual
+revamp and the v2.11.0 Yu-Gi-Oh search if those weren't announced separately
+— v2.12.0 was published, so 2.12.1 can be a short patch note.
+
+Not verified by me and worth a real human pass: drag & drop in the export
+preview, the magnifier on hover, and actual GPU upscaling (I only exercised
+the skip-AI path).
+
 ## Pending / possible issues
 - MPC search depends on mpcfill.com API + Google Drive (fragile if they change).
 - Foreign cards Scryfall doesn't know: no multiverse id → can't download from Gatherer.
