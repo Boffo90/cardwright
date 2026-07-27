@@ -1,8 +1,8 @@
-"""App identity & release info — single source of truth."""
+﻿"""App identity & release info â€” single source of truth."""
 
 APP_NAME = "Cardwright"
 
-APP_VERSION = "2.12.1"
+APP_VERSION = "2.13.0"
 
 # GitHub repository used for auto-updates ("owner/repo").
 # Point this at the real repo once it exists; update checks fail silently

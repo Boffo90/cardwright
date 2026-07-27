@@ -146,10 +146,62 @@ def _png_urls(card: dict) -> list[tuple[str, str]]:
 
 
 # --------------------------------------------------------------------------
+# language
+# --------------------------------------------------------------------------
+
+def _ref_pins_language(ref: str) -> bool:
+    """
+    True when the reference itself names a language — a /ja/ Scryfall card
+    URL, or a raw api.scryfall.com URL the caller built. An explicit link
+    always beats the global preference: someone who pastes the Japanese
+    printing wants the Japanese printing.
+    """
+    m = re.search(
+        r"scryfall\.com/card/[^/?#]+/[^/?#]+/([^/?#]+)", ref, re.I)
+    if m and m.group(1).lower() in SCRYFALL_LANGS:
+        return True
+    return "api.scryfall.com/cards" in ref
+
+
+def _localize(card: dict, lang: str | None) -> tuple[dict, bool]:
+    """
+    Swap a resolved card for its printing in `lang`.
+
+    Returns (card, fell_back). Scryfall has no bulk way to ask for a
+    language — /cards/collection identifiers don't take one — so this is a
+    per-card round trip on top of whatever resolved the card in the first
+    place. At SCRYFALL_DELAY that is ~0.1 s per unique printing.
+
+    A miss is normal, not an error: promos, Secret Lairs and older sets were
+    frequently English-only. Callers report the fallbacks rather than failing.
+    """
+    if not lang or lang == "en" or card.get("lang") == lang:
+        return card, False
+
+    setcode = card.get("set")
+    number = card.get("collector_number")
+    if not setcode or not number:
+        return card, True
+
+    r = _get(f"{SCRYFALL_API}/cards/{setcode}/{number}/{lang}")
+    if r.status_code == 200:
+        localized = r.json()
+        # Guard against a printing that exists but has no usable image in
+        # that language — better the English art than no card at all.
+        try:
+            _png_urls(localized)
+        except ScryfallError:
+            return card, True
+        return localized, False
+
+    return card, True
+
+
+# --------------------------------------------------------------------------
 # public API
 # --------------------------------------------------------------------------
 
-def fetch(ref: str, status_callback=None) -> tuple[list[Path], dict]:
+def fetch(ref: str, status_callback=None, lang: str | None = None) -> tuple[list[Path], dict]:
     """
     Resolve `ref` and download the full-resolution PNG(s) into TEMP_FOLDER.
 
@@ -180,6 +232,14 @@ def fetch(ref: str, status_callback=None) -> tuple[list[Path], dict]:
         status_callback("Looking up card...")
 
     card = _card_from_reference(ref)
+
+    # A name or a plain decklist line resolves to the English printing; the
+    # global preference is applied on top. A link that already names a
+    # language is left alone.
+    if lang and not _ref_pins_language(ref):
+        if status_callback:
+            status_callback(f"Looking for the {lang} printing...")
+        card, _ = _localize(card, lang)
 
     # keep the finish marker (*E* / *F*) in the filename if one was given
     _, finish = _extract_tags(ref)
@@ -398,16 +458,20 @@ def _post_collection(identifiers: list[dict]) -> dict:
     return r.json()
 
 
-def resolve_decklist(text: str, status_callback=None):
+def resolve_decklist(text: str, status_callback=None, lang: str | None = None):
     """
     Parse and resolve a decklist.
 
-    Returns (cards, not_found, bad_lines) where each card is:
+    Returns (cards, not_found, bad_lines, english_only) where each card is:
         {
           "display":   "3x Plains"  (or just the name),
           "qty":       int,
           "downloads": [(basename, png_url), ...]   # 2 entries for DFCs
         }
+
+    `english_only` lists the cards that had no printing in `lang` and came
+    back in English instead — a normal outcome worth surfacing, since a deck
+    that silently mixes languages looks like a bug to the user.
     """
     entries, bad = parse_decklist(text)
 
@@ -434,12 +498,21 @@ def resolve_decklist(text: str, status_callback=None):
             resolved[(c["set"], c["collector_number"])] = c
 
     cards = []
-    for key in order:
+    english_only = []
+    for i, key in enumerate(order):
         e = seen[key]
         c = resolved.get(key)
         if not c:
             not_found.append(f'{e["name"]} ({e["set"].upper()}) {e["number"]}')
             continue
+
+        if lang and lang != "en":
+            if status_callback:
+                status_callback(f"Localizing {i + 1}/{len(order)}…")
+            c, fell_back = _localize(c, lang)
+            if fell_back:
+                english_only.append(
+                    f'{c["name"]} ({c["set"].upper()}) {c["collector_number"]}')
 
         base = f"{_slug(c['name'])}-{c['set']}-{c['collector_number']}"
         if c.get("lang") and c["lang"] != "en":
@@ -464,7 +537,7 @@ def resolve_decklist(text: str, status_callback=None):
             "set": c.get("set"),
         })
 
-    return cards, not_found, bad
+    return cards, not_found, bad, english_only
 
 
 def download_to_temp(basename: str, url: str) -> Path:

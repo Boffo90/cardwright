@@ -2,6 +2,22 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.13.0 — cards in other languages
+- New **Card language** picker in the main window (its own row under Model /
+  Card size, so the row-0 width budget that v2.12.0 fixed stays intact).
+  Persisted as `card_lang`; worker threads read it from settings, never off
+  the widget.
+- Applies to the two paths that used to be English-only: **card-name lookups**
+  and **decklist imports**. Pasting a link that already names a language
+  (`/card/m11/149/ja/…`, any Gatherer URL) still wins over the picker.
+- **English fallback per card.** Cards with no printing in the chosen language
+  are added in English and listed in the import summary — an info popup, not
+  the red "issues" path, because it isn't a failure. Verified against a
+  Secret Lair printing, which is English-only.
+- Scryfall has no bulk language lookup (`/cards/collection` takes no `lang`),
+  so a decklist costs one extra request per unique printing, ~0.1 s each.
+- 11 languages, matching Scryfall's own printings.
+
 ## v2.12.1 — keep copyright microtext crisp
 - Border deepening no longer eats the anti-aliasing of the white microtext in
   the bottom band (copyright / collector line). `BORDER_TONE_MAX` 100 → 58:

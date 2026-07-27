@@ -50,6 +50,9 @@ from config import (
     BACKS_MODES,
     CARD_SIZES,
     CARD_SIZE_DEFAULT,
+    CARD_LANGS,
+    CARD_LANG_DEFAULT,
+    card_lang_code,
     card_size_mm,
     find_back_image,
     ICON_FILE,
@@ -476,6 +479,32 @@ class App(_Root):
             self.trim_switch.select()
         self.trim_switch.grid(row=0, column=5, padx=(pad["sm"], pad["lg"]))
 
+        # Second row: row 0 is already at the width budget for the 900 px
+        # minimum window, and squeezing a sixth control in there brings back
+        # the clipping v2.12.0 fixed.
+        ctk.CTkLabel(opts, text="Card language", font=(UI, theme.TYPE["small"]),
+                     text_color=TEXT_DIM).grid(
+            row=1, column=0, padx=(pad["lg"], pad["xs"]), pady=(0, pad["md"]))
+        self.card_lang_menu = ctk.CTkOptionMenu(
+            opts, values=list(CARD_LANGS.keys()), width=186,
+            height=theme.H_INPUT, font=(UI, theme.TYPE["body"]),
+            corner_radius=theme.RADIUS_SM,
+            fg_color=ROW, button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
+            text_color=TEXT, dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+            dropdown_hover_color=GRAY_HOVER,
+            command=self._persist_card_lang)
+        self.card_lang_menu.set(
+            load_settings().get("card_lang", CARD_LANG_DEFAULT))
+        self.card_lang_menu.grid(row=1, column=1, sticky="w",
+                                 pady=(0, pad["md"]))
+
+        ctk.CTkLabel(
+            opts, text="Applies to card names and decklists. Cards with no "
+                       "printing in that language stay English.",
+            font=(UI, theme.TYPE["small"]), text_color=MUTED).grid(
+            row=1, column=2, columnspan=4, sticky="w",
+            padx=(pad["sm"], 0), pady=(0, pad["md"]))
+
         # Row 2 — actions
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.grid(row=4, column=0, sticky="ew", padx=24, pady=(pad["md"], 18))
@@ -584,6 +613,12 @@ class App(_Root):
         """Card size is one setting shared with the Export dialog."""
         s = load_settings()
         s["card_size"] = name
+        save_settings(s)
+
+    def _persist_card_lang(self, name):
+        """Worker threads read this from settings, never off the widget."""
+        s = load_settings()
+        s["card_lang"] = name
         save_settings(s)
 
     def _open_ygo(self):
@@ -701,6 +736,7 @@ class App(_Root):
         trim = bool(self.trim_switch.get())
         # fit-to-card resizes to the chosen TCG's size (set in Export)
         card = load_settings().get("card_size", CARD_SIZE_DEFAULT)
+        lang = card_lang_code(load_settings().get("card_lang"))
         pending = [it for it in self.items if it.status != "done"]
         total = len(pending)
         state = {"done": 0, "errors": 0}
@@ -708,7 +744,7 @@ class App(_Root):
 
         def process(item):
             try:
-                self._process_item(item, model, fit, trim, card)
+                self._process_item(item, model, fit, trim, card, lang)
             except Exception as e:
                 with lock:
                     state["errors"] += 1
@@ -724,7 +760,7 @@ class App(_Root):
 
         self.after(0, lambda: self._finish(total, state["errors"]))
 
-    def _process_item(self, item, model, fit, trim, card_size=None):
+    def _process_item(self, item, model, fit, trim, card_size=None, lang=None):
         self._ui(item.set_status, "processing", "Preparing…", 0)
         item.outputs = []
 
@@ -740,7 +776,8 @@ class App(_Root):
             paths, meta = scryfall.fetch(
                 item.ref,
                 status_callback=lambda t, it=item: self._ui(
-                    it.set_status, "processing", t))
+                    it.set_status, "processing", t),
+                lang=lang)
             targets = [str(p) for p in paths]
             item.released_at = meta.get("released_at")
             item.set_code = meta.get("set")
@@ -887,13 +924,14 @@ class ImportDialog(ctk.CTkToplevel):
             if kind == "archidekt":
                 text = scryfall.fetch_archidekt(text, status_callback=status)
 
-            cards, not_found, bad = scryfall.resolve_decklist(
-                text, status_callback=status)
-            self.after(0, lambda: self._done(cards, not_found, bad))
+            lang = card_lang_code(load_settings().get("card_lang"))
+            cards, not_found, bad, english_only = scryfall.resolve_decklist(
+                text, status_callback=status, lang=lang)
+            self.after(0, lambda: self._done(cards, not_found, bad, english_only))
         except Exception as e:
             self.after(0, lambda: self._failed(e))
 
-    def _done(self, cards, not_found, bad):
+    def _done(self, cards, not_found, bad, english_only=()):
         if cards:
             self.on_resolved(cards)
 
@@ -902,14 +940,34 @@ class ImportDialog(ctk.CTkToplevel):
             problems.append("Not found on Scryfall:\n  - " + "\n  - ".join(not_found))
         if bad:
             problems.append("Could not parse these lines:\n  - " + "\n  - ".join(bad))
+        if english_only:
+            # Not a failure — these cards were simply never printed in the
+            # chosen language, so they were added in English.
+            problems.append(
+                "No printing in the selected language (added in English):\n  - "
+                + "\n  - ".join(english_only))
 
+        # A language fallback is not a failure, so it must not turn the whole
+        # import red — it only gets the neutral wording when nothing else
+        # actually went wrong.
+        failures = len(not_found) + len(bad)
         if problems:
             self.import_btn.configure(state="normal", text="Resolve & add")
+            if failures:
+                note = f"{failures} issue(s)"
+                colour = "#fca5a5"
+                title = "Imported with issues"
+                popup = messagebox.showwarning
+            else:
+                note = f"{len(english_only)} in English"
+                colour = MUTED
+                title = "Imported"
+                popup = messagebox.showinfo
             self.status.configure(
-                text=f"Added {len(cards)}. {len(not_found)+len(bad)} issue(s) — see popup.",
-                text_color="#fca5a5")
-            messagebox.showwarning(
-                "Imported with issues",
+                text=f"Added {len(cards)}. {note} — see popup.",
+                text_color=colour)
+            popup(
+                title,
                 f"Added {len(cards)} card(s) to the queue.\n\n" + "\n\n".join(problems),
                 parent=self)
         else:

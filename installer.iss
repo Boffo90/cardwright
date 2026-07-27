@@ -1,11 +1,11 @@
-; Cardwright installer (Inno Setup)
+﻿; Cardwright installer (Inno Setup)
 ;
 ; Per-user install (no admin needed): the app writes settings, models and
 ; output next to its exe, so it must NOT live in Program Files.
 ; Build:  ISCC installer.iss   (after building Cardwright.exe)
 
 #define AppName "Cardwright"
-#define AppVersion "2.12.1"
+#define AppVersion "2.13.0"
 #define AppExe "Cardwright.exe"
 
 [Setup]
@@ -21,7 +21,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=installer
 ; underscore matters: release assets are listed alphabetically by the GitHub
-; API, and older clients pick the FIRST .exe — "_" sorts after ".exe" so the
+; API, and older clients pick the FIRST .exe â€” "_" sorts after ".exe" so the
 ; bare app exe always comes first
 OutputBaseFilename={#AppName}_Setup-{#AppVersion}
 SetupIconFile=icon.ico
@@ -50,4 +50,4 @@ Type: filesandordirs; Name: "{app}\_temp"
 Type: files; Name: "{app}\realesrgan-ncnn-vulkan.exe"
 Type: files; Name: "{app}\vcomp140.dll"
 Type: files; Name: "{app}\settings.json"
-; keep {app}\output — never delete the user's work
+; keep {app}\output â€” never delete the user's work

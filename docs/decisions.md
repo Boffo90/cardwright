@@ -5,6 +5,16 @@ Settled decisions. Do not re-litigate; add new ones here.
 ## Language
 **Everything in the project is English** (global app): UI, code, comments, docs, README, changelog, and GitHub release titles/descriptions. Chat with the user is in Spanish, but anything that lives in the repo or is shown to the end user is English.
 
+This covers the **interface**. The *cards* are a separate axis — see below. Translating the UI itself was weighed in July 2026 and **deferred**, not rejected: ~123 literal strings in `gui.py` alone, plus a re-layout risk because CustomTkinter widths are fixed and were tuned for English during the v2.12.0 revamp. If it ever happens, start with Spanish and Portuguese (verifiable by the author) rather than machine-translating a dozen locales.
+
+## Card language (v2.13.0)
+A global **Card language** picker (main window, under Model/Card size, persisted as `card_lang`) drives which printing gets fetched.
+- **English is the fallback, always.** Promos, Secret Lairs and older sets are frequently English-only, so every lookup must survive the target language not existing. A miss is reported, never raised.
+- **Scryfall has no bulk language lookup**: `/cards/collection` identifiers accept `id`/`set`/`collector_number`/etc. but *not* a language. So decklists resolve in bulk first (cheap) and then take one `/cards/{set}/{number}/{lang}` round trip per unique printing — ~0.1 s each at `SCRYFALL_DELAY`. Do not go looking for a batch endpoint; there isn't one.
+- **An explicit link beats the picker.** A `/card/m11/149/ja/...` URL or any Gatherer link is left alone (`_ref_pins_language`) — pasting a specific printing is a deliberate act.
+- Queue labels keep the **English card name** even for localized printings (Scryfall's `printed_name` holds the localized one); it matches the decklist the user pasted and stays searchable. Filenames carry the `-<lang>` suffix.
+- A language fallback is **not** an import failure: it gets an info popup and neutral status text, not the red "Imported with issues" path.
+
 ## Licensing
 **Source-available** (not MIT): code visible, redistribution/selling/rebranding forbidden.
 

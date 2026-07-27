@@ -165,6 +165,34 @@ SCRYFALL_HEADERS = {
 
 SCRYFALL_DELAY = 0.1  # seconds between requests
 
+# Languages Scryfall has printings for. Keys are what the picker shows (kept
+# in English like the rest of the UI, which also avoids CJK glyphs falling
+# back to tofu in the Segoe UI stack); values are Scryfall's own codes.
+#
+# English is the default AND the fallback: most promos, Secret Lairs and
+# pre-1994 sets were never printed in anything else, so any lookup has to
+# survive the target language simply not existing for that card.
+CARD_LANGS = {
+    "English": "en",
+    "Spanish": "es",
+    "French": "fr",
+    "German": "de",
+    "Italian": "it",
+    "Portuguese": "pt",
+    "Japanese": "ja",
+    "Korean": "ko",
+    "Russian": "ru",
+    "Chinese (Simplified)": "zhs",
+    "Chinese (Traditional)": "zht",
+}
+
+CARD_LANG_DEFAULT = "English"
+
+
+def card_lang_code(name=None):
+    """Picker label -> Scryfall code. None/unknown falls back to English."""
+    return CARD_LANGS.get(name or CARD_LANG_DEFAULT, "en")
+
 # ==========================================
 # PROCESSING
 # ==========================================
