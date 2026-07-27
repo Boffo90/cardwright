@@ -62,6 +62,7 @@ from config import (
 )
 from upscale import upscale
 import scryfall
+import sources
 import mpcfill
 import ygoprodeck
 import print_sheet
@@ -624,8 +625,39 @@ class App(_Root):
         ref = self.ref_entry.get().strip()
         if not ref:
             return
+        # A bare name doesn't choose a printing, so show the gallery: the user
+        # sees what they are about to upscale and can switch art or source.
+        # A link or a decklist line already named one — straight to the queue.
+        if not scryfall.ref_names_a_printing(ref):
+            self.ref_entry.delete(0, "end")
+            self._open_sources(ref)
+            return
         self._add_item(ref, "scryfall")
         self.ref_entry.delete(0, "end")
+
+    def _open_sources(self, query=None):
+        if self.running:
+            return
+        CardSearchDialog(
+            self, on_pick=self._add_source_card, backend=sources.SCRYFALL,
+            title="Choose a version",
+            placeholder=sources.SCRYFALL.PLACEHOLDER,
+            empty_msg=sources.SCRYFALL.EMPTY,
+            switchable=sources.ALL, query=query)
+
+    def _add_source_card(self, card):
+        """Queue a gallery pick, however its source wants to be fetched."""
+        src = sources.by_id(card.get("_source", "scryfall"))
+        label = f"{card['name']}  [{src.LABEL}]"
+        if src.ADD_KIND == "scryfall":
+            # Gatherer: hand back the reference and let scryfall.fetch pull
+            # the image, which also converts Gatherer's webp to PNG.
+            self._add_item(card["ref"], "scryfall", label=label)
+            return
+        base = f"{card['name']}  [{card['source']}]"
+        safe = re.sub(r'[<>:"/\\|?*]', "", base)
+        self._add_item(base, "card",
+                       downloads=[(safe, card["download"])], label=base)
 
     def _open_import(self):
         if self.running:
@@ -2673,10 +2705,14 @@ class CardSearchDialog(ctk.CTkToplevel):
     def __init__(self, master, on_pick, backend=mpcfill,
                  title="Search MPC Autofill",
                  placeholder="Card name (e.g. Sol Ring)",
-                 empty_msg="No matches on MPC Autofill.", note=None):
+                 empty_msg="No matches on MPC Autofill.", note=None,
+                 switchable=None, query=None):
         super().__init__(master)
         self.on_pick = on_pick
         self.backend = backend
+        # `switchable` is a list of source classes the user can flip between
+        # without leaving the dialog; the same card, different catalogues.
+        self.switchable = switchable or []
         self.empty_msg = empty_msg
         self.title(title)
         self.geometry("720x640")
@@ -2716,15 +2752,51 @@ class CardSearchDialog(ctk.CTkToplevel):
                                         command=self._search)
         self.search_btn.grid(row=0, column=1)
 
+        if self.switchable:
+            srcbar = ctk.CTkFrame(self, fg_color="transparent")
+            srcbar.grid(row=2, column=0, sticky="w", padx=16, pady=(0, 2))
+            ctk.CTkLabel(srcbar, text="Source", font=(UI, theme.TYPE["small"]),
+                         text_color=TEXT_DIM).pack(side="left", padx=(0, 8))
+            self.source_btn = ctk.CTkSegmentedButton(
+                srcbar, values=[s.LABEL for s in self.switchable],
+                font=(UI, theme.TYPE["small"]),
+                fg_color=BG, unselected_color=BG,
+                unselected_hover_color=GRAY_HOVER,
+                selected_color=GOLD, selected_hover_color=GOLD_HOVER,
+                text_color="#d7dbe4", command=self._switch_source)
+            self.source_btn.set(backend.LABEL)
+            self.source_btn.pack(side="left")
+            self.grid_rowconfigure(2, weight=0)
+            self.grid_rowconfigure(3, weight=1)
+
+        grid_row = 3 if self.switchable else 2
         self.grid_frame = ctk.CTkScrollableFrame(self, fg_color=PANEL,
                                                  corner_radius=theme.RADIUS_LG)
-        self.grid_frame.grid(row=2, column=0, sticky="nsew", padx=16, pady=8)
+        self.grid_frame.grid(row=grid_row, column=0, sticky="nsew",
+                             padx=16, pady=8)
         for c in range(self.COLS):
             self.grid_frame.grid_columnconfigure(c, weight=1)
 
         self.status = ctk.CTkLabel(self, text="Type a card name and hit Search.",
                                    text_color=MUTED, font=(UI, 12))
-        self.status.grid(row=3, column=0, sticky="w", padx=20, pady=(0, 12))
+        self.status.grid(row=grid_row + 1, column=0, sticky="w",
+                         padx=20, pady=(0, 12))
+
+        # Opened from the main search box: run the query straight away
+        # instead of making the user retype what they just typed.
+        if query:
+            self.entry.insert(0, query)
+            self.after(120, self._search)
+
+    def _switch_source(self, label):
+        """Same query, different catalogue — the point of the switcher."""
+        for s in self.switchable:
+            if s.LABEL == label:
+                self.backend = s
+                break
+        self.empty_msg = getattr(self.backend, "EMPTY", self.empty_msg)
+        if self.entry.get().strip():
+            self._search()
 
     def _search(self):
         query = self.entry.get().strip()
@@ -2759,9 +2831,10 @@ class CardSearchDialog(ctk.CTkToplevel):
             self.status.configure(text=self.empty_msg,
                                   text_color="#fca5a5")
             return
-        self.status.configure(
-            text=f"{len(cards)} version(s). Click one to add it to the queue.",
-            text_color=MUTED)
+        msg = f"{len(cards)} version(s). Click one to add it to the queue."
+        note = getattr(self.backend, "NOTE", None)
+        self.status.configure(text=f"{msg}  {note}" if note else msg,
+                              text_color=MUTED)
         for i, card in enumerate(cards):
             self._card_tile(card, i // self.COLS, i % self.COLS, token)
 
@@ -2808,5 +2881,8 @@ class CardSearchDialog(ctk.CTkToplevel):
         threading.Thread(target=load, daemon=True).start()
 
     def _pick(self, card):
+        # Tell the handler which catalogue this came from — with the source
+        # switcher the dialog is no longer tied to one backend.
+        card = {**card, "_source": getattr(self.backend, "ID", "mpc")}
         self.on_pick(card)
         self.status.configure(text=f"Added: {card['name']}", text_color=GOLD)

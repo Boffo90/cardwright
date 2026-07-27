@@ -24,6 +24,14 @@ When a lookup is a bare card name, pick the printing with the best image rather 
 - **Restrict to the same `illustration_id`.** Without it, English "Silence" jumps to a Secret Lair by a different artist — an art swap, not a quality upgrade. If no printing in the target language shares the art, the restriction is dropped rather than failing.
 - Shortlist capped (`_BEST_SCAN_CANDIDATES`) so cards with dozens of printings (basic lands) stay to a handful of HEADs.
 
+## Card source gallery (v2.13.0)
+A bare card name opens the printing gallery; a link or decklist line does not (`scryfall.ref_names_a_printing`). Sources live in `sources.py` behind the interface `CardSearchDialog` already expected — `search(query)`, `fetch_thumb(url)`, plus `ADD_KIND` saying how a pick is fetched.
+- **Gatherer has no search API.** Scryfall finds the printing, Gatherer serves the image, same split `_fetch_gatherer` uses. Only printings with a `multiverse_id` can appear at all.
+- **Gatherer is the weaker source and the UI says so.** Measured across Lightning Bolt / Counterspell / Sol Ring, consistently 646×902 at 53-76 KB against Scryfall's 745×1040 at 837-1285 KB — ~15× less data to upscale from. Kept because it's a genuinely different scan, not because it's better.
+- **Thumbnails always come from Scryfall**, even on the Gatherer tab: Gatherer's handler serves one full-size image per request, far too heavy for a grid.
+- Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
+- Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden — in a manual picker the user can see the thumbnail and judge.
+
 ## Footer options layout
 The options panel keeps each row in its **own frame**. Tk's grid shares column widths across rows, so a wide label in one row silently widens the row above it: adding the Card language row directly to the shared grid pushed the panel from 903 px to 1027 against a 900 px minimum window — reintroducing exactly the clipping v2.12.0 fixed. Measure `winfo_reqwidth()` of the options frame after touching this area; it should stay under 900. Long help text goes on its own row with `wraplength` rebound on `<Configure>`, never inline beside controls.
 

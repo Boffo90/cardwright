@@ -34,6 +34,26 @@ Registro por versión. Actualizar en cada release.
 - Only bare names are eligible. A link or a decklist line already names the
   printing the user chose and is never second-guessed.
 
+### Card source gallery (same release)
+- Typing a **bare card name** in the main search box now opens a gallery of
+  that card's printings with thumbnails, instead of silently queueing one.
+  You see what you are about to upscale before committing to it. A link or a
+  decklist line still goes straight to the queue — it already chose.
+- A **Source** switcher flips the same query between **Scryfall**, **Gatherer**
+  and **MPC Autofill** without leaving the dialog, so alternate art from any
+  catalogue is one click away.
+- New **`sources.py`** holds the three adapters behind the interface
+  `CardSearchDialog` already expected from `mpcfill` / `ygoprodeck`.
+- Gatherer has no search of its own, so Scryfall finds the printing and
+  Gatherer serves the image — the split `_fetch_gatherer` already used.
+  Only printings carrying a multiverse id can appear.
+- The gallery warns that **Gatherer images are 646×902 at ~60 KB** against
+  Scryfall's 745×1040 at ~1 MB: measured consistently across cards, roughly
+  15× less data to upscale from.
+- Gallery thumbnails always come from Scryfall, including on the Gatherer
+  tab — Gatherer's handler serves one full-size image per request, far too
+  heavy for a grid.
+
 ## v2.12.1 — keep copyright microtext crisp
 - Border deepening no longer eats the anti-aliasing of the white microtext in
   the bottom band (copyright / collector line). `BORDER_TONE_MAX` 100 → 58:

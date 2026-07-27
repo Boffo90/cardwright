@@ -149,7 +149,7 @@ def _png_urls(card: dict) -> list[tuple[str, str]]:
 # language
 # --------------------------------------------------------------------------
 
-def _ref_names_a_printing(ref: str) -> bool:
+def ref_names_a_printing(ref: str) -> bool:
     """
     True when the reference picks a specific printing — a URL, or a decklist
     line with a set and collector number. Those are deliberate choices and
@@ -373,7 +373,7 @@ def fetch(ref: str, status_callback=None, lang: str | None = None,
 
     # A bare name doesn't choose a printing, so it can be upgraded to the one
     # with the best scan (which resolves the language at the same time).
-    if best_scan and not _ref_names_a_printing(ref):
+    if best_scan and not ref_names_a_printing(ref):
         card = best_printing(card, lang, status_callback)
 
     # Otherwise a name or a plain decklist line resolves to the English
