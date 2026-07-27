@@ -2,6 +2,18 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.10.0 — 7-card Silhouette layout
+- New **"7-card Silhouette"** layout, requested by a Cameo user: a 4×2 grid
+  whose left column holds a single vertically-centred card, with the other 6
+  in a 3×2 block. That frees both left corners, where the marks a Cameo
+  depends on most sit — clearance from the lower-left mark goes from ~5 mm
+  (4×2) to ~49 mm. Backs mirror automatically (the lone card moves right).
+- Slot placement is now driven by `layout_positions()` instead of grid index
+  maths, and duplex mirroring by `mirror_x()`, so non-grid layouts work
+  everywhere (PDF, preview, bleed frames, mark-collision detection).
+- Same idea as ProxySheet's "SevenCard" template; geometry reimplemented from
+  scratch (that project is GPL-3.0, so none of its code was used).
+
 ## v2.9.0 — cutting-machine registration marks + other TCG card sizes
 From Reddit feedback after the public launch.
 - **Registration marks** (Silhouette / Cricut print-and-cut): 3-mark standard

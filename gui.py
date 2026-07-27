@@ -1508,17 +1508,21 @@ class ExportDialog(ctk.CTkToplevel):
             PILDraw.Draw(corner_mask).rounded_rectangle(
                 [0, 0, cw - 1, ch - 1], radius=r, fill=255)
 
-        # registration marks: mirror print_sheet's geometry and slot skipping
+        # Slot positions come from the same helper the PDF uses (it is unit
+        # agnostic), in mm with a bottom-left origin; the preview flips y.
         reg_four = self.reg_pattern.get() == print_sheet.REG_PATTERNS[1]
         reg_args = (self._reg_inset(), self._reg_length(), self._reg_thick())
+        oy_mm = ph - top - bh
+        all_pos = print_sheet.layout_positions(
+            self.layout.get(), left, oy_mm, bh, g, cols, rows, CW, CH)
         if reg_on:
             blocked = print_sheet._reg_blocked_slots(
-                pw * mm_pt, ph * mm_pt, left * mm_pt, (ph - top - bh) * mm_pt,
-                bh * mm_pt, g * mm_pt, cols, rows, CW * mm_pt, CH * mm_pt,
+                [(x * mm_pt, y * mm_pt) for x, y in all_pos],
+                CW * mm_pt, CH * mm_pt, pw * mm_pt, ph * mm_pt,
                 *reg_args, reg_four)
         else:
             blocked = set()
-        usable = [s for s in range(per_page) if s not in blocked]
+        usable = [p for i, p in enumerate(all_pos) if i not in blocked]
         per_sheet = len(usable) or 1
         sheets = max(1, -(-len(fronts) // per_sheet))
         self._page = max(0, min(self._page, sheets - 1))
@@ -1528,7 +1532,7 @@ class ExportDialog(ctk.CTkToplevel):
                 text="Off — cards use every slot.", text_color=MUTED)
         elif blocked:
             self.reg_hint.configure(
-                text=f"⚠ {len(usable)} of {per_page} slots usable — "
+                text=f"⚠ {len(usable)} of {len(all_pos)} slots usable — "
                      f"{len(blocked)} sit under a mark and stay empty (those "
                      f"cards move to the next sheet). Shorter marks or a "
                      f"smaller inset fit more; A4 or 4×2 fits them all.",
@@ -1537,7 +1541,7 @@ class ExportDialog(ctk.CTkToplevel):
             shift_note = (" Shift-down is ignored: the cutter aligns to the "
                           "marks." if self._shift() else "")
             self.reg_hint.configure(
-                text=f"✓ All {per_page} slots usable with these marks." + shift_note,
+                text=f"✓ All {len(all_pos)} slots usable with these marks." + shift_note,
                 text_color="#7cc47c")
 
         def render_sheet(page):
@@ -1545,14 +1549,11 @@ class ExportDialog(ctk.CTkToplevel):
             img = PILImage.new("RGB", (W, H), (255, 255, 255))
             d = PILDraw.Draw(img)
             slots = []
-            for k, grid in enumerate(usable):
+            for k, (px, py) in enumerate(usable):
                 slot = page * per_sheet + k
-                # backs print column-mirrored so they land behind their front
-                col, rw = grid % cols, grid // cols
-                if showing_backs:
-                    col = cols - 1 - col
-                x = left + col * (CW + g)
-                y = top + rw * (CH + g)
+                # backs print mirrored so they land behind their front
+                x = print_sheet.mirror_x(px, left, bw, CW) if showing_backs else px
+                y = ph - py - CH          # bottom-left origin -> preview's top
                 if slot >= len(page_items):
                     continue
                 if eb > 0:
@@ -1646,18 +1647,15 @@ class ExportDialog(ctk.CTkToplevel):
         self._slots = []
         for p in range(sheets):
             st = self._sheet_tops[p]
-            for k, grid in enumerate(usable):
+            for k, (px, py) in enumerate(usable):
                 slot = p * per_sheet + k
                 if slot >= len(page_items):
                     continue
                 item = page_items[slot]
                 if not item:
                     continue
-                col, rw = grid % cols, grid // cols
-                if showing_backs:
-                    col = cols - 1 - col
-                x = left + col * (CW + g)
-                y = top + rw * (CH + g)
+                x = print_sheet.mirror_x(px, left, bw, CW) if showing_backs else px
+                y = ph - py - CH
                 self._slots.append((X(x), st + X(y),
                                     X(x + CW), st + X(y + CH), str(item)))
 

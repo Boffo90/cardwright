@@ -47,8 +47,20 @@ CARD_H = 88 * mm
 LAYOUTS = {
     "3×3 portrait": (3, 3, False),
     "4×2 landscape": (4, 2, True),
+    "7-card Silhouette": (4, 2, True),
 }
 DEFAULT_LAYOUT = "3×3 portrait"
+
+# A 4x2 grid whose left column holds a single, vertically centred card:
+#
+#     [    ] [ 2 ] [ 3 ] [ 4 ]
+#     [ 1  ]
+#     [    ] [ 5 ] [ 6 ] [ 7 ]
+#
+# That frees both left corners, where the registration marks a Cameo relies on
+# most (lower-left and upper-right) sit — the same trick ProxySheet's
+# "SevenCard" template uses to cut down detection failures.
+SEVEN_CARD = "7-card Silhouette"
 
 # calibration / shadow test sheets always use the classic grid
 COLS = 3
@@ -527,15 +539,13 @@ def _draw_reg_marks(c, pw, ph, inset_mm, length_mm, thick_mm, four=False):
         c.rect(x0, y0, x1 - x0, y1 - y0, stroke=0, fill=1)
 
 
-def _reg_blocked_slots(pw, ph, ox, oy, block_h, gutter, cols, rows,
-                       card_w, card_h, inset_mm, length_mm, thick_mm,
-                       four=False):
-    """Slot indices whose card would collide with a mark's keep-clear box.
-    Those slots are left empty so the sensor can still read the marks."""
+def _reg_blocked_slots(positions, card_w, card_h, pw, ph,
+                       inset_mm, length_mm, thick_mm, four=False):
+    """Indices of `positions` whose card would collide with a mark's
+    keep-clear box. Those slots are left empty so the sensor can read them."""
     _, clear = _reg_geometry(pw, ph, inset_mm, length_mm, thick_mm, four)
     blocked = set()
-    for idx in range(cols * rows):
-        x, y = _card_pos(idx, ox, oy, block_h, gutter, cols, card_w, card_h)
+    for idx, (x, y) in enumerate(positions):
         for cx0, cy0, cx1, cy1 in clear:
             if x < cx1 and x + card_w > cx0 and y < cy1 and y + card_h > cy0:
                 blocked.add(idx)
@@ -601,6 +611,27 @@ def _card_pos(idx, ox, oy, block_h, gutter=0.0, cols=COLS,
     x = ox + col * (card_w + gutter)
     y = oy + block_h - (row + 1) * card_h - row * gutter
     return x, y
+
+
+def layout_positions(layout, ox, oy, block_h, gutter, cols, rows,
+                     card_w=CARD_W, card_h=CARD_H):
+    """Card origins for one sheet, in placement order. Plain grids fill
+    left-to-right, top-to-bottom; SEVEN_CARD uses its own arrangement."""
+    if layout == SEVEN_CARD:
+        pos = [(ox, oy + (block_h - card_h) / 2)]          # lone left card
+        for i in range(6):
+            col, row = 1 + i % 3, i // 3
+            pos.append((ox + col * (card_w + gutter),
+                        oy + block_h - (row + 1) * card_h - row * gutter))
+        return pos
+    return [_card_pos(i, ox, oy, block_h, gutter, cols, card_w, card_h)
+            for i in range(cols * rows)]
+
+
+def mirror_x(x, ox, block_w, card_w):
+    """Reflect a card origin across the block's vertical centre line, so a
+    back lands behind its front when the sheet is flipped on the long edge."""
+    return ox + block_w - (x - ox) - card_w
 
 
 # --------------------------------------------------------------------------
@@ -702,12 +733,14 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
 
     # Slots a registration mark sits on are left empty: the cutter's sensor
     # needs those corners clear, so cards flow into the remaining slots.
+    all_pos = layout_positions(layout, ox, oy, block_h, gutter, cols, rows,
+                               card_w, card_h)
     reg_four = reg_pattern == REG_PATTERNS[1]
     blocked = _reg_blocked_slots(
-        pw, ph, ox, oy, block_h, gutter, cols, rows, card_w, card_h,
-        reg_inset_mm, reg_length_mm, reg_thick_mm, reg_four) if reg_marks else set()
-    usable = [s for s in range(per_page) if s not in blocked]
-    if reg_marks and not usable:
+        all_pos, card_w, card_h, pw, ph, reg_inset_mm, reg_length_mm,
+        reg_thick_mm, reg_four) if reg_marks else set()
+    usable = [p for i, p in enumerate(all_pos) if i not in blocked]
+    if not usable:
         raise ValueError("Registration marks cover every card slot — "
                          "use a smaller grid, card size or mark length")
     slots_per_page = len(usable)
@@ -762,8 +795,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
             if ebleed > 0:
                 c.setFillColorRGB(*bleed_rgb)
                 for k in range(len(batch)):
-                    x, y = _card_pos(usable[k], ox, oy, block_h, gutter, cols,
-                                     card_w, card_h)
+                    x, y = usable[k]
                     c.rect(x - ebleed, y - ebleed,
                            card_w + 2 * ebleed, card_h + 2 * ebleed,
                            stroke=0, fill=1)
@@ -771,8 +803,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 placed += 1
                 if status_callback:
                     status_callback(f"Placing card {placed}/{len(images)}…")
-                x, y = _card_pos(usable[k], ox, oy, block_h, gutter, cols,
-                                 card_w, card_h)
+                x, y = usable[k]
                 c.drawImage(ImageReader(str(flat(images[i]))), x, y,
                             card_w, card_h, mask=img_mask)
             _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
@@ -794,12 +825,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     c.rotate(back_rotation_deg)
                     c.translate(-pw / 2, -ph / 2)
                 for k, i in enumerate(batch):
-                    slot = usable[k]
-                    col = slot % cols
-                    row = slot // cols
-                    mirrored = row * cols + (cols - 1 - col)
-                    x, y = _card_pos(mirrored, ox, oy, block_h, gutter, cols,
-                                     card_w, card_h)
+                    x, y = usable[k]
+                    x = mirror_x(x, ox, block_w, card_w)
                     # oversized by the bleed on every edge: small duplex
                     # drift stays covered when cutting along the front
                     c.drawImage(ImageReader(str(flat(backs[i]))),

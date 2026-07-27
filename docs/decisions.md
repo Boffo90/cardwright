@@ -24,6 +24,11 @@ Settled decisions. Do not re-litigate; add new ones here.
 - `build_duplex_test` is the calibration tool for offset+rotation: page 1 = front grid, page 2 = back grid column-mirrored + offset + rotation (exactly like `build_pdf`), so holding the print to the light shows the real misregistration.
 - Rounded corners use transparency + reportlab `mask='auto'` (forces PNG so alpha survives), so corners show paper/bleed. Not baked onto black. Radius is mm → px via card width (63 mm).
 
+## Non-grid layouts (v2.10.0)
+- Card slots come from `print_sheet.layout_positions(layout, ...)` which returns explicit (x, y) origins in placement order, not from `index % cols` maths. It is unit-agnostic, so the preview calls it in mm and `build_pdf` in points — one source of truth for both.
+- Duplex mirroring uses `mirror_x(x, ox, block_w, card_w)` (reflect across the block centre) instead of column-index flipping. Equivalent for grids, and the only thing that works for non-grid layouts.
+- **7-card Silhouette** = 4×2 grid, left column holding one vertically centred card + a 3×2 block. Purpose is clearance around the marks a Cameo relies on: lower-left mark clearance goes ~5 mm → ~49 mm vs 4×2. Copied the *arrangement* (a geometric fact) from ProxySheet's SevenCard template; that repo is **GPL-3.0**, so no code was taken — ours is written from our own math.
+
 ## Registration marks & card sizes (v2.9.0)
 - Registration-mark geometry is a **hardware spec** (what the Silhouette/Cricut optical sensor looks for), taken from the MIT-licensed `Alan-Cha/silhouette-card-maker` and reimplemented in reportlab: 5×5 mm filled square top-left (3-mark) or an L there too (4-mark, CAMEO 5a); L brackets at the other corners; arms 5–20 mm, thickness 0.5–1 mm, inset ≥10 mm (Studio default 15.875 mm = 0.625 in), 1.5 mm keep-clear padding.
 - **Defaults are the spec minimums** (inset 10 mm, arms 5 mm) rather than Silhouette Studio's own 15.875/20: the Studio footprint eats 3 card slots on a 3×3 sheet, while 10/5 keeps every card and is still inside the readable range. Users can raise both if a machine fails to detect. Measured: A4 3×3 9/9, A4 4×2 8/8, Letter 4×2 8/8 — **Letter 3×3 is impossible** (only 7.7 mm of top/bottom margin vs the 10 mm minimum inset), so it warns and skips 3 slots.
