@@ -467,7 +467,13 @@ REG_LENGTH_MAX_MM = 20.0
 REG_THICK_MIN_MM = 0.5
 REG_THICK_MAX_MM = 1.0
 REG_INSET_MIN_MM = 10.0
-REG_INSET_DEFAULT_MM = 15.875   # Silhouette Studio default (0.625 in)
+# Silhouette Studio's own default is 0.625 in (15.875) with 20 mm arms, but
+# that footprint eats three card slots on a 3x3 sheet. The spec minimums
+# (10 mm inset, 5 mm arms) keep every card AND stay inside the readable
+# range, so they are our defaults; raise them if a machine fails to detect.
+REG_INSET_DEFAULT_MM = 10.0
+REG_LENGTH_DEFAULT_MM = 5.0
+REG_STUDIO_INSET_MM = 15.875    # what Silhouette Studio itself defaults to
 REG_PADDING_MM = 1.5            # clear space the sensor needs around a mark
 REG_PATTERNS = ["3 marks (standard)", "4 marks (CAMEO 5a)"]
 
@@ -611,7 +617,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               layout=DEFAULT_LAYOUT, deepen_border=False, border_modes=None,
               border_amount=1.0, border_width=0.0, sheets_sel=None,
               card_size_mm=None, reg_marks=False,
-              reg_inset_mm=REG_INSET_DEFAULT_MM, reg_length_mm=20.0,
+              reg_inset_mm=REG_INSET_DEFAULT_MM,
+              reg_length_mm=REG_LENGTH_DEFAULT_MM,
               reg_thick_mm=1.0, reg_pattern=REG_PATTERNS[0],
               status_callback=None) -> list[Path]:
     """
@@ -680,7 +687,12 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     if block_w > pw - 2 * MIN_BOTTOM or block_h > ph - 2 * MIN_BOTTOM:
         raise ValueError("Card block too large for this page size "
                          "(reduce edge bleed, card size or grid)")
-    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm)
+    # Registration marks make shift-down pointless and harmful: the cutter
+    # finds the marks wherever the paper actually fed and cuts relative to
+    # them, so it self-compensates. Shifting only the cards would break that
+    # card-to-mark relationship (and push cards under the marks).
+    ox, oy = _block_origin(pw, ph, block_w, block_h,
+                           0.0 if reg_marks else shift_down_mm)
     guide_rgb = GUIDE_COLORS.get(guide_color, (1, 1, 1))
     bleed_rgb = BLEED_COLORS.get(bleed_color, (0, 0, 0))
     ebleed = edge_bleed_mm * mm

@@ -8,9 +8,13 @@ From Reddit feedback after the public launch.
   or 4-mark CAMEO 5a pattern, with inset / length / thickness settings.
   Geometry follows the spec the sensor expects (5×5 mm filled square + L
   brackets, arms 5–20 mm, 0.5–1 mm thick, inset ≥10 mm, 1.5 mm clear zone).
-  Card slots a mark would sit on are **left empty** and cards flow into the
-  remaining slots (A4 3×3 goes 9 → 6 cards/sheet, or 5 with 4 marks), which
-  is required for the sensor to read them. Shown in the preview.
+  Defaults are the spec minimums (10 mm inset, 5 mm arms) so **no card slots
+  are lost**: A4 3×3 keeps all 9, A4/Letter 4×2 keep all 8. Letter 3×3 can't
+  fit marks (7.7 mm margin vs 10 mm minimum inset) — it warns and skips those
+  slots, moving the cards to the next sheet (nothing is ever discarded).
+  A live hint reports usable vs total slots.
+  Shift-down is ignored while marks are on: the cutter locates the printed
+  marks and self-compensates, so shifting only the cards would misalign them.
 - **Card size selector** for other TCGs: MTG/Pokémon 63×88 (Pokémon already
   matched MTG, so it needed nothing), Yu-Gi-Oh 59×86, mini 44×68, tarot
   70×120. Drives both fit-to-card upscaling and the PDF layout/preview.

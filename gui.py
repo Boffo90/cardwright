@@ -986,18 +986,18 @@ class ExportDialog(ctk.CTkToplevel):
         self.reg_marks.grid(row=self._r, column=0, columnspan=2, sticky="w",
                             padx=12, pady=(4, 2))
         self._r += 1
-        ctk.CTkLabel(left, text="Card slots under a mark are left empty so the "
-                     "sensor can read it.", text_color=MUTED,
-                     font=("Segoe UI", 11), wraplength=400,
-                     justify="left").grid(
-            row=self._r, column=0, columnspan=2, sticky="w", padx=12)
+        self.reg_hint = ctk.CTkLabel(
+            left, text="", text_color=MUTED, font=("Segoe UI", 11),
+            wraplength=400, justify="left")
+        self.reg_hint.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                           padx=12)
         self._r += 1
         self.reg_pattern = row("Mark pattern", print_sheet.REG_PATTERNS,
                                s.get("reg_pattern", print_sheet.REG_PATTERNS[0]))
         self.reg_inset = entry_row("Mark inset (mm)", "reg_inset",
                                    print_sheet.REG_INSET_DEFAULT_MM, "min 10")
-        self.reg_length = entry_row("Mark length (mm)", "reg_length", 20.0,
-                                    "5–20")
+        self.reg_length = entry_row("Mark length (mm)", "reg_length",
+                                    print_sheet.REG_LENGTH_DEFAULT_MM, "5–20")
         self.reg_thick = entry_row("Mark thickness (mm)", "reg_thick", 1.0,
                                    "0.5–1")
 
@@ -1481,7 +1481,10 @@ class ExportDialog(ctk.CTkToplevel):
         bw = cols * CW + (cols - 1) * g
         bh = rows * CH + (rows - 1) * g
         left = (pw - bw) / 2
-        top = (ph - bh) / 2 + self._shift()
+        # with registration marks the cutter aligns to the marks, so shift-down
+        # is ignored (see build_pdf) — keep the preview in step
+        reg_on = bool(self.reg_marks.get())
+        top = (ph - bh) / 2 + (0.0 if reg_on else self._shift())
         if ph - top - bh < 3:
             top = ph - bh - 3
 
@@ -1506,7 +1509,6 @@ class ExportDialog(ctk.CTkToplevel):
                 [0, 0, cw - 1, ch - 1], radius=r, fill=255)
 
         # registration marks: mirror print_sheet's geometry and slot skipping
-        reg_on = bool(self.reg_marks.get())
         reg_four = self.reg_pattern.get() == print_sheet.REG_PATTERNS[1]
         reg_args = (self._reg_inset(), self._reg_length(), self._reg_thick())
         if reg_on:
@@ -1520,6 +1522,23 @@ class ExportDialog(ctk.CTkToplevel):
         per_sheet = len(usable) or 1
         sheets = max(1, -(-len(fronts) // per_sheet))
         self._page = max(0, min(self._page, sheets - 1))
+
+        if not reg_on:
+            self.reg_hint.configure(
+                text="Off — cards use every slot.", text_color=MUTED)
+        elif blocked:
+            self.reg_hint.configure(
+                text=f"⚠ {len(usable)} of {per_page} slots usable — "
+                     f"{len(blocked)} sit under a mark and stay empty (those "
+                     f"cards move to the next sheet). Shorter marks or a "
+                     f"smaller inset fit more; A4 or 4×2 fits them all.",
+                text_color="#e0b050")
+        else:
+            shift_note = (" Shift-down is ignored: the cutter aligns to the "
+                          "marks." if self._shift() else "")
+            self.reg_hint.configure(
+                text=f"✓ All {per_page} slots usable with these marks." + shift_note,
+                text_color="#7cc47c")
 
         def render_sheet(page):
             """One sheet as a (W,H) image plus its local card hit-boxes."""
