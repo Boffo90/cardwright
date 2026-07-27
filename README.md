@@ -5,40 +5,92 @@ print-ready proxies** using AI upscaling on your own GPU — free, offline
 after setup, no upload limits.
 
 Unlike web-based proxy builders (which embed ~300 DPI images into a
-"1200 DPI" PDF), this app reconstructs real detail with per-card AI model
-selection, then builds guillotine-ready sheets with print-shop features.
+"1200 DPI" PDF), Cardwright reconstructs real detail with per-card AI model
+selection, then builds guillotine-ready — or cutting-machine-ready — sheets
+with print-shop features.
 
 ## Features
 
-- **Real AI upscaling to 2976×4160 px (1200 DPI at 63×88 mm)** on your GPU
-  (Vulkan). Per-card automatic model choice: paper scans, digital renders
-  and photorealistic art each get the model that suits them, with manual
+### Upscaling
+- **Real AI upscaling to 2976×4160 px** (1200 DPI at 63×88 mm) on your GPU
+  via Vulkan. No GPU? It falls back to high-quality resizing.
+- **Automatic per-card model choice**: paper scans, digital renders and
+  photorealistic art each get the model that suits them, with a manual
   override per card.
-- **Card sources**: card names, Scryfall links (any language), Gatherer
-  links (classic and new format, foreign printings), decklist paste
-  (`1 Card Name (SET) 123 [matte] *F*`), Archidekt deck URLs, local files
-  (PNG/JPG/WEBP/AVIF/…), drag & drop. Double-faced cards fetch both faces.
-- **Print sheets**: 3×3 at exactly 63×88 mm on A4/Letter, lossless or JPEG
-  PDF, corner cut guides + margin ticks (customizable), edge bleed with
-  color, page shift for thick-stock feeding, split into one file per page.
-- **Duplex backs**: mirrored back pages for flip-on-long-edge printing,
-  DFC backs paired automatically, user-supplied generic back, offset and
-  bleed to survive duplex drift.
-- **Printer calibration**: printable calibration sheet (9 color profiles),
-  shadow-lift test sheet (rescues dark details crushed by inkjet + matte
-  lamination), output sharpening. All applied at PDF time — PNG masters
+- Already high-res? The AI step is **skipped automatically** instead of
+  bloating the file.
+- Parallel processing, retry of failed cards, status filtering.
+
+### Getting cards in
+- Card names and **Scryfall** links (any language).
+- **Gatherer** links — classic and new format, including foreign printings
+  (images come from Gatherer, not substituted).
+- **Decklist paste**: `1 Card Name (SET) 123 [matte] *F*`, exact printings
+  by set + collector number.
+- **Archidekt** deck URLs.
+- **MPC Autofill search** built in: search, browse versions, pick one, and
+  its bleed edge is trimmed automatically.
+- Local files (PNG/JPG/WEBP/AVIF/…) and drag & drop.
+- Double-faced cards fetch both faces and stay paired.
+
+### Editable print preview
+The preview is a workspace, not a picture — what you see is what prints.
+
+- Scroll through **every sheet**, not just the first.
+- **Drag a card** to reorder it anywhere in the layout.
+- **Right-click** a card to duplicate it, remove it from the PDF, or delete
+  its file from the output folder.
+- **Add cards…** to pull more in mid-export.
+- Magnifier on hover to inspect detail at print resolution.
+- Build a PDF straight from picked files, without using the queue.
+- Print **only selected sheets** (e.g. `1` or `1-3,5`).
+- **Export presets** — save and reload named configurations.
+
+### Print sheets
+- Layouts: **3×3 portrait**, **4×2 landscape**, and **7-card Silhouette**.
+- Card sizes: **MTG / Pokémon (63×88)**, **Yu-Gi-Oh (59×86)**, mini (44×68),
+  tarot (70×120). Pokémon cards are the same size as Magic cards, so they
+  work as-is.
+- A4 / Letter, lossless or JPEG PDF, split into one file per N pages.
+- Cut guides with adjustable style (cross or corner crop marks), length,
+  thickness and offset; margin ticks; optional rounded corners.
+- Edge bleed with selectable colour, page shift for thick-stock feeding.
+
+### Cutting machines (Silhouette / Cricut)
+- **Registration marks** for print & cut: 3-mark standard and 4-mark
+  CAMEO 5a patterns, with adjustable inset, arm length and thickness.
+- Defaults are tuned so you **don't lose card slots** — A4 3×3 still prints
+  all 9. If a mark would sit on a card, that slot is left empty and the card
+  moves to the next sheet; a live hint tells you how many slots are usable.
+- **7-card Silhouette layout**: one vertically centred card in the left
+  column plus a 3×2 block, clearing both left corners where a Cameo's key
+  marks sit (clearance goes from ~5 mm to ~49 mm on Letter).
+
+### Duplex backs
+- Mirrored back pages for flip-on-long-edge printing, DFC backs paired
+  automatically, plus a user-supplied or MPC-sourced generic back.
+- **Back offset and rotation** to correct duplex misalignment, and back
+  bleed to survive drift.
+- **Duplex alignment test**: a two-page front/back registration sheet —
+  print it double-sided, hold it to the light, dial in offset and rotation.
+
+### Print quality
+- **Calibration sheet** with 9 colour profiles to match your printer.
+- **Shadow-lift test sheet** — rescues dark details crushed by inkjet plus
+  matte lamination.
+- **Black border deepening** for scans whose border prints as dark grey,
+  with automatic detection, per-card override and strength control.
+- Output sharpening. All of it is applied at PDF time — your PNG masters
   stay untouched.
-- **Live preview** of the sheet while you tweak export options.
-- Parallel processing, retry of failed cards, status filtering, in-app
-  auto-update.
 
 ## Install (Windows)
 
-1. Download the latest `.exe` from [Releases](../../releases).
+1. Download the latest release from [Releases](../../releases) — the
+   installer (`Cardwright_Setup-x.y.z.exe`, per-user, no admin) or the
+   portable `Cardwright.exe`.
 2. Run it. On first launch it downloads the AI engine and models
-   (~110 MB, one time) from their official sources and detects your GPU.
-3. No compatible Vulkan GPU? The app still works with high-quality
-   resizing instead of AI upscaling.
+   (one time) from their official sources and detects your GPU.
+3. The app updates itself from within.
 
 ## Run from source
 
@@ -66,6 +118,11 @@ version, or sell it. See [LICENSE](LICENSE).
   (BSD-3). Community models UltraSharp (Kim2091) and High Fidelity are
   fetched from the [Upscayl](https://github.com/upscayl/upscayl) project
   and carry non-commercial licenses.
+- Registration-mark geometry follows the spec used by
+  [silhouette-card-maker](https://github.com/Alan-Cha/silhouette-card-maker)
+  (MIT); the 7-card arrangement matches the "SevenCard" template from
+  [ProxySheet](https://github.com/Regenshire/ProxySheet) (GPL-3.0). No code
+  from either project is used — only the published geometry.
 - Intended for personal playtesting. You are responsible for how you use
   the output.
 
