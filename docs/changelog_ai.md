@@ -2,6 +2,13 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.12.1 — keep copyright microtext crisp
+- Border deepening no longer eats the anti-aliasing of the white microtext in
+  the bottom band (copyright / collector line). `BORDER_TONE_MAX` 100 → 58:
+  measured across 5 cards, anti-aliasing preserved went from 45-62% to 100%
+  while the frame still snaps to solid black. Fixes strokes looking thicker
+  and 'o'/'a'/'e' closing up in print.
+
 ## v2.12.0 — visual revamp (stage 1: design system, main window, Export tabs)
 - New **`theme.py`**: one set of colour / spacing / radius / type tokens.
 - Repalette to a **neutral graphite** scheme with a single warm accent, in the

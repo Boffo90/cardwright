@@ -24,6 +24,10 @@ Settled decisions. Do not re-litigate; add new ones here.
 - `build_duplex_test` is the calibration tool for offset+rotation: page 1 = front grid, page 2 = back grid column-mirrored + offset + rotation (exactly like `build_pdf`), so holding the print to the light shows the real misregistration.
 - Rounded corners use transparency + reportlab `mask='auto'` (forces PNG so alpha survives), so corners show paper/bleed. Not baked onto black. Radius is mm → px via card width (63 mm).
 
+## Microtext vs border deepening (v2.12.1)
+- `BORDER_TONE_MAX` went 100 → **58**. The bottom band carries the copyright/collector line as WHITE microtext on black, and its anti-aliased edges ramp through ~60-160. The binary snap at 100 crushed those to pure black, so in print the strokes thickened and the counters of 'o', 'a', 'e' closed up. Measured across 5 cards: only **45-62% of the anti-aliasing survived at 100, vs 100% at 58**, while the frame still snaps to solid black (99.3-100% of the top edge). A washed scan border sits near 37 after the shadow lift, so 58 keeps the original purpose intact.
+- Diagnosis note for the future: if a user reports "black looks thicker" on tiny text, compare the exported PDF with the border option Off vs On **on screen at 800%** before touching the printer driver — it isolates software from dot gain without wasting paper.
+
 ## Visual design system (v2.12.0)
 - All colour, spacing, radius and type live in **`theme.py`**. `gui.py` keeps its historical names (GOLD, PANEL, ROW…) as aliases onto those tokens, so the whole app restyled without touching every widget call.
 - Direction: **neutral pro tool** (Linear/Figma feel) — a low-chroma graphite ramp for every surface, with **one** warm accent (`#E0A33E`). The accent is reserved for the primary action, the active tab/filter and progress; headings and section labels use the text ramp. Previously gold was used for headings *and* buttons, which flattened the hierarchy.

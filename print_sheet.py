@@ -154,7 +154,13 @@ BORDER_MAX_DEPTH = 0.13      # per-edge cap, fraction of that dimension
 # 1200 DPI this is a quarter of a millimetre — enough to avoid a hard cut,
 # too small to see.
 BORDER_FADE_FRAC = 0.005     # fade-out distance past the detected border
-BORDER_TONE_MAX = 100       # inside the frame, pixels below this go black
+# Inside the frame, pixels below this go black. Kept low on purpose: the
+# bottom band carries the copyright/collector microtext in WHITE on black,
+# and its anti-aliased edges ramp through ~60-160. Crushing those to black
+# ate the letter edges, closing the counters of 'o', 'a' and 'e' in print
+# (measured: >half the ramp destroyed at 100). A washed scan border sits
+# near 37 after the shadow lift, so 58 still snaps real frames to black.
+BORDER_TONE_MAX = 58
 
 
 def _apply_profile(im: Image.Image, profile, shadow=0) -> Image.Image:
