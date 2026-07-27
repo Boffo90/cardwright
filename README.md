@@ -30,6 +30,8 @@ with print-shop features.
 - **Archidekt** deck URLs.
 - **MPC Autofill search** built in: search, browse versions, pick one, and
   its bleed edge is trimmed automatically.
+- **Yu-Gi-Oh search** via the YGOPRODeck catalogue, with every artwork of a
+  card listed; the card size switches to 59×86 mm automatically.
 - Local files (PNG/JPG/WEBP/AVIF/…) and drag & drop.
 - Double-faced cards fetch both faces and stay paired.
 
@@ -114,6 +116,10 @@ version, or sell it. See [LICENSE](LICENSE).
   images are fetched at the user's request from public APIs.
 - Card data and images courtesy of [Scryfall](https://scryfall.com);
   this app is not affiliated with Scryfall.
+- Yu-Gi-Oh card data and images courtesy of
+  [YGOPRODeck](https://ygoprodeck.com); this app is not affiliated with them.
+  Images are downloaded once to your machine rather than hotlinked, per their
+  API terms.
 - AI engine: [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
   (BSD-3). Community models UltraSharp (Kim2091) and High Fidelity are
   fetched from the [Upscayl](https://github.com/upscayl/upscayl) project

@@ -1,5 +1,10 @@
 # Cardwright — Project State
 
+## Direction (set July 2026)
+Goal is the **best all-in-one proxy tool for TCGs in general** — MTG stays the primary game and the default experience, but other games are first-class where a real data source exists.
+
+Rule for adding a game: **only integrate sources with a proper API** (Scryfall, Gatherer, MPC Autofill, YGOPRODeck). Curated Google Drive folders were offered and **declined**: no index or stable ids, one person's account as a single point of failure (public Drive folders hit download quotas), and shipping curated links to scanned catalogues shifts the project from "fetches on the user's request" toward being a distribution index. Users can still use those images via "Add files…" — the app handles any local image and the card size is configurable.
+
 ## Objective
 Free (not open-source) Windows desktop app that turns MTG card images into print-ready proxies at **true 1200 DPI** via GPU AI upscaling, and builds print-ready PDFs. Distributed globally via GitHub. Repo: **Boffo90/cardwright**. Author: Boffo90. Donations: paypal.me/warchazzz. Separate from the local proxy-selling business (never mention sales).
 

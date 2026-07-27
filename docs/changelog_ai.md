@@ -2,6 +2,23 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.11.0 — Yu-Gi-Oh card search (YGOPRODeck)
+- New **"Yu-Gi-Oh…"** search: gallery over the YGOPRODeck API, one entry per
+  artwork, click to queue. `ygoprodeck.py` is new and mirrors `mpcfill.py`'s
+  interface (search / download / fetch_thumb).
+- Respects their terms: requests throttled well under 20/s, and thumbnails are
+  cached on disk because they ask you not to keep hotlinking their images.
+- **Card size moved into the main window** next to the model picker (still one
+  shared setting with Export). It has to be right at upscale time — a Yu-Gi-Oh
+  card is 59×86 mm (aspect 0.686) and fitting it to Magic's 63×88 (0.716)
+  stretches it. Adding a Yu-Gi-Oh card switches the size over automatically
+  the first time.
+- `MPCDialog` generalised into `CardSearchDialog`, which takes the catalogue
+  backend as a parameter, so MPC and YGOPRODeck share one gallery.
+- Google Drive card dumps offered for Pokémon/Digimon/One Piece/Dragon Ball
+  were **declined** — see project_state.md for why (no index, quota-bound
+  single account, distribution-index risk).
+
 ## v2.10.0 — 7-card Silhouette layout
 - New **"7-card Silhouette"** layout, requested by a Cameo user: a 4×2 grid
   whose left column holds a single vertically-centred card, with the other 6

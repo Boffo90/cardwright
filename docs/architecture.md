@@ -10,6 +10,7 @@ All source in `C:/Users/smyo9/upscaler`.
 - `upscale.py` — pipeline: normalize → (trim MPC bleed) → Real-ESRGAN x4 → fit 2976×4160 → set 1200 DPI. No GPU: LANCZOS resize.
 - `scryfall.py` — fetch by name/link/decklist/Gatherer/Archidekt; `resolve_decklist`, `fetch_archidekt`, `_fetch_gatherer`, `download_to_temp` (handles Drive, timeout 120).
 - `mpcfill.py` — mpcfill.com API: `search`, `download`, `fetch_thumb`.
+- `ygoprodeck.py` — Yu-Gi-Oh catalogue (db.ygoprodeck.com), same interface as `mpcfill.py` so `CardSearchDialog` can drive either.
 - `print_sheet.py` — `build_pdf` (3×3 / 4×2 layouts, quality, calibration, shadow, sharpen, bleed, duplex, split), `build_calibration`, `build_shadow_test`, `_deepen_black_border`.
 - `bootstrap.py` — first-run download of engine + models; `probe_gpu` (Vulkan-only).
 - `update.py` — auto-update from GitHub Releases; `_write_swap_script`.

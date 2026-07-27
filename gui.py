@@ -59,6 +59,7 @@ from config import (
 from upscale import upscale
 import scryfall
 import mpcfill
+import ygoprodeck
 import print_sheet
 import bootstrap
 import update as app_update
@@ -341,7 +342,10 @@ class App(_Root):
                       command=self._open_import).grid(row=0, column=3, padx=4, pady=12)
         ctk.CTkButton(bar, text="MPC search…", width=110, height=40,
                       fg_color=BLUE, hover_color=BLUE_HOVER,
-                      command=self._open_mpc).grid(row=0, column=4, padx=(4, 12), pady=12)
+                      command=self._open_mpc).grid(row=0, column=4, padx=4, pady=12)
+        ctk.CTkButton(bar, text="Yu-Gi-Oh…", width=100, height=40,
+                      fg_color=BLUE, hover_color=BLUE_HOVER,
+                      command=self._open_ygo).grid(row=0, column=5, padx=(4, 12), pady=12)
 
     # ----------------------------------------------------------------- queue
     def _build_queue(self):
@@ -381,7 +385,7 @@ class App(_Root):
     def _build_footer(self):
         opts = ctk.CTkFrame(self, fg_color="transparent")
         opts.grid(row=3, column=0, sticky="ew", padx=24, pady=(4, 0))
-        opts.grid_columnconfigure(4, weight=1)
+        opts.grid_columnconfigure(6, weight=1)   # spacer
 
         ctk.CTkLabel(opts, text="Model:").grid(row=0, column=0, padx=(0, 6))
         self.model_menu = ctk.CTkOptionMenu(
@@ -399,18 +403,30 @@ class App(_Root):
             self.trim_switch.select()
         self.trim_switch.grid(row=0, column=3, padx=8)
 
+        # Card size drives what fit-to-card resizes to, so it has to be right
+        # here and not only in Export — a Yu-Gi-Oh card forced into Magic
+        # proportions comes out stretched.
+        ctk.CTkLabel(opts, text="Card:").grid(row=0, column=4, padx=(12, 4))
+        self.card_size_menu = ctk.CTkOptionMenu(
+            opts, values=list(CARD_SIZES.keys()), width=190,
+            fg_color=GRAY_BTN, button_color=GRAY_HOVER,
+            command=self._persist_card_size)
+        self.card_size_menu.set(
+            load_settings().get("card_size", CARD_SIZE_DEFAULT))
+        self.card_size_menu.grid(row=0, column=5, padx=(0, 8))
+
         self.pdf_btn = ctk.CTkButton(opts, text="Export PDF…", width=120,
                                      fg_color=BLUE, hover_color=BLUE_HOVER,
                                      command=self._export_pdf)
-        self.pdf_btn.grid(row=0, column=5, padx=2)
+        self.pdf_btn.grid(row=0, column=7, padx=2)
 
         ctk.CTkButton(opts, text="From files…", width=110,
                       fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._export_pdf_files).grid(row=0, column=6, padx=2)
+                      command=self._export_pdf_files).grid(row=0, column=8, padx=2)
 
         ctk.CTkButton(opts, text="Open output folder", width=140,
                       fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._open_output).grid(row=0, column=7, padx=(2, 0))
+                      command=self._open_output).grid(row=0, column=9, padx=(2, 0))
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.grid(row=4, column=0, sticky="ew", padx=24, pady=(8, 20))
@@ -493,7 +509,38 @@ class App(_Root):
     def _open_mpc(self):
         if self.running:
             return
-        MPCDialog(self, on_pick=self._add_mpc_card)
+        CardSearchDialog(self, on_pick=self._add_mpc_card)
+
+    def _persist_card_size(self, name):
+        """Card size is one setting shared with the Export dialog."""
+        s = load_settings()
+        s["card_size"] = name
+        save_settings(s)
+
+    def _open_ygo(self):
+        if self.running:
+            return
+        CardSearchDialog(
+            self, on_pick=self._add_ygo_card, backend=ygoprodeck,
+            title="Search Yu-Gi-Oh (YGOPRODeck)",
+            placeholder="Card name (e.g. Dark Magician)",
+            empty_msg="No matches on YGOPRODeck.",
+            note="Set Card size to Yu-Gi-Oh below")
+
+    def _add_ygo_card(self, card):
+        # same path as MPC: download the chosen artwork, then upscale it
+        base = f"{card['name']}  [{card['source'] or 'YGO'}]"
+        safe = re.sub(r'[<>:"/\\|?*]', "", base)
+        self._add_item(base, "card",
+                       downloads=[(safe, card["download"])], label=base)
+        # Yu-Gi-Oh cards are 59x86 mm — fit-to-card would stretch them to
+        # Magic proportions, so switch the size over the first time.
+        if self.card_size_menu.get() == CARD_SIZE_DEFAULT:
+            for name in CARD_SIZES:
+                if name.startswith("Yu-Gi-Oh"):
+                    self.card_size_menu.set(name)
+                    self._persist_card_size(name)
+                    break
 
     def _add_mpc_card(self, card):
         # MPC images are Google-Drive downloads with a bleed edge; reuse the
@@ -1330,6 +1377,13 @@ class ExportDialog(ctk.CTkToplevel):
         s = load_settings()
         s.update(self._collect_settings())
         save_settings(s)
+        # keep the main window's copy of the shared card-size setting in step
+        menu = getattr(self.master, "card_size_menu", None)
+        if menu is not None:
+            try:
+                menu.set(self.card_size.get())
+            except Exception:
+                pass
 
     # ---------------------------------------------------------- presets
     _PRESET_NONE = "— presets —"
@@ -1879,7 +1933,7 @@ class ExportDialog(ctk.CTkToplevel):
             self._after_back_change()
 
     def _choose_back_mpc(self):
-        MPCDialog(self, on_pick=self._back_from_mpc)
+        CardSearchDialog(self, on_pick=self._back_from_mpc)
 
     def _back_from_mpc(self, card):
         # download the chosen MPC image now so it can be used as the back
@@ -2396,16 +2450,25 @@ class SetupDialog(ctk.CTkToplevel):
 # --------------------------------------------------------------------------
 # MPC Autofill search dialog
 # --------------------------------------------------------------------------
-class MPCDialog(ctk.CTkToplevel):
-    """Search mpcfill.com and pick a card version to add to the queue."""
+class CardSearchDialog(ctk.CTkToplevel):
+    """Search a card catalogue and pick a version to add to the queue.
+
+    `backend` is any module exposing search(query) -> [card dict] and
+    fetch_thumb(url) -> bytes, where a card dict carries name / source / dpi /
+    thumb / download / identifier. Both mpcfill and ygoprodeck match that."""
 
     COLS = 4
     THUMB = (150, 209)
 
-    def __init__(self, master, on_pick):
+    def __init__(self, master, on_pick, backend=mpcfill,
+                 title="Search MPC Autofill",
+                 placeholder="Card name (e.g. Sol Ring)",
+                 empty_msg="No matches on MPC Autofill.", note=None):
         super().__init__(master)
         self.on_pick = on_pick
-        self.title("Search MPC Autofill")
+        self.backend = backend
+        self.empty_msg = empty_msg
+        self.title(title)
         self.geometry("720x640")
         self.transient(master)
         self.after(60, self.grab_set)
@@ -2415,16 +2478,20 @@ class MPCDialog(ctk.CTkToplevel):
         self._thumbs = {}          # keep CTkImage refs alive
         self._token = 0            # ignore stale search threads
 
-        ctk.CTkLabel(self, text="Search MPC Autofill",
+        ctk.CTkLabel(self, text=title,
                      font=("Georgia", 18, "bold"), text_color=GOLD).grid(
             row=0, column=0, sticky="w", padx=20, pady=(16, 2))
+        if note:
+            ctk.CTkLabel(self, text=note, text_color=MUTED,
+                         font=("Segoe UI", 11)).grid(
+                row=0, column=0, sticky="e", padx=20, pady=(20, 2))
 
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.grid(row=1, column=0, sticky="ew", padx=16, pady=6)
         bar.grid_columnconfigure(0, weight=1)
         self.entry = ctk.CTkEntry(bar, height=38, fg_color=PANEL,
                                   border_color=GRAY_BTN,
-                                  placeholder_text="Card name (e.g. Sol Ring)")
+                                  placeholder_text=placeholder)
         self.entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
         self.entry.bind("<Return>", lambda e: self._search())
         self.search_btn = ctk.CTkButton(bar, text="Search", width=100, height=38,
@@ -2458,7 +2525,7 @@ class MPCDialog(ctk.CTkToplevel):
 
         def work():
             try:
-                cards = mpcfill.search(query)
+                cards = self.backend.search(query)
                 self.after(0, lambda: self._show(cards, token))
             except Exception as e:
                 self.after(0, lambda: self._failed(e))
@@ -2474,7 +2541,7 @@ class MPCDialog(ctk.CTkToplevel):
             return
         self.search_btn.configure(state="normal")
         if not cards:
-            self.status.configure(text="No matches on MPC Autofill.",
+            self.status.configure(text=self.empty_msg,
                                   text_color="#fca5a5")
             return
         self.status.configure(
@@ -2493,8 +2560,11 @@ class MPCDialog(ctk.CTkToplevel):
         short = name if len(name) <= 26 else name[:25] + "…"
         ctk.CTkLabel(tile, text=short, font=("Segoe UI", 11),
                      wraplength=self.THUMB[0]).pack(padx=6)
-        ctk.CTkLabel(tile, text=f"{card['source']} · {card['dpi']}dpi",
-                     font=("Segoe UI", 10), text_color=MUTED).pack(padx=6)
+        sub = card["source"] or ""
+        if card.get("dpi"):                  # YGOPRODeck doesn't report DPI
+            sub = f"{sub} · {card['dpi']}dpi" if sub else f"{card['dpi']}dpi"
+        ctk.CTkLabel(tile, text=sub, font=("Segoe UI", 10),
+                     text_color=MUTED).pack(padx=6)
         add = ctk.CTkButton(tile, text="Add", width=70, height=26,
                             fg_color=GOLD, hover_color=GOLD_HOVER,
                             text_color=GOLD_TEXT, font=("Segoe UI", 11, "bold"),
@@ -2502,7 +2572,7 @@ class MPCDialog(ctk.CTkToplevel):
         add.pack(padx=6, pady=(2, 8))
 
         def load():
-            data = mpcfill.fetch_thumb(card["thumb"])
+            data = self.backend.fetch_thumb(card["thumb"])
             if not data or token != self._token:
                 return
             try:

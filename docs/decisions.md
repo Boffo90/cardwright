@@ -24,6 +24,11 @@ Settled decisions. Do not re-litigate; add new ones here.
 - `build_duplex_test` is the calibration tool for offset+rotation: page 1 = front grid, page 2 = back grid column-mirrored + offset + rotation (exactly like `build_pdf`), so holding the print to the light shows the real misregistration.
 - Rounded corners use transparency + reportlab `mask='auto'` (forces PNG so alpha survives), so corners show paper/bleed. Not baked onto black. Radius is mm → px via card width (63 mm).
 
+## Multi-TCG sources (v2.11.0)
+- One catalogue backend interface: a module exposing `search(query)` → list of dicts with `name / source / dpi / thumb / download / ext / identifier`, plus `download(card, target)` and `fetch_thumb(url)`. `mpcfill.py` and `ygoprodeck.py` both implement it, and `CardSearchDialog(backend=...)` renders either. Add a game by writing one module.
+- YGOPRODeck rules shape the client: ≤20 req/s (we throttle to ~8) and *"do not continually hotlink images — download and re-host"*. Full images already land in the user's output folder; search thumbnails are cached under `TEMP_FOLDER/ygo_thumbs` so a repeated search never re-hits their CDN.
+- **Card size must be set before upscaling, not just before printing.** `fit_to_card` force-resizes, so a Yu-Gi-Oh card (59×86, aspect 0.686) squeezed into MTG's 2976×4160 (0.716) comes out stretched. Hence the selector now sits in the main window too, sharing `settings["card_size"]` with Export, and queueing a Yu-Gi-Oh card flips it automatically the first time.
+
 ## Non-grid layouts (v2.10.0)
 - Card slots come from `print_sheet.layout_positions(layout, ...)` which returns explicit (x, y) origins in placement order, not from `index % cols` maths. It is unit-agnostic, so the preview calls it in mm and `build_pdf` in points — one source of truth for both.
 - Duplex mirroring uses `mirror_x(x, ox, block_w, card_w)` (reflect across the block centre) instead of column-index flipping. Equivalent for grids, and the only thing that works for non-grid layouts.
