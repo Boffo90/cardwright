@@ -193,6 +193,14 @@ def card_lang_code(name=None):
     """Picker label -> Scryfall code. None/unknown falls back to English."""
     return CARD_LANGS.get(name or CARD_LANG_DEFAULT, "en")
 
+
+# When a lookup is just a card name, compare that card's printings and take
+# the one with the best scan instead of whichever Scryfall returns first.
+# Worth defaulting on here: a weak scan is exactly what upscaling to 1200 DPI
+# magnifies. Only applies to bare names — a link or a decklist line already
+# names the printing the user wants.
+BEST_SCAN_DEFAULT = True
+
 # ==========================================
 # PROCESSING
 # ==========================================

@@ -15,6 +15,15 @@ A global **Card language** picker (main window, under Model/Card size, persisted
 - Queue labels keep the **English card name** even for localized printings (Scryfall's `printed_name` holds the localized one); it matches the decklist the user pasted and stays searchable. Filenames carry the `-<lang>` suffix.
 - A language fallback is **not** an import failure: it gets an info popup and neutral status text, not the red "Imported with issues" path.
 
+## Best scan selection (v2.13.0)
+When a lookup is a bare card name, pick the printing with the best image rather than Scryfall's first result. On by default (`best_scan`) because a weak scan is what upscaling to 1200 DPI magnifies.
+- **Pixel dimensions are useless here** — Scryfall serves every PNG at 745×1040. Quality is `image_status` plus real byte size.
+- **Filter by `image_status` before weighing bytes.** Measured on Silence: the m11 *placeholder* is 810 KB while the real m14 scan is 801 KB, so weight alone picks the placeholder.
+- **`Content-Length` via HEAD**, not a download — exact size, no image transfer. Verified working on `cards.scryfall.io`.
+- **Bytes only break ties within one `image_status` tier.** Across tiers they mislead: grain is what PNG compresses worst, so a noisy low-res scan can out-weigh a clean high-res one.
+- **Restrict to the same `illustration_id`.** Without it, English "Silence" jumps to a Secret Lair by a different artist — an art swap, not a quality upgrade. If no printing in the target language shares the art, the restriction is dropped rather than failing.
+- Shortlist capped (`_BEST_SCAN_CANDIDATES`) so cards with dozens of printings (basic lands) stay to a handful of HEADs.
+
 ## Licensing
 **Source-available** (not MIT): code visible, redistribution/selling/rebranding forbidden.
 

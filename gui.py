@@ -52,6 +52,7 @@ from config import (
     CARD_SIZE_DEFAULT,
     CARD_LANGS,
     CARD_LANG_DEFAULT,
+    BEST_SCAN_DEFAULT,
     card_lang_code,
     card_size_mm,
     find_back_image,
@@ -498,11 +499,19 @@ class App(_Root):
         self.card_lang_menu.grid(row=1, column=1, sticky="w",
                                  pady=(0, pad["md"]))
 
+        self.best_scan_switch = _switch(opts, "Best scan")
+        if load_settings().get("best_scan", BEST_SCAN_DEFAULT):
+            self.best_scan_switch.select()
+        self.best_scan_switch.configure(command=self._persist_best_scan)
+        self.best_scan_switch.grid(row=1, column=2, padx=(pad["md"], 0),
+                                   pady=(0, pad["md"]))
+
         ctk.CTkLabel(
-            opts, text="Applies to card names and decklists. Cards with no "
-                       "printing in that language stay English.",
+            opts, text="Language applies to card names and decklists; cards "
+                       "with no printing in it stay English. Best scan "
+                       "compares printings of a searched name.",
             font=(UI, theme.TYPE["small"]), text_color=MUTED).grid(
-            row=1, column=2, columnspan=4, sticky="w",
+            row=1, column=3, columnspan=3, sticky="w",
             padx=(pad["sm"], 0), pady=(0, pad["md"]))
 
         # Row 2 — actions
@@ -621,6 +630,11 @@ class App(_Root):
         s["card_lang"] = name
         save_settings(s)
 
+    def _persist_best_scan(self):
+        s = load_settings()
+        s["best_scan"] = bool(self.best_scan_switch.get())
+        save_settings(s)
+
     def _open_ygo(self):
         if self.running:
             return
@@ -737,6 +751,7 @@ class App(_Root):
         # fit-to-card resizes to the chosen TCG's size (set in Export)
         card = load_settings().get("card_size", CARD_SIZE_DEFAULT)
         lang = card_lang_code(load_settings().get("card_lang"))
+        best_scan = bool(load_settings().get("best_scan", BEST_SCAN_DEFAULT))
         pending = [it for it in self.items if it.status != "done"]
         total = len(pending)
         state = {"done": 0, "errors": 0}
@@ -744,7 +759,7 @@ class App(_Root):
 
         def process(item):
             try:
-                self._process_item(item, model, fit, trim, card, lang)
+                self._process_item(item, model, fit, trim, card, lang, best_scan)
             except Exception as e:
                 with lock:
                     state["errors"] += 1
@@ -760,7 +775,8 @@ class App(_Root):
 
         self.after(0, lambda: self._finish(total, state["errors"]))
 
-    def _process_item(self, item, model, fit, trim, card_size=None, lang=None):
+    def _process_item(self, item, model, fit, trim, card_size=None, lang=None,
+                      best_scan=False):
         self._ui(item.set_status, "processing", "Preparing…", 0)
         item.outputs = []
 
@@ -777,7 +793,7 @@ class App(_Root):
                 item.ref,
                 status_callback=lambda t, it=item: self._ui(
                     it.set_status, "processing", t),
-                lang=lang)
+                lang=lang, best_scan=best_scan)
             targets = [str(p) for p in paths]
             item.released_at = meta.get("released_at")
             item.set_code = meta.get("set")

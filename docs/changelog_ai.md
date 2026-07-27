@@ -18,6 +18,22 @@ Registro por versión. Actualizar en cada release.
   so a decklist costs one extra request per unique printing, ~0.1 s each.
 - 11 languages, matching Scryfall's own printings.
 
+### Best scan (same release)
+- New **Best scan** switch (on by default): when the lookup is just a card
+  name, compare that card's printings and take the one with the best image
+  instead of whichever Scryfall returns first. A weak scan is exactly what
+  upscaling to 1200 DPI magnifies.
+- Every Scryfall PNG is 745×1040, so quality is judged by `image_status`
+  first (placeholders and missing art are dropped outright — a placeholder
+  can out-weigh a real scan) and then by **Content-Length via HEAD**, which
+  reads the true byte size without downloading the image. Bytes only break
+  ties *within* the best status tier; across tiers a grainy low-res scan
+  would beat a clean high-res one, since noise is what PNG compresses worst.
+- **Same artwork only.** This is a scan upgrade, not an art swap — otherwise
+  "Silence" in English lands on a Secret Lair by a different artist.
+- Only bare names are eligible. A link or a decklist line already names the
+  printing the user chose and is never second-guessed.
+
 ## v2.12.1 — keep copyright microtext crisp
 - Border deepening no longer eats the anti-aliasing of the white microtext in
   the bottom band (copyright / collector line). `BORDER_TONE_MAX` 100 → 58:

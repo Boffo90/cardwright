@@ -149,6 +149,20 @@ def _png_urls(card: dict) -> list[tuple[str, str]]:
 # language
 # --------------------------------------------------------------------------
 
+def _ref_names_a_printing(ref: str) -> bool:
+    """
+    True when the reference picks a specific printing — a URL, or a decklist
+    line with a set and collector number. Those are deliberate choices and
+    must never be second-guessed; only a bare card name is up for grabs.
+    """
+    if "scryfall.com" in ref.lower() or "scryfall.io" in ref.lower():
+        return True
+    if "gatherer.wizards.com" in ref.lower():
+        return True
+    entries, _ = parse_decklist(_extract_tags(ref)[0])
+    return bool(entries)
+
+
 def _ref_pins_language(ref: str) -> bool:
     """
     True when the reference itself names a language — a /ja/ Scryfall card
@@ -198,10 +212,134 @@ def _localize(card: dict, lang: str | None) -> tuple[dict, bool]:
 
 
 # --------------------------------------------------------------------------
+# best scan
+# --------------------------------------------------------------------------
+# Scryfall serves every PNG at the same 745x1040, so pixel dimensions say
+# nothing about quality — what varies is how good the underlying scan is.
+# Two signals, and both are needed:
+#
+#   image_status  drops the ones that aren't the card at all. A "placeholder"
+#                 can easily outweigh a real scan (Silence: the m11
+#                 placeholder is 810 KB, the real m14 scan 801 KB), so
+#                 filtering by status has to happen BEFORE weighing bytes.
+#   Content-Length  at identical dimensions and a lossless format, more bytes
+#                 means more actual detail. A HEAD request gets it without
+#                 transferring the image.
+
+_IMAGE_STATUS_RANK = {"highres_scan": 0, "lowres": 1}
+
+# Cards like basic lands have dozens of printings; ranking by metadata first
+# and only weighing this many keeps a name lookup to a handful of HEADs.
+_BEST_SCAN_CANDIDATES = 8
+
+
+def _printings(name: str, lang: str | None) -> list[dict]:
+    """Every printing of `name`, restricted to `lang` when one is given."""
+    q = f'!"{name}"'
+    if lang:
+        q += f" lang:{lang}"
+    r = _get(f"{SCRYFALL_API}/cards/search", params={
+        "q": q, "unique": "prints", "include_multilingual": "true"})
+    if r.status_code != 200:
+        return []
+    return r.json().get("data", [])
+
+
+def _illustration(card: dict) -> str | None:
+    """A card's illustration id (double-faced cards carry it per face)."""
+    if card.get("illustration_id"):
+        return card["illustration_id"]
+    for face in card.get("card_faces") or []:
+        if face.get("illustration_id"):
+            return face["illustration_id"]
+    return None
+
+
+def _png_bytes(card: dict) -> int:
+    """Size of a card's front PNG via HEAD, or 0 if it can't be measured."""
+    try:
+        url, _ = _png_urls(card)[0]
+    except (ScryfallError, IndexError):
+        return 0
+    try:
+        time.sleep(SCRYFALL_DELAY)
+        r = requests.head(url, headers=SCRYFALL_HEADERS, timeout=15,
+                          allow_redirects=True)
+        return int(r.headers.get("Content-Length") or 0)
+    except (requests.RequestException, ValueError):
+        return 0
+
+
+def best_printing(card: dict, lang: str | None,
+                  status_callback=None) -> dict:
+    """
+    Swap a card for whichever of its printings has the best scan.
+
+    Only ever called for a bare card name, where no particular printing was
+    asked for. A decklist line or a link names an exact printing and is left
+    alone — the user already chose.
+
+    Falls back to `card` unchanged whenever the search turns up nothing
+    usable, so this can never make a lookup fail.
+    """
+    name = card.get("name")
+    if not name:
+        return card
+
+    candidates = _printings(name, lang)
+    if not candidates and lang and lang != "en":
+        candidates = _printings(name, "en")
+    if not candidates:
+        return card
+
+    # Real scans only.
+    usable = [c for c in candidates
+              if c.get("image_status") in _IMAGE_STATUS_RANK
+              and (c.get("image_uris") or c.get("card_faces"))]
+    if not usable:
+        return card
+
+    # Same artwork only. This is a scan-quality upgrade, not an art swap —
+    # "Silence" in English otherwise lands on a Secret Lair with completely
+    # different art, which is not what someone typing a card name asked for.
+    illus = _illustration(card)
+    if illus:
+        same_art = [c for c in usable if _illustration(c) == illus]
+        if same_art:
+            usable = same_art
+
+    # Weigh bytes only WITHIN the best tier available. Across tiers it would
+    # misjudge: a grainy low-res scan can out-weigh a clean high-res one,
+    # since noise is exactly what PNG compresses worst.
+    best_tier = min(_IMAGE_STATUS_RANK[c["image_status"]] for c in usable)
+    usable = [c for c in usable
+              if _IMAGE_STATUS_RANK[c["image_status"]] == best_tier]
+
+    # Newest first, so the shortlist cut keeps the most recent printings.
+    usable.sort(key=lambda c: c.get("released_at") or "", reverse=True)
+    shortlist = usable[:_BEST_SCAN_CANDIDATES]
+
+    if len(shortlist) == 1:
+        return shortlist[0]
+
+    if status_callback:
+        status_callback(f"Comparing {len(shortlist)} printings...")
+
+    best, best_size = card, -1
+    for c in shortlist:
+        size = _png_bytes(c)
+        if size > best_size:
+            best, best_size = c, size
+
+    return best if best_size > 0 else shortlist[0]
+
+
+# --------------------------------------------------------------------------
 # public API
 # --------------------------------------------------------------------------
 
-def fetch(ref: str, status_callback=None, lang: str | None = None) -> tuple[list[Path], dict]:
+def fetch(ref: str, status_callback=None, lang: str | None = None,
+          best_scan: bool = False) -> tuple[list[Path], dict]:
     """
     Resolve `ref` and download the full-resolution PNG(s) into TEMP_FOLDER.
 
@@ -233,10 +371,15 @@ def fetch(ref: str, status_callback=None, lang: str | None = None) -> tuple[list
 
     card = _card_from_reference(ref)
 
-    # A name or a plain decklist line resolves to the English printing; the
-    # global preference is applied on top. A link that already names a
-    # language is left alone.
-    if lang and not _ref_pins_language(ref):
+    # A bare name doesn't choose a printing, so it can be upgraded to the one
+    # with the best scan (which resolves the language at the same time).
+    if best_scan and not _ref_names_a_printing(ref):
+        card = best_printing(card, lang, status_callback)
+
+    # Otherwise a name or a plain decklist line resolves to the English
+    # printing and the global preference goes on top. A link that already
+    # names a language is left alone.
+    elif lang and not _ref_pins_language(ref):
         if status_callback:
             status_callback(f"Looking for the {lang} printing...")
         card, _ = _localize(card, lang)
