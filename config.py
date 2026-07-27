@@ -99,6 +99,34 @@ TARGET_DPI = 1200
 CARD_WIDTH_PX = 2976
 CARD_HEIGHT_PX = 4160
 
+# --- card size (other TCGs) ----------------------------------------------
+# Physical card sizes in mm. MTG and Pokémon share the standard 63x88 size,
+# so Pokémon works with no changes; Yu-Gi-Oh and others are smaller.
+# name -> (width_mm, height_mm)
+CARD_SIZES = {
+    "MTG / Pokémon (63×88 mm)": (63.0, 88.0),
+    "Yu-Gi-Oh (59×86 mm)": (59.0, 86.0),
+    "Mini / board game (44×68 mm)": (44.0, 68.0),
+    "Tarot (70×120 mm)": (70.0, 120.0),
+}
+CARD_SIZE_DEFAULT = "MTG / Pokémon (63×88 mm)"
+
+
+def card_size_mm(name=None):
+    """(width_mm, height_mm) of the chosen card size."""
+    return CARD_SIZES.get(name or CARD_SIZE_DEFAULT, CARD_SIZES[CARD_SIZE_DEFAULT])
+
+
+def card_size_px(name=None, dpi=TARGET_DPI):
+    """Card size in pixels at the target DPI (what fit-to-card resizes to)."""
+    if (name or CARD_SIZE_DEFAULT) == CARD_SIZE_DEFAULT and dpi == TARGET_DPI:
+        # keep the exact legacy MTG size: 4160 is the clean x4 of Scryfall's
+        # 1040 px, where rounding 88 mm at 1200 dpi would give 4157
+        return CARD_WIDTH_PX, CARD_HEIGHT_PX
+    w_mm, h_mm = card_size_mm(name)
+    return round(w_mm / 25.4 * dpi), round(h_mm / 25.4 * dpi)
+
+
 # When True, the final image is resized to the exact card pixel size above.
 # When False, the native upscaled resolution is kept (DPI metadata still set).
 FIT_TO_CARD_DEFAULT = True

@@ -456,6 +456,87 @@ BLEED_COLORS = {
 }
 
 
+# --- Silhouette / Cricut registration marks -------------------------------
+# Geometry the cutter's optical sensor expects (same spec the silhouette-card-
+# maker project implements): a 5x5 mm filled square at the top-left plus
+# L-shaped brackets at the other corners. The CAMEO 5a reads a 4-mark pattern
+# where the top-left square is an L too.
+REG_SQUARE_MM = 5.0          # side of the filled top-left square (3-mark)
+REG_LENGTH_MIN_MM = 5.0
+REG_LENGTH_MAX_MM = 20.0
+REG_THICK_MIN_MM = 0.5
+REG_THICK_MAX_MM = 1.0
+REG_INSET_MIN_MM = 10.0
+REG_INSET_DEFAULT_MM = 15.875   # Silhouette Studio default (0.625 in)
+REG_PADDING_MM = 1.5            # clear space the sensor needs around a mark
+REG_PATTERNS = ["3 marks (standard)", "4 marks (CAMEO 5a)"]
+
+
+def _reg_geometry(pw, ph, inset_mm, length_mm, thick_mm, four=False):
+    """Marks as ([(x0,y0,x1,y1) filled rects], [keep-clear boxes]) in points.
+
+    Coordinates are reportlab's (origin bottom-left). Each mark is drawn as
+    filled rectangles so the thickness is exact at any resolution.
+    """
+    length_mm = max(REG_LENGTH_MIN_MM, min(length_mm, REG_LENGTH_MAX_MM))
+    thick_mm = max(REG_THICK_MIN_MM, min(thick_mm, REG_THICK_MAX_MM))
+    inset_mm = max(REG_INSET_MIN_MM, inset_mm)
+
+    ins, ln, th = inset_mm * mm, length_mm * mm, thick_mm * mm
+    sq = REG_SQUARE_MM * mm
+    pad = REG_PADDING_MM * mm
+    rects, clear = [], []
+
+    def L(cx, cy, dx, dy):
+        """Bracket with its corner at (cx, cy), arms running dx/dy (±1)."""
+        x0, x1 = sorted((cx, cx + dx * ln))
+        y0, y1 = sorted((cy, cy + dy * th))
+        rects.append((x0, y0, x1, y1))                    # horizontal arm
+        x2, x3 = sorted((cx, cx + dx * th))
+        y2, y3 = sorted((cy, cy + dy * ln))
+        rects.append((x2, y2, x3, y3))                    # vertical arm
+        bx0, bx1 = sorted((cx, cx + dx * ln))
+        by0, by1 = sorted((cy, cy + dy * ln))
+        clear.append((bx0 - pad, by0 - pad, bx1 + pad, by1 + pad))
+
+    # top-left: filled square (3-mark) or bracket (4-mark)
+    if four:
+        L(ins, ph - ins, +1, -1)
+    else:
+        x0, y0 = ins, ph - ins - sq
+        rects.append((x0, y0, x0 + sq, y0 + sq))
+        clear.append((x0 - pad, y0 - pad, x0 + sq + pad, y0 + sq + pad))
+
+    L(pw - ins, ph - ins, -1, -1)          # top-right
+    L(ins, ins, +1, +1)                    # bottom-left
+    if four:
+        L(pw - ins, ins, -1, +1)           # bottom-right
+    return rects, clear
+
+
+def _draw_reg_marks(c, pw, ph, inset_mm, length_mm, thick_mm, four=False):
+    rects, _ = _reg_geometry(pw, ph, inset_mm, length_mm, thick_mm, four)
+    c.setFillColorRGB(0, 0, 0)
+    for x0, y0, x1, y1 in rects:
+        c.rect(x0, y0, x1 - x0, y1 - y0, stroke=0, fill=1)
+
+
+def _reg_blocked_slots(pw, ph, ox, oy, block_h, gutter, cols, rows,
+                       card_w, card_h, inset_mm, length_mm, thick_mm,
+                       four=False):
+    """Slot indices whose card would collide with a mark's keep-clear box.
+    Those slots are left empty so the sensor can still read the marks."""
+    _, clear = _reg_geometry(pw, ph, inset_mm, length_mm, thick_mm, four)
+    blocked = set()
+    for idx in range(cols * rows):
+        x, y = _card_pos(idx, ox, oy, block_h, gutter, cols, card_w, card_h)
+        for cx0, cy0, cx1, cy1 in clear:
+            if x < cx1 and x + card_w > cx0 and y < cy1 and y + card_h > cy0:
+                blocked.add(idx)
+                break
+    return blocked
+
+
 def _boundaries(origin, size, gutter, count=3):
     """Card-edge coordinates along one axis (duplicates removed at gutter 0)."""
     edges = []
@@ -468,9 +549,10 @@ def _boundaries(origin, size, gutter, count=3):
 
 def _draw_marks(c, ox, oy, block_w, block_h, gutter=0.0, guide_rgb=(1, 1, 1),
                 cols=COLS, rows=ROWS, guide_len_mm=4.0, guide_thick=0.4,
-                guide_style="Cross", guide_offset_mm=0.0):
-    xs = _boundaries(ox, CARD_W, gutter, cols)
-    ys = _boundaries(oy, CARD_H, gutter, rows)
+                guide_style="Cross", guide_offset_mm=0.0,
+                card_w=CARD_W, card_h=CARD_H):
+    xs = _boundaries(ox, card_w, gutter, cols)
+    ys = _boundaries(oy, card_h, gutter, rows)
     tick = guide_len_mm * mm
     # The gap between the corner and where each arm starts. "Corner" guides
     # default to a small gap (crop-mark look); an explicit offset overrides it
@@ -506,11 +588,12 @@ def _draw_marks(c, ox, oy, block_w, block_h, gutter=0.0, guide_rgb=(1, 1, 1),
         c.line(ox + block_w + MARK_GAP, y, ox + block_w + MARK_GAP + MARK_LEN, y)
 
 
-def _card_pos(idx, ox, oy, block_h, gutter=0.0, cols=COLS):
+def _card_pos(idx, ox, oy, block_h, gutter=0.0, cols=COLS,
+              card_w=CARD_W, card_h=CARD_H):
     col = idx % cols
     row = idx // cols
-    x = ox + col * (CARD_W + gutter)
-    y = oy + block_h - (row + 1) * CARD_H - row * gutter
+    x = ox + col * (card_w + gutter)
+    y = oy + block_h - (row + 1) * card_h - row * gutter
     return x, y
 
 
@@ -527,6 +610,9 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               guide_offset_mm=0.0, corner_radius_mm=0.0,
               layout=DEFAULT_LAYOUT, deepen_border=False, border_modes=None,
               border_amount=1.0, border_width=0.0, sheets_sel=None,
+              card_size_mm=None, reg_marks=False,
+              reg_inset_mm=REG_INSET_DEFAULT_MM, reg_length_mm=20.0,
+              reg_thick_mm=1.0, reg_pattern=REG_PATTERNS[0],
               status_callback=None) -> list[Path]:
     """
     Compose `images` (paths, in order) into one or more print-sheet PDFs.
@@ -549,6 +635,10 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     guide_len_mm / guide_thick / guide_style: cut-guide length, line width and
                     "Cross" (solid +) vs "Corner" (gapped crop marks).
     corner_radius_mm: >0 rounds every card's printed corners.
+    card_size_mm:   (w, h) in mm for non-MTG TCGs; None = 63x88.
+    reg_marks:      draw Silhouette/Cricut registration marks. Card slots that
+                    a mark would sit on are left empty so the cutter's sensor
+                    can read them, which lowers the cards per sheet.
     edge_bleed_mm:  fronts get a colored bleed frame this wide around each
                     card; cards are separated by a 2x gutter so the cut runs
                     through the frame — small cut drift shows frame color,
@@ -582,11 +672,14 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     if landscape:
         page = (page[1], page[0])
     pw, ph = page
+    card_w, card_h = ((card_size_mm[0] * mm, card_size_mm[1] * mm)
+                      if card_size_mm else (CARD_W, CARD_H))
     gutter = 2 * edge_bleed_mm * mm
-    block_w = cols * CARD_W + (cols - 1) * gutter
-    block_h = rows * CARD_H + (rows - 1) * gutter
+    block_w = cols * card_w + (cols - 1) * gutter
+    block_h = rows * card_h + (rows - 1) * gutter
     if block_w > pw - 2 * MIN_BOTTOM or block_h > ph - 2 * MIN_BOTTOM:
-        raise ValueError("Edge bleed too large for this page size")
+        raise ValueError("Card block too large for this page size "
+                         "(reduce edge bleed, card size or grid)")
     ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm)
     guide_rgb = GUIDE_COLORS.get(guide_color, (1, 1, 1))
     bleed_rgb = BLEED_COLORS.get(bleed_color, (0, 0, 0))
@@ -595,9 +688,22 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     dy = back_offset[1] * mm
     img_mask = "auto" if corner_radius_mm > 0 else None
 
+    # Slots a registration mark sits on are left empty: the cutter's sensor
+    # needs those corners clear, so cards flow into the remaining slots.
+    reg_four = reg_pattern == REG_PATTERNS[1]
+    blocked = _reg_blocked_slots(
+        pw, ph, ox, oy, block_h, gutter, cols, rows, card_w, card_h,
+        reg_inset_mm, reg_length_mm, reg_thick_mm, reg_four) if reg_marks else set()
+    usable = [s for s in range(per_page) if s not in blocked]
+    if reg_marks and not usable:
+        raise ValueError("Registration marks cover every card slot — "
+                         "use a smaller grid, card size or mark length")
+    slots_per_page = len(usable)
+
     # split the card list into sheets, then sheets into files
     idxs = list(range(len(images)))
-    batches = [idxs[i:i + per_page] for i in range(0, len(idxs), per_page)]
+    batches = [idxs[i:i + slots_per_page]
+               for i in range(0, len(idxs), slots_per_page)]
     if sheets_sel is not None:
         # keep only the chosen sheets (0-based indices), e.g. "print sheet 1"
         batches = [b for i, b in enumerate(batches) if i in sheets_sel]
@@ -643,21 +749,26 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
             # ---- front page
             if ebleed > 0:
                 c.setFillColorRGB(*bleed_rgb)
-                for slot in range(len(batch)):
-                    x, y = _card_pos(slot, ox, oy, block_h, gutter, cols)
+                for k in range(len(batch)):
+                    x, y = _card_pos(usable[k], ox, oy, block_h, gutter, cols,
+                                     card_w, card_h)
                     c.rect(x - ebleed, y - ebleed,
-                           CARD_W + 2 * ebleed, CARD_H + 2 * ebleed,
+                           card_w + 2 * ebleed, card_h + 2 * ebleed,
                            stroke=0, fill=1)
-            for slot, i in enumerate(batch):
+            for k, i in enumerate(batch):
                 placed += 1
                 if status_callback:
                     status_callback(f"Placing card {placed}/{len(images)}…")
-                x, y = _card_pos(slot, ox, oy, block_h, gutter, cols)
+                x, y = _card_pos(usable[k], ox, oy, block_h, gutter, cols,
+                                 card_w, card_h)
                 c.drawImage(ImageReader(str(flat(images[i]))), x, y,
-                            CARD_W, CARD_H, mask=img_mask)
+                            card_w, card_h, mask=img_mask)
             _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
                         cols, rows, guide_len_mm, guide_thick, guide_style,
-                        guide_offset_mm)
+                        guide_offset_mm, card_w, card_h)
+            if reg_marks:
+                _draw_reg_marks(c, pw, ph, reg_inset_mm, reg_length_mm,
+                                reg_thick_mm, reg_four)
             c.showPage()
 
             # ---- mirrored back page (duplex, flip on long edge)
@@ -670,21 +781,26 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     c.translate(pw / 2, ph / 2)
                     c.rotate(back_rotation_deg)
                     c.translate(-pw / 2, -ph / 2)
-                for slot, i in enumerate(batch):
+                for k, i in enumerate(batch):
+                    slot = usable[k]
                     col = slot % cols
                     row = slot // cols
                     mirrored = row * cols + (cols - 1 - col)
-                    x, y = _card_pos(mirrored, ox, oy, block_h, gutter, cols)
+                    x, y = _card_pos(mirrored, ox, oy, block_h, gutter, cols,
+                                     card_w, card_h)
                     # oversized by the bleed on every edge: small duplex
                     # drift stays covered when cutting along the front
                     c.drawImage(ImageReader(str(flat(backs[i]))),
                                 x + dx - bleed, y + dy - bleed,
-                                CARD_W + 2 * bleed, CARD_H + 2 * bleed,
+                                card_w + 2 * bleed, card_h + 2 * bleed,
                                 mask=img_mask)
                 c.restoreState()
                 _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
                             cols, rows, guide_len_mm, guide_thick, guide_style,
-                            guide_offset_mm)
+                            guide_offset_mm, card_w, card_h)
+                if reg_marks:
+                    _draw_reg_marks(c, pw, ph, reg_inset_mm, reg_length_mm,
+                                    reg_thick_mm, reg_four)
                 c.showPage()
 
         c.save()

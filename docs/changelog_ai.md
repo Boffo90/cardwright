@@ -2,6 +2,20 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.9.0 — cutting-machine registration marks + other TCG card sizes
+From Reddit feedback after the public launch.
+- **Registration marks** (Silhouette / Cricut print-and-cut): 3-mark standard
+  or 4-mark CAMEO 5a pattern, with inset / length / thickness settings.
+  Geometry follows the spec the sensor expects (5×5 mm filled square + L
+  brackets, arms 5–20 mm, 0.5–1 mm thick, inset ≥10 mm, 1.5 mm clear zone).
+  Card slots a mark would sit on are **left empty** and cards flow into the
+  remaining slots (A4 3×3 goes 9 → 6 cards/sheet, or 5 with 4 marks), which
+  is required for the sensor to read them. Shown in the preview.
+- **Card size selector** for other TCGs: MTG/Pokémon 63×88 (Pokémon already
+  matched MTG, so it needed nothing), Yu-Gi-Oh 59×86, mini 44×68, tarot
+  70×120. Drives both fit-to-card upscaling and the PDF layout/preview.
+  The MTG size keeps its exact legacy 2976×4160 px (clean x4 of Scryfall).
+
 ## v2.8.0 — renamed ProxyForge → Cardwright
 - App and brand renamed to **Cardwright** (ProxyForge was too generic and
   clashed with other *Forge proxy tools). No functional changes.

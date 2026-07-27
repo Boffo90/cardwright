@@ -12,6 +12,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import numpy as np
 from PIL import Image as PILImage, ImageDraw as PILDraw, ImageTk as PILImageTk
+from reportlab.lib.units import mm as mm_pt      # 1 mm in PDF points
 
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -47,6 +48,9 @@ from config import (
     BORDER_WIDTH_DEFAULT,
     CALIBRATION_PROFILES,
     BACKS_MODES,
+    CARD_SIZES,
+    CARD_SIZE_DEFAULT,
+    card_size_mm,
     find_back_image,
     ICON_FILE,
     load_settings,
@@ -579,6 +583,8 @@ class App(_Root):
         model = self.model_menu.get()
         fit = bool(self.fit_switch.get())
         trim = bool(self.trim_switch.get())
+        # fit-to-card resizes to the chosen TCG's size (set in Export)
+        card = load_settings().get("card_size", CARD_SIZE_DEFAULT)
         pending = [it for it in self.items if it.status != "done"]
         total = len(pending)
         state = {"done": 0, "errors": 0}
@@ -586,7 +592,7 @@ class App(_Root):
 
         def process(item):
             try:
-                self._process_item(item, model, fit, trim)
+                self._process_item(item, model, fit, trim, card)
             except Exception as e:
                 with lock:
                     state["errors"] += 1
@@ -602,7 +608,7 @@ class App(_Root):
 
         self.after(0, lambda: self._finish(total, state["errors"]))
 
-    def _process_item(self, item, model, fit, trim):
+    def _process_item(self, item, model, fit, trim, card_size=None):
         self._ui(item.set_status, "processing", "Preparing…", 0)
         item.outputs = []
 
@@ -637,6 +643,7 @@ class App(_Root):
                 set_code=item.set_code,
                 ai=self.ai_ok,
                 trim_bleed=trim,
+                card_size=card_size,
                 progress_callback=lambda v, it=item: self._ui(
                     it.set_status, "processing", None, v),
                 status_callback=lambda s, it=item: self._ui(
@@ -944,6 +951,8 @@ class ExportDialog(ctk.CTkToplevel):
                       command=self._delete_preset).pack(side="left")
 
         section("Layout")
+        self.card_size = row("Card size", list(CARD_SIZES.keys()),
+                             s.get("card_size", CARD_SIZE_DEFAULT))
         self.layout = row("Card grid", list(print_sheet.LAYOUTS.keys()),
                           s.get("layout", print_sheet.DEFAULT_LAYOUT))
         self.page = row("Page size", PDF_PAGE_SIZES,
@@ -968,6 +977,29 @@ class ExportDialog(ctk.CTkToplevel):
                                        0.0, "0 = square")
         self.shift_down = entry_row("Shift down (mm)", "shift_down", 0.0,
                                     "late paper feed")
+
+        section("Cutting machine (Silhouette / Cricut)")
+        self.reg_marks = ctk.CTkSwitch(
+            left, text="Registration marks", command=self._refresh_preview)
+        if s.get("reg_marks"):
+            self.reg_marks.select()
+        self.reg_marks.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                            padx=12, pady=(4, 2))
+        self._r += 1
+        ctk.CTkLabel(left, text="Card slots under a mark are left empty so the "
+                     "sensor can read it.", text_color=MUTED,
+                     font=("Segoe UI", 11), wraplength=400,
+                     justify="left").grid(
+            row=self._r, column=0, columnspan=2, sticky="w", padx=12)
+        self._r += 1
+        self.reg_pattern = row("Mark pattern", print_sheet.REG_PATTERNS,
+                               s.get("reg_pattern", print_sheet.REG_PATTERNS[0]))
+        self.reg_inset = entry_row("Mark inset (mm)", "reg_inset",
+                                   print_sheet.REG_INSET_DEFAULT_MM, "min 10")
+        self.reg_length = entry_row("Mark length (mm)", "reg_length", 20.0,
+                                    "5–20")
+        self.reg_thick = entry_row("Mark thickness (mm)", "reg_thick", 1.0,
+                                   "0.5–1")
 
         section("Image pipeline (PDF only, masters untouched)")
         self.quality = row("Quality", list(PDF_QUALITY_MODES.keys()),
@@ -1174,6 +1206,23 @@ class ExportDialog(ctk.CTkToplevel):
     def _corner_radius(self):
         return self._float(self.corner_radius, 0.0, 0.0, 6.0)
 
+    def _card_mm(self):
+        return card_size_mm(self.card_size.get())
+
+    def _reg_inset(self):
+        return self._float(self.reg_inset, print_sheet.REG_INSET_DEFAULT_MM,
+                           print_sheet.REG_INSET_MIN_MM, 86.0)
+
+    def _reg_length(self):
+        return self._float(self.reg_length, 20.0,
+                           print_sheet.REG_LENGTH_MIN_MM,
+                           print_sheet.REG_LENGTH_MAX_MM)
+
+    def _reg_thick(self):
+        return self._float(self.reg_thick, 1.0,
+                           print_sheet.REG_THICK_MIN_MM,
+                           print_sheet.REG_THICK_MAX_MM)
+
     def _sheets_sel(self):
         """Parse the Sheets box ('' / '1' / '1-3' / '1,3,5' / '2-') into a set
         of 0-based sheet indices, or None for all sheets. Input is 1-based."""
@@ -1204,6 +1253,12 @@ class ExportDialog(ctk.CTkToplevel):
         last-used values and to save/load named presets."""
         dx, dy = self._offsets()
         return {
+            "card_size": self.card_size.get(),
+            "reg_marks": bool(self.reg_marks.get()),
+            "reg_pattern": self.reg_pattern.get(),
+            "reg_inset": self._reg_inset(),
+            "reg_length": self._reg_length(),
+            "reg_thick": self._reg_thick(),
             "layout": self.layout.get(),
             "page": self.page.get(),
             "quality": self.quality.get(),
@@ -1239,6 +1294,10 @@ class ExportDialog(ctk.CTkToplevel):
                 except Exception:
                     pass
         om(self.layout, "layout"); om(self.page, "page"); om(self.split, "split")
+        om(self.card_size, "card_size"); om(self.reg_pattern, "reg_pattern")
+        if "reg_marks" in d:
+            (self.reg_marks.select if d["reg_marks"] else
+             self.reg_marks.deselect)()
         om(self.bleed_color, "bleed_color"); om(self.guides, "guides")
         om(self.guide_style, "guide_style"); om(self.quality, "quality")
         om(self.sharpen, "sharpen"); om(self.shadow, "shadow")
@@ -1253,6 +1312,9 @@ class ExportDialog(ctk.CTkToplevel):
                        (self.guide_thick, "guide_thick"),
                        (self.guide_offset, "guide_offset"),
                        (self.corner_radius, "corner_radius"),
+                       (self.reg_inset, "reg_inset"),
+                       (self.reg_length, "reg_length"),
+                       (self.reg_thick, "reg_thick"),
                        (self.back_dx, "back_dx"), (self.back_dy, "back_dy"),
                        (self.back_rot, "back_rot"), (self.back_bleed, "back_bleed")):
             if key in d:
@@ -1404,6 +1466,7 @@ class ExportDialog(ctk.CTkToplevel):
         W, H = int(pw * s), int(ph * s)
 
         per_page = cols * rows
+        CW, CH = self._card_mm()          # card size in mm for this TCG
         border_on = self.border.get() != BORDER_MODES[0]
         # preview keeps excluded cards visible (shown crossed out); the export
         # count below uses the dropped-excluded list
@@ -1415,8 +1478,8 @@ class ExportDialog(ctk.CTkToplevel):
         page_items = backs if showing_backs else fronts
         eb = self._edge_bleed()
         g = 2 * eb
-        bw = cols * 63 + (cols - 1) * g
-        bh = rows * 88 + (rows - 1) * g
+        bw = cols * CW + (cols - 1) * g
+        bh = rows * CH + (rows - 1) * g
         left = (pw - bw) / 2
         top = (ph - bh) / 2 + self._shift()
         if ph - top - bh < 3:
@@ -1429,9 +1492,7 @@ class ExportDialog(ctk.CTkToplevel):
             self.bleed_color.get(), (10, 10, 10))
         gc = {"White": (255, 255, 255), "Black": (0, 0, 0),
               "Gray": (120, 120, 120), "None": None}.get(self.guides.get())
-        cw, ch = X(left + 63) - X(left), X(top + 88) - X(top)
-        sheets = max(1, -(-len(fronts) // per_page))
-        self._page = max(0, min(self._page, sheets - 1))
+        cw, ch = X(left + CW) - X(left), X(top + CH) - X(top)
 
         guide_len = self._guide_len()
         guide_style = self.guide_style.get()
@@ -1439,29 +1500,45 @@ class ExportDialog(ctk.CTkToplevel):
         corner_r = self._corner_radius()
         corner_mask = None
         if corner_r > 0:
-            r = max(1, int(corner_r * cw / 63))
+            r = max(1, int(corner_r * cw / CW))
             corner_mask = PILImage.new("L", (cw, ch), 0)
             PILDraw.Draw(corner_mask).rounded_rectangle(
                 [0, 0, cw - 1, ch - 1], radius=r, fill=255)
+
+        # registration marks: mirror print_sheet's geometry and slot skipping
+        reg_on = bool(self.reg_marks.get())
+        reg_four = self.reg_pattern.get() == print_sheet.REG_PATTERNS[1]
+        reg_args = (self._reg_inset(), self._reg_length(), self._reg_thick())
+        if reg_on:
+            blocked = print_sheet._reg_blocked_slots(
+                pw * mm_pt, ph * mm_pt, left * mm_pt, (ph - top - bh) * mm_pt,
+                bh * mm_pt, g * mm_pt, cols, rows, CW * mm_pt, CH * mm_pt,
+                *reg_args, reg_four)
+        else:
+            blocked = set()
+        usable = [s for s in range(per_page) if s not in blocked]
+        per_sheet = len(usable) or 1
+        sheets = max(1, -(-len(fronts) // per_sheet))
+        self._page = max(0, min(self._page, sheets - 1))
 
         def render_sheet(page):
             """One sheet as a (W,H) image plus its local card hit-boxes."""
             img = PILImage.new("RGB", (W, H), (255, 255, 255))
             d = PILDraw.Draw(img)
             slots = []
-            base_i = page * per_page
-            for idx in range(per_page):
-                col, rw = idx % cols, idx // cols
+            for k, grid in enumerate(usable):
+                slot = page * per_sheet + k
                 # backs print column-mirrored so they land behind their front
-                local = rw * cols + (cols - 1 - col) if showing_backs else idx
-                slot = base_i + local
-                x = left + col * (63 + g)
-                y = top + rw * (88 + g)
+                col, rw = grid % cols, grid // cols
+                if showing_backs:
+                    col = cols - 1 - col
+                x = left + col * (CW + g)
+                y = top + rw * (CH + g)
                 if slot >= len(page_items):
                     continue
                 if eb > 0:
                     d.rectangle([X(x - eb), X(y - eb),
-                                 X(x + 63 + eb), X(y + 88 + eb)],
+                                 X(x + CW + eb), X(y + CH + eb)],
                                 fill=bleed_fill, outline=(210, 210, 215))
                 item = page_items[slot]
                 key = str(item) if item else None
@@ -1474,13 +1551,13 @@ class ExportDialog(ctk.CTkToplevel):
                     t = None
                 if t:
                     img.paste(t.resize((cw, ch)), (X(x), X(y)), corner_mask)
-                    slots.append((X(x), X(y), X(x + 63), X(y + 88), key))
+                    slots.append((X(x), X(y), X(x + CW), X(y + CH), key))
                     if key in self._excluded:
                         ov = PILImage.new("RGBA", (cw, ch), (20, 20, 25, 150))
                         img.paste(ov, (X(x), X(y)), ov)
-                        d.line([X(x), X(y), X(x + 63), X(y + 88)],
+                        d.line([X(x), X(y), X(x + CW), X(y + CH)],
                                fill=(220, 70, 70), width=3)
-                        d.line([X(x + 63), X(y), X(x), X(y + 88)],
+                        d.line([X(x + CW), X(y), X(x), X(y + CH)],
                                fill=(220, 70, 70), width=3)
                     elif mode != "auto":
                         bc = (90, 190, 110) if mode == "on" else (210, 110, 110)
@@ -1489,7 +1566,7 @@ class ExportDialog(ctk.CTkToplevel):
                         d.text((X(x) + 8, X(y) + 5),
                                "ON" if mode == "on" else "OFF", fill=(15, 15, 20))
                 else:
-                    d.rectangle([X(x), X(y), X(x + 63), X(y + 88)],
+                    d.rectangle([X(x), X(y), X(x + CW), X(y + CH)],
                                 fill=(55, 60, 76))
                     if showing_backs and not item:
                         d.text((X(x) + cw // 2 - 26, X(y) + ch // 2),
@@ -1497,9 +1574,9 @@ class ExportDialog(ctk.CTkToplevel):
 
             xs, ys = set(), set()
             for c_ in range(cols):
-                xs.add(left + c_ * (63 + g)); xs.add(left + c_ * (63 + g) + 63)
+                xs.add(left + c_ * (CW + g)); xs.add(left + c_ * (CW + g) + CW)
             for c_ in range(rows):
-                ys.add(top + c_ * (88 + g)); ys.add(top + c_ * (88 + g) + 88)
+                ys.add(top + c_ * (CH + g)); ys.add(top + c_ * (CH + g) + CH)
             if gc:
                 if guide_offset > 0:
                     gap = guide_offset
@@ -1527,6 +1604,15 @@ class ExportDialog(ctk.CTkToplevel):
                 d.line([X(left - 5), X(y), X(left - 1), X(y)], fill=(120, 125, 135))
                 d.line([X(left + bw + 1), X(y), X(left + bw + 5), X(y)],
                        fill=(120, 125, 135))
+            if reg_on:
+                # same rects the PDF draws, converted from points back to mm
+                rects, _ = print_sheet._reg_geometry(
+                    pw * mm_pt, ph * mm_pt, *reg_args, reg_four)
+                for x0, y0, x1, y1 in rects:
+                    # PDF origin is bottom-left, the preview's is top-left
+                    d.rectangle([X(x0 / mm_pt), X(ph - y1 / mm_pt),
+                                 X(x1 / mm_pt), X(ph - y0 / mm_pt)],
+                                fill=(0, 0, 0))
             d.rectangle([0, 0, W - 1, H - 1], outline=(185, 190, 200))
             return img, slots
 
@@ -1541,19 +1627,20 @@ class ExportDialog(ctk.CTkToplevel):
         self._slots = []
         for p in range(sheets):
             st = self._sheet_tops[p]
-            for idx in range(per_page):
-                col, rw = idx % cols, idx // cols
-                local = rw * cols + (cols - 1 - col) if showing_backs else idx
-                slot = p * per_page + local
+            for k, grid in enumerate(usable):
+                slot = p * per_sheet + k
                 if slot >= len(page_items):
                     continue
                 item = page_items[slot]
                 if not item:
                     continue
-                x = left + col * (63 + g)
-                y = top + rw * (88 + g)
+                col, rw = grid % cols, grid // cols
+                if showing_backs:
+                    col = cols - 1 - col
+                x = left + col * (CW + g)
+                y = top + rw * (CH + g)
                 self._slots.append((X(x), st + X(y),
-                                    X(x + 63), st + X(y + 88), str(item)))
+                                    X(x + CW), st + X(y + CH), str(item)))
 
         self._render_sheet = lambda p: render_sheet(p)[0]
         self._sheet_geom = (W, H, gap, sheets)
@@ -1586,7 +1673,7 @@ class ExportDialog(ctk.CTkToplevel):
             self.side_btn.set("Fronts")
 
         # export counts use the dropped-excluded list
-        exp_sheets = max(1, -(-len(exp_fronts) // per_page)) if exp_fronts else 0
+        exp_sheets = max(1, -(-len(exp_fronts) // per_sheet)) if exp_fronts else 0
         if sel is not None:
             exp_sheets = sum(1 for i in range(exp_sheets) if i in sel)
         exp_pages = exp_sheets * 2 if duplex else exp_sheets
@@ -2024,6 +2111,12 @@ class ExportDialog(ctk.CTkToplevel):
             border_amount=self.border_amount.get() / 100.0,
             border_width=self.border_width.get() / 100.0,
             sheets_sel=self._sheets_sel(),
+            card_size_mm=self._card_mm(),
+            reg_marks=bool(self.reg_marks.get()),
+            reg_pattern=self.reg_pattern.get(),
+            reg_inset_mm=self._reg_inset(),
+            reg_length_mm=self._reg_length(),
+            reg_thick_mm=self._reg_thick(),
             pages_per_file=PAGES_PER_FILE.get(self.split.get(), 0),
             backs=backs,
             back_offset=self._offsets(),

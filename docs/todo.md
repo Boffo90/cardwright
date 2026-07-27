@@ -14,7 +14,11 @@
 - Add cards from the preview — needs the upscaling pipeline inside ExportDialog (cross-module; deferred).
 - Preview still loads every card's working image up front (raw thumbs); only the treated copies and sheet painting are lazy now. Fully lazy thumb loading could help 300+ card decks.
 
-## Reference project (Malacath-92/Proxy-PDF-Maker) — not adopted
+## From the Reddit launch (July 2026)
+- **Linux .deb** — requested. Real cost: Real-ESRGAN ncnn has Linux builds, but `update.py` (Windows `.bat` swap), `bootstrap.py` (downloads the Windows zip) and packaging all need a Linux path. A real port, not a tweak. Undecided.
+- **Card fetching for other TCGs** — only the size is configurable now; Scryfall search is still MTG-only. Yu-Gi-Oh/Pokémon users must add files or use MPC search.
+- **mpcfill OCR fork (GPL)** — a user is building an OCR'd catalog + vote federation. Consuming their **HTTP API is fine** (GPL covers distributing code, not using a service); we must NOT vendor their GPL code into Cardwright. Wait for their API/spec.
+
+## Reference projects — not adopted
 - Manual bleed override ("Assume no/full bleed") when MPC auto-detect misfires — worth doing if reported.
-- Custom card size / other TCGs (Lorcana, FaB) — big scope, changes MTG identity.
 - Margin modes, mixed card orientation, base-PDF registration — low value for our fixed grid.

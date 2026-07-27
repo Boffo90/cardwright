@@ -32,6 +32,7 @@ from config import (
     TARGET_DPI,
     CARD_WIDTH_PX,
     CARD_HEIGHT_PX,
+    card_size_px,
     FIT_TO_CARD_DEFAULT,
     MPC_BLEED_RATIO_MIN,
     MPC_BLEED_RATIO_MAX,
@@ -112,12 +113,13 @@ def _normalize_input(file: Path, trim_bleed: bool = False,
     return temp
 
 
-def _postprocess(path: Path, fit_to_card: bool):
+def _postprocess(path: Path, fit_to_card: bool, target=None):
     """Resize to exact card size (optional) and stamp DPI metadata in place."""
     im = Image.open(path)
+    target = target or (CARD_WIDTH_PX, CARD_HEIGHT_PX)
 
-    if fit_to_card and im.size != (CARD_WIDTH_PX, CARD_HEIGHT_PX):
-        im = im.resize((CARD_WIDTH_PX, CARD_HEIGHT_PX), Image.LANCZOS)
+    if fit_to_card and im.size != target:
+        im = im.resize(target, Image.LANCZOS)
 
     im.save(path, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
 
@@ -131,6 +133,7 @@ def upscale(
     set_code: str | None = None,
     ai: bool = True,
     trim_bleed: bool = False,
+    card_size: str | None = None,
     progress_callback=None,
     status_callback=None,
 ):
@@ -152,6 +155,9 @@ def upscale(
     if not file.exists():
         raise FileNotFoundError(file)
 
+    # target pixels for the chosen TCG card size (MTG/Pokemon by default)
+    card_w_px, card_h_px = card_size_px(card_size)
+
     if not ai or not REALESRGAN_EXE.exists():
         # No compatible GPU (or engine missing): plain high-quality resize.
         # Still yields a correctly sized 1200 DPI file, just without the AI
@@ -164,7 +170,7 @@ def upscale(
         im = Image.open(source)
         if im.mode not in ("RGB", "RGBA"):
             im = im.convert("RGBA")
-        im = im.resize((CARD_WIDTH_PX, CARD_HEIGHT_PX), Image.LANCZOS)
+        im = im.resize((card_w_px, card_h_px), Image.LANCZOS)
         im.save(output, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
         if progress_callback:
             progress_callback(1.0)
@@ -207,14 +213,14 @@ def upscale(
     # pixels (slow preview, heavy PDFs). Just fit to card (if asked) + DPI.
     with Image.open(source) as probe:
         w, h = probe.size
-    if w >= CARD_WIDTH_PX and h >= CARD_HEIGHT_PX:
+    if w >= card_w_px and h >= card_h_px:
         if status_callback:
             status_callback("Already high-res — skipping AI upscale")
         im = Image.open(source)
         if im.mode not in ("RGB", "RGBA"):
             im = im.convert("RGBA")
-        if fit_to_card and im.size != (CARD_WIDTH_PX, CARD_HEIGHT_PX):
-            im = im.resize((CARD_WIDTH_PX, CARD_HEIGHT_PX), Image.LANCZOS)
+        if fit_to_card and im.size != (card_w_px, card_h_px):
+            im = im.resize((card_w_px, card_h_px), Image.LANCZOS)
         im.save(output, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
         if progress_callback:
             progress_callback(1.0)
@@ -266,7 +272,7 @@ def upscale(
     if status_callback:
         status_callback("Finalizing (DPI / size)...")
 
-    _postprocess(output, fit_to_card)
+    _postprocess(output, fit_to_card, (card_w_px, card_h_px))
 
     if progress_callback:
         progress_callback(1.0)
