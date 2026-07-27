@@ -63,27 +63,56 @@ import ygoprodeck
 import print_sheet
 import bootstrap
 import update as app_update
+import theme
 from version import APP_NAME, APP_VERSION, DONATE_URL
 
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
-# ---- palette: dark arena + MTG gold accent -------------------------------
-BG        = "#101218"   # window
-PANEL     = "#181b24"   # bars / frames
-ROW       = "#1f2330"   # queue rows
-GOLD      = "#d4a017"
-GOLD_HOVER = "#b8860b"
-GOLD_TEXT = "#171003"   # text on gold buttons
-BLUE      = "#2c5f8a"   # secondary actions (import / export)
-BLUE_HOVER = "#24486a"
-GRAY_BTN  = "#2a2e3a"
-GRAY_HOVER = "#39404f"
-MUTED     = "#8a92a6"
 
-# WUBRG accent dots for the header
-MANA_COLORS = ["#f5e7bd", "#2f76b5", "#6b6570", "#d3202a", "#00733e"]
+def _has_font(name: str) -> bool:
+    """Segoe UI Variable ships with Windows 11; fall back on older systems."""
+    try:
+        from tkinter import font as tkfont
+        return name in tkfont.families()
+    except Exception:
+        return False
+
+# ---- palette ------------------------------------------------------------
+# Everything comes from theme.py so the whole app shares one set of tokens.
+# These aliases keep the historical names used throughout this file.
+BG         = theme.BG
+PANEL      = theme.SURFACE
+ROW        = theme.SURFACE_ALT
+GOLD       = theme.ACCENT            # primary actions / active state
+GOLD_HOVER = theme.ACCENT_HOVER
+GOLD_TEXT  = theme.ON_ACCENT
+BLUE       = theme.CONTROL           # secondary actions are neutral now
+BLUE_HOVER = theme.CONTROL_HOVER
+GRAY_BTN   = theme.CONTROL
+GRAY_HOVER = theme.CONTROL_HOVER
+MUTED      = theme.TEXT_MUTED
+TEXT       = theme.TEXT
+TEXT_DIM   = theme.TEXT_DIM
+BORDER     = theme.BORDER
+BORDER_STRONG = theme.BORDER_STRONG
+
+CONTROL_ALT = theme.SURFACE_HOVER
+TEXT_MUTED_ = theme.TEXT_MUTED     # section eyebrows
+
+# resolved once the Tk root exists (font families need one) — see App.__init__
+UI = theme.FONT_FALLBACK
+
+
+def _switch(parent, text, **kw):
+    """Switch styled with the accent, so nothing keeps CTk's default blue."""
+    return ctk.CTkSwitch(
+        parent, text=text, font=(UI, theme.TYPE["body"]), text_color=TEXT_DIM,
+        progress_color=theme.ACCENT, button_color=theme.TEXT,
+        button_hover_color="#FFFFFF", fg_color=theme.SURFACE_HOVER,
+        width=40, switch_width=38, switch_height=18, **kw)
+
 
 # short per-row model names -> full config labels (None = follow global menu)
 ROW_MODELS = {
@@ -137,7 +166,7 @@ class QueueItem(ctk.CTkFrame):
 
         self.dot = ctk.CTkLabel(self, text="●", width=18,
                                 text_color=STATUS_COLORS["pending"][0],
-                                font=("Segoe UI", 16))
+                                font=(UI, 16))
         self.dot.grid(row=0, column=0, padx=(12, 6), pady=8)
 
         if label is not None:
@@ -147,17 +176,17 @@ class QueueItem(ctk.CTkFrame):
         else:
             label = ref
         self.name = ctk.CTkLabel(self, text=self._trim(label), anchor="w",
-                                 font=("Segoe UI", 13))
+                                 font=(UI, 13))
         self.name.grid(row=0, column=1, sticky="ew", pady=(8, 0))
 
         self.info = ctk.CTkLabel(self, text="Pending", anchor="w",
                                  text_color=STATUS_COLORS["pending"][1],
-                                 font=("Segoe UI", 11))
+                                 font=(UI, 11))
         self.info.grid(row=1, column=1, sticky="ew", pady=(0, 8))
 
         self.model_menu = ctk.CTkOptionMenu(
             self, values=list(ROW_MODELS.keys()), width=104, height=26,
-            font=("Segoe UI", 11), fg_color=GRAY_BTN, button_color=GRAY_HOVER,
+            font=(UI, 11), fg_color=GRAY_BTN, button_color=GRAY_HOVER,
             command=self._model_changed)
         self.model_menu.set("Auto")
         self.model_menu.grid(row=0, column=2, rowspan=2, padx=(4, 2))
@@ -204,6 +233,9 @@ class QueueItem(ctk.CTkFrame):
 class App(_Root):
     def __init__(self):
         super().__init__()
+        global UI
+        if _has_font(theme.FONT):        # needs a live Tk root, so not at import
+            UI = theme.FONT
         self.title(WINDOW_TITLE)
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.minsize(900, 620)
@@ -301,20 +333,18 @@ class App(_Root):
         self.header = header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 6))
         ctk.CTkLabel(header, text=APP_NAME,
-                     font=("Georgia", 30, "bold"),
-                     text_color=GOLD).pack(side="left")
-        for color in MANA_COLORS:
-            ctk.CTkLabel(header, text="●", font=("Segoe UI", 16),
-                         text_color=color).pack(side="left", padx=2, pady=(12, 0))
-        ctk.CTkLabel(header, text="  Scryfall · Gatherer → 1200 DPI print-ready cards",
-                     font=("Segoe UI", 13),
-                     text_color=MUTED).pack(side="left", pady=(14, 0))
-        ctk.CTkLabel(header, text=f"v{APP_VERSION}", font=("Segoe UI", 11),
-                     text_color=MUTED).pack(side="right", pady=(14, 0))
-        ctk.CTkButton(header, text="♥ Donate", width=84, height=28,
+                     font=(UI, theme.TYPE["display"], "bold"),
+                     text_color=TEXT).pack(side="left")
+        ctk.CTkLabel(header, text="1200 DPI print-ready proxies",
+                     font=(UI, theme.TYPE["small"]),
+                     text_color=MUTED).pack(side="left", padx=(10, 0), pady=(6, 0))
+        ctk.CTkLabel(header, text=f"v{APP_VERSION}",
+                     font=(UI, theme.TYPE["caption"]),
+                     text_color=MUTED).pack(side="right", pady=(6, 0))
+        ctk.CTkButton(header, text="Donate", width=76, height=28,
                       fg_color="transparent", hover_color=GRAY_HOVER,
                       border_width=1, border_color=GOLD, text_color=GOLD,
-                      font=("Segoe UI", 12),
+                      font=(UI, 12),
                       command=lambda: webbrowser.open(DONATE_URL)).pack(
             side="right", padx=(4, 10), pady=(10, 0))
 
@@ -326,13 +356,13 @@ class App(_Root):
 
         self.ref_entry = ctk.CTkEntry(
             bar, height=40, fg_color=BG, border_color=GRAY_BTN,
-            placeholder_text="Card name, Scryfall or Gatherer link  (e.g. Lightning Bolt, scryfall.com/card/…, gatherer.wizards.com/…)")
+            placeholder_text="Card name, Scryfall or Gatherer link")
         self.ref_entry.grid(row=0, column=0, sticky="ew", padx=(12, 8), pady=12)
         self.ref_entry.bind("<Return>", lambda e: self._add_scryfall())
 
         ctk.CTkButton(bar, text="Add card", width=100, height=40,
                       fg_color=GOLD, hover_color=GOLD_HOVER, text_color=GOLD_TEXT,
-                      font=("Segoe UI", 13, "bold"),
+                      font=(UI, 13, "bold"),
                       command=self._add_scryfall).grid(row=0, column=1, padx=4, pady=12)
         ctk.CTkButton(bar, text="Add files…", width=100, height=40,
                       fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
@@ -356,14 +386,14 @@ class App(_Root):
 
         top = ctk.CTkFrame(wrap, fg_color="transparent")
         top.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 0))
-        ctk.CTkLabel(top, text="Queue", text_color=GOLD,
-                     font=("Segoe UI", 13, "bold")).pack(side="left")
+        ctk.CTkLabel(top, text="Queue", text_color=TEXT_DIM,
+                     font=(UI, 13, "bold")).pack(side="left")
 
         self.status_filter = "All"
         self.filter_btn = ctk.CTkSegmentedButton(
             top, values=["All", "Pending", "Processing", "Done", "Error"],
             command=self._set_filter, height=26,
-            font=("Segoe UI", 11),
+            font=(UI, 11),
             fg_color=BG, unselected_color=BG, unselected_hover_color=GRAY_HOVER,
             selected_color=GOLD, selected_hover_color=GOLD_HOVER,
             text_color="#d7dbe4")
@@ -378,75 +408,99 @@ class App(_Root):
         hint = "Drag & drop images here" if _DND else "Use “Add files…” to add images"
         self.empty_hint = ctk.CTkLabel(
             self.queue_frame, text=f"\n\n{hint}\n",
-            text_color=MUTED, font=("Segoe UI", 14))
+            text_color=MUTED, font=(UI, 14))
         self.empty_hint.grid(row=0, column=0, pady=40)
 
     # ---------------------------------------------------------------- footer
     def _build_footer(self):
-        opts = ctk.CTkFrame(self, fg_color="transparent")
+        # Row 1 — how cards get processed (settings only, no actions)
+        opts = ctk.CTkFrame(self, fg_color=PANEL, corner_radius=theme.RADIUS_LG)
         opts.grid(row=3, column=0, sticky="ew", padx=24, pady=(4, 0))
-        opts.grid_columnconfigure(6, weight=1)   # spacer
+        opts.grid_columnconfigure(6, weight=1)
+        pad = theme.SPACE
 
-        ctk.CTkLabel(opts, text="Model:").grid(row=0, column=0, padx=(0, 6))
+        def label(text, col, left=0):
+            ctk.CTkLabel(opts, text=text, font=(UI, theme.TYPE["small"]),
+                         text_color=TEXT_DIM).grid(
+                row=0, column=col, padx=(left, pad["xs"]), pady=pad["md"])
+
+        label("Model", 0, pad["lg"])
         self.model_menu = ctk.CTkOptionMenu(
-            opts, values=[AUTO_MODEL] + list(MODELS.keys()), width=250)
+            opts, values=[AUTO_MODEL] + list(MODELS.keys()), width=232,
+            height=theme.H_INPUT, font=(UI, theme.TYPE["body"]),
+            corner_radius=theme.RADIUS_SM,
+            fg_color=ROW, button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
+            text_color=TEXT, dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+            dropdown_hover_color=GRAY_HOVER)
         self.model_menu.set(DEFAULT_MODEL)
-        self.model_menu.grid(row=0, column=1, padx=(0, 16))
+        self.model_menu.grid(row=0, column=1, padx=(0, pad["lg"]))
 
-        self.fit_switch = ctk.CTkSwitch(opts, text="Fit to MTG card (1200 DPI)")
-        if FIT_TO_CARD_DEFAULT:
-            self.fit_switch.select()
-        self.fit_switch.grid(row=0, column=2, padx=8)
-
-        self.trim_switch = ctk.CTkSwitch(opts, text="Trim MPC bleed")
-        if MPC_TRIM_DEFAULT:
-            self.trim_switch.select()
-        self.trim_switch.grid(row=0, column=3, padx=8)
-
-        # Card size drives what fit-to-card resizes to, so it has to be right
-        # here and not only in Export — a Yu-Gi-Oh card forced into Magic
+        # Card size drives what fit-to-card resizes to, so it has to be here
+        # and not only in Export — a Yu-Gi-Oh card forced into Magic
         # proportions comes out stretched.
-        ctk.CTkLabel(opts, text="Card:").grid(row=0, column=4, padx=(12, 4))
+        label("Card", 2)
         self.card_size_menu = ctk.CTkOptionMenu(
-            opts, values=list(CARD_SIZES.keys()), width=190,
-            fg_color=GRAY_BTN, button_color=GRAY_HOVER,
+            opts, values=list(CARD_SIZES.keys()), width=186,
+            height=theme.H_INPUT, font=(UI, theme.TYPE["body"]),
+            corner_radius=theme.RADIUS_SM,
+            fg_color=ROW, button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
+            text_color=TEXT, dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+            dropdown_hover_color=GRAY_HOVER,
             command=self._persist_card_size)
         self.card_size_menu.set(
             load_settings().get("card_size", CARD_SIZE_DEFAULT))
-        self.card_size_menu.grid(row=0, column=5, padx=(0, 8))
+        self.card_size_menu.grid(row=0, column=3, padx=(0, pad["lg"]))
 
-        self.pdf_btn = ctk.CTkButton(opts, text="Export PDF…", width=120,
-                                     fg_color=BLUE, hover_color=BLUE_HOVER,
-                                     command=self._export_pdf)
-        self.pdf_btn.grid(row=0, column=7, padx=2)
+        self.fit_switch = _switch(opts, "Fit to card (1200 DPI)")
+        if FIT_TO_CARD_DEFAULT:
+            self.fit_switch.select()
+        self.fit_switch.grid(row=0, column=4, padx=pad["sm"])
 
-        ctk.CTkButton(opts, text="From files…", width=110,
-                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._export_pdf_files).grid(row=0, column=8, padx=2)
+        self.trim_switch = _switch(opts, "Trim MPC bleed")
+        if MPC_TRIM_DEFAULT:
+            self.trim_switch.select()
+        self.trim_switch.grid(row=0, column=5, padx=(pad["sm"], pad["lg"]))
 
-        ctk.CTkButton(opts, text="Open output folder", width=140,
-                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._open_output).grid(row=0, column=9, padx=(2, 0))
-
+        # Row 2 — actions
         footer = ctk.CTkFrame(self, fg_color="transparent")
-        footer.grid(row=4, column=0, sticky="ew", padx=24, pady=(8, 20))
+        footer.grid(row=4, column=0, sticky="ew", padx=24, pady=(pad["md"], 18))
         footer.grid_columnconfigure(0, weight=1)
 
-        self.overall = ctk.CTkProgressBar(footer, height=12, progress_color=GOLD)
+        self.overall = ctk.CTkProgressBar(
+            footer, height=6, corner_radius=3, progress_color=GOLD,
+            fg_color=ROW)
         self.overall.set(0)
-        self.overall.grid(row=0, column=0, sticky="ew", padx=(0, 16))
+        self.overall.grid(row=0, column=0, sticky="ew", padx=(0, pad["lg"]))
 
-        self.clear_btn = ctk.CTkButton(footer, text="Clear", width=90, height=44,
-                                       fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                                       command=self._clear)
-        self.clear_btn.grid(row=0, column=1, padx=4)
+        def ghost(text, cmd, w):
+            return ctk.CTkButton(
+                footer, text=text, width=w, height=theme.H_BUTTON,
+                corner_radius=theme.RADIUS_SM, font=(UI, theme.TYPE["body"]),
+                fg_color="transparent", hover_color=GRAY_HOVER,
+                border_width=1, border_color=BORDER_STRONG, text_color=TEXT_DIM,
+                command=cmd)
 
-        self.start_btn = ctk.CTkButton(footer, text="UPSCALE ALL", width=180, height=44,
-                                       font=("Segoe UI", 15, "bold"),
-                                       fg_color=GOLD, hover_color=GOLD_HOVER,
-                                       text_color=GOLD_TEXT,
-                                       command=self._start)
-        self.start_btn.grid(row=0, column=2)
+        ghost("Output folder", self._open_output, 118).grid(
+            row=0, column=1, padx=pad["xs"])
+        ghost("From files…", self._export_pdf_files, 104).grid(
+            row=0, column=2, padx=pad["xs"])
+        self.pdf_btn = ghost("Export PDF…", self._export_pdf, 112)
+        self.pdf_btn.grid(row=0, column=3, padx=(pad["xs"], pad["lg"]))
+
+        self.clear_btn = ctk.CTkButton(
+            footer, text="Clear", width=76, height=theme.H_BUTTON_LG,
+            corner_radius=theme.RADIUS_SM, font=(UI, theme.TYPE["body"]),
+            fg_color=CONTROL_ALT, hover_color=GRAY_HOVER, text_color=TEXT,
+            command=self._clear)
+        self.clear_btn.grid(row=0, column=4, padx=pad["xs"])
+
+        self.start_btn = ctk.CTkButton(
+            footer, text="Upscale all", width=150, height=theme.H_BUTTON_LG,
+            corner_radius=theme.RADIUS_SM,
+            font=(UI, theme.TYPE["subtitle"], "bold"),
+            fg_color=GOLD, hover_color=GOLD_HOVER, text_color=GOLD_TEXT,
+            command=self._start)
+        self.start_btn.grid(row=0, column=5)
 
     # ============================================================ queue ops
     def _refresh_empty(self):
@@ -759,7 +813,7 @@ class ImportDialog(ctk.CTkToplevel):
 
         self.configure(fg_color=BG)
         ctk.CTkLabel(self, text="Import from decklist",
-                     font=("Georgia", 18, "bold"), text_color=GOLD).grid(
+                     font=(UI, theme.TYPE["title"], "bold"), text_color=TEXT).grid(
             row=0, column=0, sticky="w", padx=20, pady=(18, 4))
 
         self.textbox = ctk.CTkTextbox(self, font=("Consolas", 12), wrap="none",
@@ -772,7 +826,7 @@ class ImportDialog(ctk.CTkToplevel):
 
         self.status = ctk.CTkLabel(self, text="Fetches the exact printing "
                                    "(set + number) from Scryfall.",
-                                   text_color="#9ca3af", font=("Segoe UI", 12))
+                                   text_color="#9ca3af", font=(UI, 12))
         self.status.grid(row=2, column=0, sticky="w", padx=20, pady=2)
 
         btns = ctk.CTkFrame(self, fg_color="transparent")
@@ -783,7 +837,7 @@ class ImportDialog(ctk.CTkToplevel):
         self.import_btn = ctk.CTkButton(btns, text="Resolve & add", width=140,
                                         fg_color=GOLD, hover_color=GOLD_HOVER,
                                         text_color=GOLD_TEXT,
-                                        font=("Segoe UI", 13, "bold"),
+                                        font=(UI, 13, "bold"),
                                         command=self._do_import)
         self.import_btn.pack(side="left")
 
@@ -924,23 +978,49 @@ class ExportDialog(ctk.CTkToplevel):
         self.grid_rowconfigure(1, weight=1)
 
         ctk.CTkLabel(self, text="Export print sheet",
-                     font=("Georgia", 18, "bold"), text_color=GOLD).grid(
+                     font=(UI, theme.TYPE["title"], "bold"), text_color=TEXT).grid(
             row=0, column=0, sticky="w", padx=20, pady=(16, 2))
         self.summary = ctk.CTkLabel(self, text="", text_color=MUTED,
-                                    font=("Segoe UI", 12))
+                                    font=(UI, 12))
         self.summary.grid(row=0, column=1, sticky="w", padx=8, pady=(20, 2))
         # progress/status, kept at the top so it stays visible while the left
         # panel is scrolled
         self.status = ctk.CTkLabel(self, text="", text_color=GOLD,
-                                   font=("Segoe UI", 12, "bold"))
+                                   font=(UI, 12, "bold"))
         self.status.grid(row=0, column=1, sticky="e", padx=(8, 20), pady=(20, 2))
 
         # ------------------------------------------------ left: controls
-        left = ctk.CTkScrollableFrame(self, width=430, fg_color=PANEL,
-                                      corner_radius=12)
-        left.grid(row=1, column=0, sticky="nsw", padx=(16, 8), pady=8)
-        left.grid_columnconfigure(1, weight=1)
+        # Grouped into tabs: ~30 controls in one scrolling column was the
+        # dialog's worst usability problem. Each tab now fits without scrolling.
+        panel = ctk.CTkFrame(self, width=430, fg_color=PANEL,
+                             corner_radius=theme.RADIUS_LG)
+        panel.grid(row=1, column=0, sticky="nsw", padx=(16, 8), pady=8)
+        panel.grid_rowconfigure(1, weight=1)
+        panel.grid_propagate(False)
+
+        self.tabs = ctk.CTkTabview(
+            panel, width=406, fg_color=PANEL, corner_radius=theme.RADIUS_MD,
+            segmented_button_fg_color=BG,
+            segmented_button_selected_color=GOLD,
+            segmented_button_selected_hover_color=GOLD_HOVER,
+            segmented_button_unselected_color=BG,
+            segmented_button_unselected_hover_color=GRAY_HOVER,
+            text_color=TEXT_DIM, text_color_disabled=MUTED,
+            anchor="w")
+        self.tabs.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0, 6))
+        for _name in ("Layout", "Image", "Backs", "Cutting", "Tests"):
+            self.tabs.add(_name)
+            self.tabs.tab(_name).grid_columnconfigure(1, weight=1)
+        self.tabs._segmented_button.configure(font=(UI, theme.TYPE["small"]))
+
+        left = self.tabs.tab("Layout")
         self._r = 0
+
+        def tab(name):
+            """Point the row helpers at another tab and restart its grid."""
+            nonlocal left
+            left = self.tabs.tab(name)
+            self._r = 0
 
         def row(label, values, initial):
             ctk.CTkLabel(left, text=label, anchor="w").grid(
@@ -964,40 +1044,38 @@ class ExportDialog(ctk.CTkToplevel):
             e.bind("<KeyRelease>", self._refresh_preview)
             if hint:
                 ctk.CTkLabel(fr, text=hint, text_color=MUTED,
-                             font=("Segoe UI", 11)).pack(side="left", padx=6)
+                             font=(UI, 11)).pack(side="left", padx=6)
             self._r += 1
             return e
-
-        def section(text):
-            ctk.CTkLabel(left, text=text, text_color=GOLD,
-                         font=("Segoe UI", 12, "bold")).grid(
-                row=self._r, column=0, columnspan=2, sticky="w",
-                padx=12, pady=(10, 2))
-            self._r += 1
 
         profile_labels = [p[0] for p in CALIBRATION_PROFILES.values()]
         saved_profile = CALIBRATION_PROFILES.get(s.get("profile", 1),
                                                  CALIBRATION_PROFILES[1])[0]
 
-        section("Presets")
-        prow = ctk.CTkFrame(left, fg_color="transparent")
-        prow.grid(row=self._r, column=0, columnspan=2, sticky="w",
-                  padx=12, pady=4)
-        self._r += 1
+        # Presets sit above the tabs: they apply to every tab at once.
+        prow = ctk.CTkFrame(panel, fg_color="transparent")
+        prow.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 4))
         self.preset_menu = ctk.CTkOptionMenu(
-            prow, values=self._preset_names(), width=180,
-            fg_color=GRAY_BTN, button_color=GRAY_HOVER,
+            prow, values=self._preset_names(), width=176,
+            height=theme.H_INPUT, corner_radius=theme.RADIUS_SM,
+            font=(UI, theme.TYPE["small"]),
+            fg_color=ROW, button_color=CONTROL_ALT,
+            button_hover_color=GRAY_HOVER, text_color=TEXT,
+            dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+            dropdown_hover_color=GRAY_HOVER,
             command=self._apply_preset)
         self.preset_menu.set(self._PRESET_NONE)
         self.preset_menu.pack(side="left")
-        ctk.CTkButton(prow, text="Save…", width=52, height=28,
-                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._save_preset).pack(side="left", padx=(6, 2))
-        ctk.CTkButton(prow, text="Delete", width=58, height=28,
-                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._delete_preset).pack(side="left")
+        for _t, _c in (("Save…", self._save_preset), ("Delete", self._delete_preset)):
+            ctk.CTkButton(prow, text=_t, width=58, height=theme.H_INPUT,
+                          corner_radius=theme.RADIUS_SM,
+                          font=(UI, theme.TYPE["small"]),
+                          fg_color="transparent", hover_color=GRAY_HOVER,
+                          border_width=1, border_color=BORDER_STRONG,
+                          text_color=TEXT_DIM,
+                          command=_c).pack(side="left", padx=(6, 0))
 
-        section("Layout")
+        tab("Layout")
         self.card_size = row("Card size", list(CARD_SIZES.keys()),
                              s.get("card_size", CARD_SIZE_DEFAULT))
         self.layout = row("Card grid", list(print_sheet.LAYOUTS.keys()),
@@ -1025,7 +1103,7 @@ class ExportDialog(ctk.CTkToplevel):
         self.shift_down = entry_row("Shift down (mm)", "shift_down", 0.0,
                                     "late paper feed")
 
-        section("Cutting machine (Silhouette / Cricut)")
+        tab("Cutting")
         self.reg_marks = ctk.CTkSwitch(
             left, text="Registration marks", command=self._refresh_preview)
         if s.get("reg_marks"):
@@ -1034,7 +1112,7 @@ class ExportDialog(ctk.CTkToplevel):
                             padx=12, pady=(4, 2))
         self._r += 1
         self.reg_hint = ctk.CTkLabel(
-            left, text="", text_color=MUTED, font=("Segoe UI", 11),
+            left, text="", text_color=MUTED, font=(UI, 11),
             wraplength=400, justify="left")
         self.reg_hint.grid(row=self._r, column=0, columnspan=2, sticky="w",
                            padx=12)
@@ -1048,7 +1126,7 @@ class ExportDialog(ctk.CTkToplevel):
         self.reg_thick = entry_row("Mark thickness (mm)", "reg_thick", 1.0,
                                    "0.5–1")
 
-        section("Image pipeline (PDF only, masters untouched)")
+        tab("Image")
         self.quality = row("Quality", list(PDF_QUALITY_MODES.keys()),
                            s.get("quality", PDF_DEFAULT_QUALITY))
         self.profile = row("Color profile", profile_labels, saved_profile)
@@ -1065,7 +1143,7 @@ class ExportDialog(ctk.CTkToplevel):
             fr = ctk.CTkFrame(left, fg_color="transparent")
             fr.grid(row=self._r, column=1, sticky="w", pady=4)
             val = ctk.CTkLabel(fr, text="", width=54, text_color=MUTED,
-                               font=("Segoe UI", 11))
+                               font=(UI, 11))
             sl = ctk.CTkSlider(fr, from_=0, to=to, width=175,
                                button_color=GOLD, progress_color=GOLD_HOVER,
                                command=lambda v: (
@@ -1087,7 +1165,7 @@ class ExportDialog(ctk.CTkToplevel):
                                        "border_width", BORDER_WIDTH_DEFAULT,
                                        12, "%", "{:.1f}")
 
-        section("Duplex backs")
+        tab("Backs")
         self.backs = row("Card backs", BACKS_MODES,
                          s.get("backs", BACKS_MODES[0]))
 
@@ -1098,7 +1176,7 @@ class ExportDialog(ctk.CTkToplevel):
         backfr.grid(row=self._r, column=1, sticky="w", pady=4)
         self._r += 1
         self.back_lbl = ctk.CTkLabel(backfr, text=self._back_label(),
-                                     text_color=MUTED, font=("Segoe UI", 11),
+                                     text_color=MUTED, font=(UI, 11),
                                      width=110, anchor="w")
         self.back_lbl.pack(side="left")
         ctk.CTkButton(backfr, text="File…", width=52, height=26,
@@ -1115,7 +1193,7 @@ class ExportDialog(ctk.CTkToplevel):
         self.back_bleed = entry_row("Back bleed (mm)", "back_bleed", 1.5,
                                     "covers duplex drift")
 
-        section("Test sheets")
+        tab("Tests")
         tests = ctk.CTkFrame(left, fg_color="transparent")
         tests.grid(row=self._r, column=0, columnspan=2, sticky="w",
                    padx=12, pady=4)
@@ -1150,7 +1228,7 @@ class ExportDialog(ctk.CTkToplevel):
                                            command=lambda: self._flip_page(-1))
         self.prev_page_btn.grid(row=0, column=0, sticky="w")
         self.preview_title = ctk.CTkLabel(head, text="Preview",
-                                          text_color=MUTED, font=("Segoe UI", 12))
+                                          text_color=MUTED, font=(UI, 12))
         self.preview_title.grid(row=0, column=1)
         self.next_page_btn = ctk.CTkButton(head, text="▶", width=30, height=24,
                                            fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
@@ -1158,7 +1236,7 @@ class ExportDialog(ctk.CTkToplevel):
         self.next_page_btn.grid(row=0, column=2, sticky="e")
         self.side_btn = ctk.CTkSegmentedButton(
             head, values=["Fronts", "Backs"], height=24,
-            font=("Segoe UI", 11), command=lambda _v: self._draw_preview(),
+            font=(UI, 11), command=lambda _v: self._draw_preview(),
             fg_color=BG, unselected_color=BG, unselected_hover_color=GRAY_HOVER,
             selected_color=GOLD, selected_hover_color=GOLD_HOVER,
             text_color="#d7dbe4")
@@ -1183,7 +1261,7 @@ class ExportDialog(ctk.CTkToplevel):
         ctk.CTkLabel(right, text="Scroll through every sheet · drag a card to "
                      "reorder · left-click cycles the black border · "
                      "right-click: duplicate / remove / delete a card",
-                     text_color=MUTED, font=("Segoe UI", 11),
+                     text_color=MUTED, font=(UI, 11),
                      wraplength=self._PREVIEW_BOX[0], justify="center").grid(
             row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
 
@@ -1191,16 +1269,25 @@ class ExportDialog(ctk.CTkToplevel):
         btns = ctk.CTkFrame(self, fg_color="transparent")
         btns.grid(row=2, column=0, columnspan=2, sticky="e",
                   padx=20, pady=(0, 14))
-        ctk.CTkButton(btns, text="Cancel", width=90, fg_color=GRAY_BTN,
-                      hover_color=GRAY_HOVER, command=self.destroy).pack(
+        ctk.CTkButton(btns, text="Cancel", width=88, height=theme.H_BUTTON,
+                      corner_radius=theme.RADIUS_SM,
+                      font=(UI, theme.TYPE["body"]),
+                      fg_color="transparent", hover_color=GRAY_HOVER,
+                      border_width=1, border_color=BORDER_STRONG,
+                      text_color=TEXT_DIM, command=self.destroy).pack(
             side="left", padx=6)
-        ctk.CTkButton(btns, text="Add cards…", width=110, fg_color=GRAY_BTN,
-                      hover_color=GRAY_HOVER, command=self._add_cards).pack(
+        ctk.CTkButton(btns, text="Add cards…", width=110,
+                      height=theme.H_BUTTON, corner_radius=theme.RADIUS_SM,
+                      font=(UI, theme.TYPE["body"]),
+                      fg_color=CONTROL_ALT, hover_color=GRAY_HOVER,
+                      text_color=TEXT, command=self._add_cards).pack(
             side="left", padx=6)
-        self.export_btn = ctk.CTkButton(btns, text="Export", width=130,
+        self.export_btn = ctk.CTkButton(btns, text="Export", width=132,
+                                        height=theme.H_BUTTON_LG,
+                                        corner_radius=theme.RADIUS_SM,
                                         fg_color=GOLD, hover_color=GOLD_HOVER,
                                         text_color=GOLD_TEXT,
-                                        font=("Segoe UI", 13, "bold"),
+                                        font=(UI, theme.TYPE["subtitle"], "bold"),
                                         command=self._export)
         self.export_btn.pack(side="left")
 
@@ -1731,7 +1818,7 @@ class ExportDialog(ctk.CTkToplevel):
             self.canvas.create_text(
                 self._img_xoff + 4, self._sheet_tops[p] - 8, anchor="w",
                 text=cap, fill="#5c6270" if skipped else "#969caa",
-                font=("Segoe UI", 8), tags="cap")
+                font=(UI, 8), tags="cap")
         self.canvas.configure(scrollregion=(0, 0, max(W, canvas_w), total_h))
         self._render_visible()
 
@@ -1816,7 +1903,7 @@ class ExportDialog(ctk.CTkToplevel):
                 continue
             it = self.canvas.create_text(
                 self._img_xoff + (x0 + x1) // 2, (y0 + y1) // 2,
-                text=frame, fill="#c9cfdb", font=("Segoe UI", 20), tags="spin")
+                text=frame, fill="#c9cfdb", font=(UI, 20), tags="spin")
             self._spin_items.append(it)
         if self._spin_items and not self._spin_job:
             self._spin_job = self.after(120, self._animate_spinners)
@@ -2388,7 +2475,7 @@ class SetupDialog(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", lambda: None)  # not closable mid-setup
 
         ctk.CTkLabel(self, text="Setting up the AI engine",
-                     font=("Georgia", 18, "bold"), text_color=GOLD).pack(
+                     font=(UI, theme.TYPE["title"], "bold"), text_color=TEXT).pack(
             anchor="w", padx=24, pady=(20, 4))
         ctk.CTkLabel(
             self,
@@ -2398,13 +2485,13 @@ class SetupDialog(ctk.CTkToplevel):
                  "  •  UltraSharp / High Fidelity models (Upscayl project)\n\n"
                  "This happens only once.",
             justify="left", text_color=MUTED,
-            font=("Segoe UI", 12)).pack(anchor="w", padx=24)
+            font=(UI, 12)).pack(anchor="w", padx=24)
 
         self.bar = ctk.CTkProgressBar(self, width=460, progress_color=GOLD)
         self.bar.set(0)
         self.bar.pack(padx=24, pady=(16, 4))
         self.status = ctk.CTkLabel(self, text="Starting…", text_color=MUTED,
-                                   font=("Segoe UI", 11))
+                                   font=(UI, 11))
         self.status.pack(anchor="w", padx=24)
 
         threading.Thread(target=self._run, daemon=True).start()
@@ -2479,11 +2566,11 @@ class CardSearchDialog(ctk.CTkToplevel):
         self._token = 0            # ignore stale search threads
 
         ctk.CTkLabel(self, text=title,
-                     font=("Georgia", 18, "bold"), text_color=GOLD).grid(
+                     font=(UI, theme.TYPE["title"], "bold"), text_color=TEXT).grid(
             row=0, column=0, sticky="w", padx=20, pady=(16, 2))
         if note:
             ctk.CTkLabel(self, text=note, text_color=MUTED,
-                         font=("Segoe UI", 11)).grid(
+                         font=(UI, 11)).grid(
                 row=0, column=0, sticky="e", padx=20, pady=(20, 2))
 
         bar = ctk.CTkFrame(self, fg_color="transparent")
@@ -2497,7 +2584,7 @@ class CardSearchDialog(ctk.CTkToplevel):
         self.search_btn = ctk.CTkButton(bar, text="Search", width=100, height=38,
                                         fg_color=GOLD, hover_color=GOLD_HOVER,
                                         text_color=GOLD_TEXT,
-                                        font=("Segoe UI", 13, "bold"),
+                                        font=(UI, 13, "bold"),
                                         command=self._search)
         self.search_btn.grid(row=0, column=1)
 
@@ -2508,7 +2595,7 @@ class CardSearchDialog(ctk.CTkToplevel):
             self.grid_frame.grid_columnconfigure(c, weight=1)
 
         self.status = ctk.CTkLabel(self, text="Type a card name and hit Search.",
-                                   text_color=MUTED, font=("Segoe UI", 12))
+                                   text_color=MUTED, font=(UI, 12))
         self.status.grid(row=3, column=0, sticky="w", padx=20, pady=(0, 12))
 
     def _search(self):
@@ -2558,16 +2645,16 @@ class CardSearchDialog(ctk.CTkToplevel):
         ph.pack(padx=6, pady=(6, 2))
         name = card["name"]
         short = name if len(name) <= 26 else name[:25] + "…"
-        ctk.CTkLabel(tile, text=short, font=("Segoe UI", 11),
+        ctk.CTkLabel(tile, text=short, font=(UI, 11),
                      wraplength=self.THUMB[0]).pack(padx=6)
         sub = card["source"] or ""
         if card.get("dpi"):                  # YGOPRODeck doesn't report DPI
             sub = f"{sub} · {card['dpi']}dpi" if sub else f"{card['dpi']}dpi"
-        ctk.CTkLabel(tile, text=sub, font=("Segoe UI", 10),
+        ctk.CTkLabel(tile, text=sub, font=(UI, 10),
                      text_color=MUTED).pack(padx=6)
         add = ctk.CTkButton(tile, text="Add", width=70, height=26,
                             fg_color=GOLD, hover_color=GOLD_HOVER,
-                            text_color=GOLD_TEXT, font=("Segoe UI", 11, "bold"),
+                            text_color=GOLD_TEXT, font=(UI, 11, "bold"),
                             command=lambda ca=card: self._pick(ca))
         add.pack(padx=6, pady=(2, 8))
 

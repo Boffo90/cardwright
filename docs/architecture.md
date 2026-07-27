@@ -15,6 +15,7 @@ All source in `C:/Users/smyo9/upscaler`.
 - `bootstrap.py` — first-run download of engine + models; `probe_gpu` (Vulkan-only).
 - `update.py` — auto-update from GitHub Releases; `_write_swap_script`.
 - `installer.iss` — Inno Setup (per-user, no admin). Build with ISCC at `C:/Users/smyo9/AppData/Local/Programs/Inno Setup 6/ISCC.exe`.
+- `theme.py` — design tokens (colour ramp, spacing, radius, type). `gui.py` aliases its historical colour names onto these.
 - `icon.ico` — gold card+star (embedded).
 - Engine/models are NOT in the repo (.gitignore); downloaded on first run.
 

@@ -2,6 +2,20 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.12.0 — visual revamp (stage 1: design system, main window, Export tabs)
+- New **`theme.py`**: one set of colour / spacing / radius / type tokens.
+- Repalette to a **neutral graphite** scheme with a single warm accent, in the
+  spirit of a professional tool. Accent now means "primary action or active
+  state" only; headings use the text ramp. Contrast verified against WCAG.
+- Typography unified on Segoe UI Variable (fallback Segoe UI); Georgia and the
+  mana-dot decoration removed.
+- Main window: header simplified, options and actions split into two rows so
+  the buttons stop clipping, ghost/secondary/primary button hierarchy,
+  accent-coloured switches instead of CustomTkinter's default blue.
+- **Export dialog is now tabbed** — Layout / Image / Backs / Cutting / Tests —
+  instead of ~30 controls in one scrolling column. Presets moved above the tabs.
+- Stages 2-3 (queue rows, search/import/setup dialogs) still to come.
+
 ## v2.11.0 — Yu-Gi-Oh card search (YGOPRODeck)
 - New **"Yu-Gi-Oh…"** search: gallery over the YGOPRODeck API, one entry per
   artwork, click to queue. `ygoprodeck.py` is new and mirrors `mpcfill.py`'s

@@ -24,6 +24,13 @@ Settled decisions. Do not re-litigate; add new ones here.
 - `build_duplex_test` is the calibration tool for offset+rotation: page 1 = front grid, page 2 = back grid column-mirrored + offset + rotation (exactly like `build_pdf`), so holding the print to the light shows the real misregistration.
 - Rounded corners use transparency + reportlab `mask='auto'` (forces PNG so alpha survives), so corners show paper/bleed. Not baked onto black. Radius is mm → px via card width (63 mm).
 
+## Visual design system (v2.12.0)
+- All colour, spacing, radius and type live in **`theme.py`**. `gui.py` keeps its historical names (GOLD, PANEL, ROW…) as aliases onto those tokens, so the whole app restyled without touching every widget call.
+- Direction: **neutral pro tool** (Linear/Figma feel) — a low-chroma graphite ramp for every surface, with **one** warm accent (`#E0A33E`). The accent is reserved for the primary action, the active tab/filter and progress; headings and section labels use the text ramp. Previously gold was used for headings *and* buttons, which flattened the hierarchy.
+- Every foreground/background pair is contrast-checked: text 15.7:1, secondary 8.2:1, muted 5.3:1, accent 7.9:1, on-accent 8.4:1. `BORDER` is decorative; `BORDER_STRONG` is for input outlines and clears the 3:1 non-text threshold.
+- Fonts: Segoe UI Variable Text when present (Win 11), falling back to Segoe UI. Resolved in `App.__init__` because `tkfont.families()` needs a live Tk root. Georgia and the WUBRG mana dots are gone — they read as themed rather than professional.
+- **Export dialog is tabbed** (Layout / Image / Backs / Cutting / Tests) instead of ~30 controls in one scrolling column; each tab now fits without scrolling. Implementation trick: the row helpers close over a `left` variable that `tab()` rebinds, so switching tabs needed no changes to the ~30 existing control definitions. Presets sit above the tabs since they apply across all of them.
+
 ## Multi-TCG sources (v2.11.0)
 - One catalogue backend interface: a module exposing `search(query)` → list of dicts with `name / source / dpi / thumb / download / ext / identifier`, plus `download(card, target)` and `fetch_thumb(url)`. `mpcfill.py` and `ygoprodeck.py` both implement it, and `CardSearchDialog(backend=...)` renders either. Add a game by writing one module.
 - YGOPRODeck rules shape the client: ≤20 req/s (we throttle to ~8) and *"do not continually hotlink images — download and re-host"*. Full images already land in the user's output folder; search thumbnails are cached under `TEMP_FOLDER/ygo_thumbs` so a repeated search never re-hits their CDN.
