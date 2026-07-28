@@ -384,18 +384,20 @@ class App(_Root):
                       fg_color=GOLD, hover_color=GOLD_HOVER, text_color=GOLD_TEXT,
                       font=(UI, 13, "bold"),
                       command=self._add_scryfall).grid(row=0, column=1, padx=4, pady=12)
-        ctk.CTkButton(bar, text="Add files…", width=100, height=40,
-                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
-                      command=self._add_files).grid(row=0, column=2, padx=4, pady=12)
-        ctk.CTkButton(bar, text="Import list…", width=110, height=40,
-                      fg_color=BLUE, hover_color=BLUE_HOVER,
-                      command=self._open_import).grid(row=0, column=3, padx=4, pady=12)
-        ctk.CTkButton(bar, text="MPC search…", width=110, height=40,
-                      fg_color=BLUE, hover_color=BLUE_HOVER,
-                      command=self._open_mpc).grid(row=0, column=4, padx=4, pady=12)
-        ctk.CTkButton(bar, text="Yu-Gi-Oh…", width=100, height=40,
-                      fg_color=BLUE, hover_color=BLUE_HOVER,
-                      command=self._open_ygo).grid(row=0, column=5, padx=(4, 12), pady=12)
+        # One secondary tier, one width, one colour. The per-catalogue buttons
+        # are gone: every catalogue is a tab inside the browse gallery now, so
+        # the bar states three intents instead of five entry points.
+        def secondary(text, cmd, col, right=4):
+            ctk.CTkButton(
+                bar, text=text, width=124, height=theme.H_BUTTON_LG,
+                corner_radius=theme.RADIUS_SM,
+                font=(UI, theme.TYPE["body"]),
+                fg_color=CONTROL_ALT, hover_color=GRAY_HOVER, text_color=TEXT,
+                command=cmd).grid(row=0, column=col, padx=(4, right), pady=12)
+
+        secondary("Browse cards…", self._open_sources, 2)
+        secondary("Add files…", self._add_files, 3)
+        secondary("Import list…", self._open_import, 4, right=12)
 
     # ----------------------------------------------------------------- queue
     def _build_queue(self):
@@ -436,103 +438,73 @@ class App(_Root):
         # Row 1 — how cards get processed (settings only, no actions)
         opts = ctk.CTkFrame(self, fg_color=PANEL, corner_radius=theme.RADIUS_LG)
         opts.grid(row=3, column=0, sticky="ew", padx=24, pady=(4, 0))
-        opts.grid_columnconfigure(6, weight=1)
         pad = theme.SPACE
+        opts.grid_columnconfigure(1, weight=1)
 
-        def label(text, col, left=0):
-            ctk.CTkLabel(opts, text=text, font=(UI, theme.TYPE["small"]),
-                         text_color=TEXT_DIM).grid(
-                row=0, column=col, padx=(left, pad["xs"]), pady=pad["md"])
+        # Two blocks: named settings on the left in an aligned label/control
+        # grid, plain on/off toggles stacked on the right. Previously these
+        # were interleaved on one grid, so the labels never lined up and the
+        # panel read as a row of loose parts.
+        fields = ctk.CTkFrame(opts, fg_color="transparent")
+        fields.grid(row=0, column=0, sticky="w", padx=(pad["lg"], 0),
+                    pady=pad["md"])
 
-        label("Model", 0, pad["lg"])
-        self.model_menu = ctk.CTkOptionMenu(
-            opts, values=[AUTO_MODEL] + list(MODELS.keys()), width=232,
-            height=theme.H_INPUT, font=(UI, theme.TYPE["body"]),
-            corner_radius=theme.RADIUS_SM,
-            fg_color=ROW, button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
-            text_color=TEXT, dropdown_fg_color=ROW, dropdown_text_color=TEXT,
-            dropdown_hover_color=GRAY_HOVER)
+        MENU_W = 220
+
+        def field(text, row, col, values, width=MENU_W, command=None):
+            ctk.CTkLabel(fields, text=text, font=(UI, theme.TYPE["small"]),
+                         text_color=TEXT_DIM, anchor="w", width=84).grid(
+                row=row, column=col * 2, sticky="w",
+                padx=(0 if col == 0 else pad["xl"], pad["sm"]),
+                pady=(0 if row == 0 else pad["sm"], 0))
+            menu = ctk.CTkOptionMenu(
+                fields, values=values, width=width, height=theme.H_INPUT,
+                font=(UI, theme.TYPE["body"]), corner_radius=theme.RADIUS_SM,
+                fg_color=ROW, button_color=CONTROL_ALT,
+                button_hover_color=GRAY_HOVER, text_color=TEXT,
+                dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+                dropdown_hover_color=GRAY_HOVER, command=command)
+            menu.grid(row=row, column=col * 2 + 1, sticky="w",
+                      pady=(0 if row == 0 else pad["sm"], 0))
+            return menu
+
+        self.model_menu = field("Model", 0, 0,
+                                [AUTO_MODEL] + list(MODELS.keys()))
         self.model_menu.set(DEFAULT_MODEL)
-        self.model_menu.grid(row=0, column=1, padx=(0, pad["lg"]))
 
-        # Card size drives what fit-to-card resizes to, so it has to be here
-        # and not only in Export — a Yu-Gi-Oh card forced into Magic
-        # proportions comes out stretched.
-        label("Card", 2)
-        self.card_size_menu = ctk.CTkOptionMenu(
-            opts, values=list(CARD_SIZES.keys()), width=186,
-            height=theme.H_INPUT, font=(UI, theme.TYPE["body"]),
-            corner_radius=theme.RADIUS_SM,
-            fg_color=ROW, button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
-            text_color=TEXT, dropdown_fg_color=ROW, dropdown_text_color=TEXT,
-            dropdown_hover_color=GRAY_HOVER,
-            command=self._persist_card_size)
+        # Card size drives what fit-to-card resizes to, so it lives here and
+        # not only in Export — a Yu-Gi-Oh card forced into Magic proportions
+        # comes out stretched.
+        self.card_size_menu = field("Card size", 0, 1, list(CARD_SIZES.keys()),
+                                    command=self._persist_card_size)
         self.card_size_menu.set(
             load_settings().get("card_size", CARD_SIZE_DEFAULT))
-        self.card_size_menu.grid(row=0, column=3, padx=(0, pad["lg"]))
 
-        self.fit_switch = _switch(opts, "Fit to card (1200 DPI)")
-        if FIT_TO_CARD_DEFAULT:
-            self.fit_switch.select()
-        self.fit_switch.grid(row=0, column=4, padx=pad["sm"])
-
-        self.trim_switch = _switch(opts, "Trim MPC bleed")
-        if MPC_TRIM_DEFAULT:
-            self.trim_switch.select()
-        self.trim_switch.grid(row=0, column=5, padx=(pad["sm"], pad["lg"]))
-
-        # Second row: row 0 is already at the width budget for the 900 px
-        # minimum window, and squeezing a sixth control in there brings back
-        # the clipping v2.12.0 fixed.
-        #
-        # It lives in its own frame because grid shares column widths across
-        # rows — dropping these straight into `opts` widened columns 0 and 2
-        # and pushed the row above from 903 px to 1027, which is precisely
-        # the clipping this placement was meant to avoid.
-        langrow = ctk.CTkFrame(opts, fg_color="transparent")
-        langrow.grid(row=1, column=0, columnspan=7, sticky="w",
-                     padx=(pad["lg"], 0))
-
-        ctk.CTkLabel(langrow, text="Card language", font=(UI, theme.TYPE["small"]),
-                     text_color=TEXT_DIM).grid(
-            row=0, column=0, padx=(0, pad["xs"]), pady=(0, pad["md"]))
-        self.card_lang_menu = ctk.CTkOptionMenu(
-            langrow, values=list(CARD_LANGS.keys()), width=186,
-            height=theme.H_INPUT, font=(UI, theme.TYPE["body"]),
-            corner_radius=theme.RADIUS_SM,
-            fg_color=ROW, button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
-            text_color=TEXT, dropdown_fg_color=ROW, dropdown_text_color=TEXT,
-            dropdown_hover_color=GRAY_HOVER,
-            command=self._persist_card_lang)
+        self.card_lang_menu = field("Language", 1, 0, list(CARD_LANGS.keys()),
+                                    command=self._persist_card_lang)
         self.card_lang_menu.set(
             load_settings().get("card_lang", CARD_LANG_DEFAULT))
-        self.card_lang_menu.grid(row=0, column=1, sticky="w",
-                                 pady=(0, pad["md"]))
 
-        self.best_scan_switch = _switch(langrow, "Best scan")
+        toggles = ctk.CTkFrame(opts, fg_color="transparent")
+        toggles.grid(row=0, column=1, sticky="w", padx=(pad["xl"], pad["lg"]),
+                     pady=pad["md"])
+
+        self.fit_switch = _switch(toggles, "Fit to card (1200 DPI)")
+        if FIT_TO_CARD_DEFAULT:
+            self.fit_switch.select()
+        self.fit_switch.grid(row=0, column=0, sticky="w")
+
+        self.trim_switch = _switch(toggles, "Trim MPC bleed")
+        if MPC_TRIM_DEFAULT:
+            self.trim_switch.select()
+        self.trim_switch.grid(row=1, column=0, sticky="w", pady=(pad["sm"], 0))
+
+        self.best_scan_switch = _switch(toggles, "Best scan")
         if load_settings().get("best_scan", BEST_SCAN_DEFAULT):
             self.best_scan_switch.select()
         self.best_scan_switch.configure(command=self._persist_best_scan)
-        self.best_scan_switch.grid(row=0, column=2, padx=(pad["md"], 0),
-                                   pady=(0, pad["md"]))
-
-        # Its own row, wrapped: the line is too long to sit beside the
-        # controls without being clipped at the 900 px minimum width.
-        self.card_hint = ctk.CTkLabel(
-            opts, text="Language applies to card names and decklists; cards "
-                       "with no printing in it stay English. Best scan "
-                       "compares printings of a searched name and takes the "
-                       "sharpest one, keeping the same artwork.",
-            font=(UI, theme.TYPE["small"]), text_color=MUTED,
-            justify="left", anchor="w", wraplength=760)
-        self.card_hint.grid(row=2, column=0, columnspan=7, sticky="ew",
-                            padx=(pad["lg"], pad["lg"]), pady=(0, pad["md"]))
-
-        # Re-wrap with the window instead of pinning one width.
-        opts.bind(
-            "<Configure>",
-            lambda e: self.card_hint.configure(
-                wraplength=max(400, e.width - 2 * pad["lg"])))
+        self.best_scan_switch.grid(row=2, column=0, sticky="w",
+                                   pady=(pad["sm"], 0))
 
         # Row 2 — actions
         footer = ctk.CTkFrame(self, fg_color="transparent")
@@ -553,19 +525,18 @@ class App(_Root):
                 border_width=1, border_color=BORDER_STRONG, text_color=TEXT_DIM,
                 command=cmd)
 
+        # Utilities read as one tier at one height; only "Upscale all" is
+        # allowed to look like a primary action. Clear used to be a filled
+        # button 6 px taller than its neighbours, which made the whole row
+        # look misaligned.
         ghost("Output folder", self._open_output, 118).grid(
             row=0, column=1, padx=pad["xs"])
-        ghost("From files…", self._export_pdf_files, 104).grid(
-            row=0, column=2, padx=pad["xs"])
-        self.pdf_btn = ghost("Export PDF…", self._export_pdf, 112)
-        self.pdf_btn.grid(row=0, column=3, padx=(pad["xs"], pad["lg"]))
-
-        self.clear_btn = ctk.CTkButton(
-            footer, text="Clear", width=76, height=theme.H_BUTTON_LG,
-            corner_radius=theme.RADIUS_SM, font=(UI, theme.TYPE["body"]),
-            fg_color=CONTROL_ALT, hover_color=GRAY_HOVER, text_color=TEXT,
-            command=self._clear)
-        self.clear_btn.grid(row=0, column=4, padx=pad["xs"])
+        self.clear_btn = ghost("Clear", self._clear, 76)
+        self.clear_btn.grid(row=0, column=2, padx=pad["xs"])
+        ghost("PDF from files…", self._export_pdf_files, 130).grid(
+            row=0, column=3, padx=pad["xs"])
+        self.pdf_btn = ghost("Export PDF…", self._export_pdf, 116)
+        self.pdf_btn.grid(row=0, column=4, padx=(pad["xs"], pad["lg"]))
 
         self.start_btn = ctk.CTkButton(
             footer, text="Upscale all", width=150, height=theme.H_BUTTON_LG,
@@ -648,26 +619,32 @@ class App(_Root):
     def _add_source_card(self, card):
         """Queue a gallery pick, however its source wants to be fetched."""
         src = sources.by_id(card.get("_source", "scryfall"))
-        label = f"{card['name']}  [{src.LABEL}]"
         if src.ADD_KIND == "scryfall":
             # Gatherer: hand back the reference and let scryfall.fetch pull
             # the image, which also converts Gatherer's webp to PNG.
-            self._add_item(card["ref"], "scryfall", label=label)
+            self._add_item(card["ref"], "scryfall",
+                           label=f"{card['name']}  [{src.LABEL}]")
             return
-        base = f"{card['name']}  [{card['source']}]"
+
+        base = f"{card['name']}  [{card['source'] or src.LABEL}]"
         safe = re.sub(r'[<>:"/\\|?*]', "", base)
         self._add_item(base, "card",
                        downloads=[(safe, card["download"])], label=base)
+
+        # A source printed at another size (Yu-Gi-Oh) has to move the card
+        # size with it, or fit-to-card stretches it into Magic proportions.
+        hint = getattr(src, "CARD_SIZE_HINT", None)
+        if hint and self.card_size_menu.get() == CARD_SIZE_DEFAULT:
+            for name in CARD_SIZES:
+                if name.startswith(hint):
+                    self.card_size_menu.set(name)
+                    self._persist_card_size(name)
+                    break
 
     def _open_import(self):
         if self.running:
             return
         ImportDialog(self, on_resolved=self._add_resolved_cards)
-
-    def _open_mpc(self):
-        if self.running:
-            return
-        CardSearchDialog(self, on_pick=self._add_mpc_card)
 
     def _persist_card_size(self, name):
         """Card size is one setting shared with the Export dialog."""
@@ -685,39 +662,6 @@ class App(_Root):
         s = load_settings()
         s["best_scan"] = bool(self.best_scan_switch.get())
         save_settings(s)
-
-    def _open_ygo(self):
-        if self.running:
-            return
-        CardSearchDialog(
-            self, on_pick=self._add_ygo_card, backend=ygoprodeck,
-            title="Search Yu-Gi-Oh (YGOPRODeck)",
-            placeholder="Card name (e.g. Dark Magician)",
-            empty_msg="No matches on YGOPRODeck.",
-            note="Set Card size to Yu-Gi-Oh below")
-
-    def _add_ygo_card(self, card):
-        # same path as MPC: download the chosen artwork, then upscale it
-        base = f"{card['name']}  [{card['source'] or 'YGO'}]"
-        safe = re.sub(r'[<>:"/\\|?*]', "", base)
-        self._add_item(base, "card",
-                       downloads=[(safe, card["download"])], label=base)
-        # Yu-Gi-Oh cards are 59x86 mm — fit-to-card would stretch them to
-        # Magic proportions, so switch the size over the first time.
-        if self.card_size_menu.get() == CARD_SIZE_DEFAULT:
-            for name in CARD_SIZES:
-                if name.startswith("Yu-Gi-Oh"):
-                    self.card_size_menu.set(name)
-                    self._persist_card_size(name)
-                    break
-
-    def _add_mpc_card(self, card):
-        # MPC images are Google-Drive downloads with a bleed edge; reuse the
-        # "card" path (download then upscale), the bleed trim handles the edge
-        base = f"{card['name']}  [{card['source']}]"
-        safe = re.sub(r'[<>:"/\\|?*]', "", base)
-        self._add_item(base, "card",
-                       downloads=[(safe, card["download"])], label=base)
 
     def _add_resolved_cards(self, cards):
         for c in cards:
@@ -881,7 +825,7 @@ class App(_Root):
 
     def _finish(self, total, errors):
         self.running = False
-        self.start_btn.configure(state="normal", text="UPSCALE ALL")
+        self.start_btn.configure(state="normal", text="Upscale all")
         self.clear_btn.configure(state="normal")
         ok = total - errors
         if errors:
@@ -1271,8 +1215,11 @@ class ExportDialog(ctk.CTkToplevel):
         self._r += 1
         self.reg_pattern = row("Mark pattern", print_sheet.REG_PATTERNS,
                                s.get("reg_pattern", print_sheet.REG_PATTERNS[0]))
-        self.reg_inset = entry_row("Mark inset (mm)", "reg_inset",
-                                   print_sheet.REG_INSET_DEFAULT_MM, "min 10")
+        # Naming Studio's own default here is the difference between marks
+        # that land on a Studio-made template and marks that don't.
+        self.reg_inset = entry_row(
+            "Mark inset (mm)", "reg_inset", print_sheet.REG_INSET_DEFAULT_MM,
+            f"min 10 · Studio uses {print_sheet.REG_STUDIO_INSET_MM}")
         self.reg_length = entry_row("Mark length (mm)", "reg_length",
                                     print_sheet.REG_LENGTH_DEFAULT_MM, "5–20")
         self.reg_thick = entry_row("Mark thickness (mm)", "reg_thick", 1.0,

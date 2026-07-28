@@ -572,7 +572,7 @@ def _boundaries(origin, size, gutter, count=3):
 def _draw_marks(c, ox, oy, block_w, block_h, gutter=0.0, guide_rgb=(1, 1, 1),
                 cols=COLS, rows=ROWS, guide_len_mm=4.0, guide_thick=0.4,
                 guide_style="Cross", guide_offset_mm=0.0,
-                card_w=CARD_W, card_h=CARD_H):
+                card_w=CARD_W, card_h=CARD_H, clear_boxes=()):
     xs = _boundaries(ox, card_w, gutter, cols)
     ys = _boundaries(oy, card_h, gutter, rows)
     tick = guide_len_mm * mm
@@ -584,30 +584,58 @@ def _draw_marks(c, ox, oy, block_w, block_h, gutter=0.0, guide_rgb=(1, 1, 1),
     else:
         gap = 0.9 * mm if guide_style == "Corner" else 0.0
 
+    # Nothing may land inside a registration mark's keep-clear area: the
+    # cutter reads those marks optically and a stray line beside one can throw
+    # the scan off. On A4 at the default inset several marks did exactly that.
+    def _clear(x0, y0, x1, y1):
+        lx0, lx1 = sorted((x0, x1))
+        ly0, ly1 = sorted((y0, y1))
+        for bx0, by0, bx1, by1 in clear_boxes:
+            if not (lx1 < bx0 or lx0 > bx1 or ly1 < by0 or ly0 > by1):
+                return False
+        return True
+
     # ticks at every card corner (over borders / bleed frames)
     if guide_rgb is not None:
         c.setLineWidth(guide_thick)
         c.setStrokeColorRGB(*guide_rgb)
         for x in xs:
             for y in ys:
-                # vertical arms (up / down from the corner)
-                c.line(x, min(y + gap, oy + block_h),
-                       x, min(y + tick, oy + block_h))
-                c.line(x, max(y - gap, oy), x, max(y - tick, oy))
-                # horizontal arms (right / left from the corner)
-                c.line(min(x + gap, ox + block_w), y,
-                       min(x + tick, ox + block_w), y)
-                c.line(max(x - gap, ox), y, max(x - tick, ox), y)
+                for seg in (
+                    # vertical arms (up / down from the corner)
+                    (x, min(y + gap, oy + block_h),
+                     x, min(y + tick, oy + block_h)),
+                    (x, max(y - gap, oy), x, max(y - tick, oy)),
+                    # horizontal arms (right / left from the corner)
+                    (min(x + gap, ox + block_w), y,
+                     min(x + tick, ox + block_w), y),
+                    (max(x - gap, ox), y, max(x - tick, ox), y),
+                ):
+                    if _clear(*seg):
+                        c.line(*seg)
 
-    # dark tick marks in the margins, aligned to every boundary
+    # Dark tick marks in the margins, aligned to every boundary.
+    #
+    # These are guides too. Turning guides off used to leave them printed —
+    # the setting only gated the corner crosses above — so the page still came
+    # out with dark marks in the margins.
+    if guide_rgb is None:
+        return
+
     c.setLineWidth(0.4)
     c.setStrokeColorRGB(0.4, 0.4, 0.4)
     for x in xs:
-        c.line(x, oy + block_h + MARK_GAP, x, oy + block_h + MARK_GAP + MARK_LEN)
-        c.line(x, oy - MARK_GAP, x, oy - MARK_GAP - MARK_LEN)
+        for seg in ((x, oy + block_h + MARK_GAP,
+                     x, oy + block_h + MARK_GAP + MARK_LEN),
+                    (x, oy - MARK_GAP, x, oy - MARK_GAP - MARK_LEN)):
+            if _clear(*seg):
+                c.line(*seg)
     for y in ys:
-        c.line(ox - MARK_GAP, y, ox - MARK_GAP - MARK_LEN, y)
-        c.line(ox + block_w + MARK_GAP, y, ox + block_w + MARK_GAP + MARK_LEN, y)
+        for seg in ((ox - MARK_GAP, y, ox - MARK_GAP - MARK_LEN, y),
+                    (ox + block_w + MARK_GAP, y,
+                     ox + block_w + MARK_GAP + MARK_LEN, y)):
+            if _clear(*seg):
+                c.line(*seg)
 
 
 def _card_pos(idx, ox, oy, block_h, gutter=0.0, cols=COLS,
@@ -731,6 +759,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     ox, oy = _block_origin(pw, ph, block_w, block_h,
                            0.0 if reg_marks else shift_down_mm)
     guide_rgb = GUIDE_COLORS.get(guide_color, (1, 1, 1))
+
     bleed_rgb = BLEED_COLORS.get(bleed_color, (0, 0, 0))
     ebleed = edge_bleed_mm * mm
     dx = back_offset[0] * mm
@@ -742,6 +771,14 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     all_pos = layout_positions(layout, ox, oy, block_h, gutter, cols, rows,
                                card_w, card_h)
     reg_four = reg_pattern == REG_PATTERNS[1]
+
+    # Keep-clear boxes around the registration marks, so no guide or margin
+    # tick lands beside one. Empty when marks are off — nothing to avoid then.
+    reg_clear = ()
+    if reg_marks:
+        _, reg_clear = _reg_geometry(pw, ph, reg_inset_mm, reg_length_mm,
+                                     reg_thick_mm, reg_four)
+
     blocked = _reg_blocked_slots(
         all_pos, card_w, card_h, pw, ph, reg_inset_mm, reg_length_mm,
         reg_thick_mm, reg_four) if reg_marks else set()
@@ -814,7 +851,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                             card_w, card_h, mask=img_mask)
             _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
                         cols, rows, guide_len_mm, guide_thick, guide_style,
-                        guide_offset_mm, card_w, card_h)
+                        guide_offset_mm, card_w, card_h, reg_clear)
             if reg_marks:
                 _draw_reg_marks(c, pw, ph, reg_inset_mm, reg_length_mm,
                                 reg_thick_mm, reg_four)
@@ -842,7 +879,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 c.restoreState()
                 _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
                             cols, rows, guide_len_mm, guide_thick, guide_style,
-                            guide_offset_mm, card_w, card_h)
+                            guide_offset_mm, card_w, card_h, reg_clear)
                 if reg_marks:
                     _draw_reg_marks(c, pw, ph, reg_inset_mm, reg_length_mm,
                                     reg_thick_mm, reg_four)

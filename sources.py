@@ -202,11 +202,38 @@ class _MPC:
         return mpcfill.fetch_thumb(url)
 
 
+# --------------------------------------------------------------------------
+# Yu-Gi-Oh (YGOPRODeck)
+# --------------------------------------------------------------------------
+
+class _YGO:
+    ID = "ygo"
+    LABEL = "Yu-Gi-Oh"
+    ADD_KIND = "card"
+    EMPTY = "No matches on YGOPRODeck."
+    PLACEHOLDER = "Card name (e.g. Dark Magician)"
+    # A Yu-Gi-Oh card is 59×86 mm. Fit-to-card would stretch it into Magic's
+    # 63×88, so picking one switches the size over.
+    CARD_SIZE_HINT = "Yu-Gi-Oh"
+    NOTE = "Card size switches to Yu-Gi-Oh when you add one."
+
+    @staticmethod
+    def search(query: str, limit: int = 60) -> list[dict]:
+        import ygoprodeck
+        return ygoprodeck.search(query, limit)
+
+    @staticmethod
+    def fetch_thumb(url: str) -> bytes | None:
+        import ygoprodeck
+        return ygoprodeck.fetch_thumb(url)
+
+
 SCRYFALL = _Scryfall
 GATHERER = _Gatherer
 MPC = _MPC
+YGO = _YGO
 
-ALL = [SCRYFALL, GATHERER, MPC]
+ALL = [SCRYFALL, GATHERER, MPC, YGO]
 
 
 def by_id(source_id: str):
