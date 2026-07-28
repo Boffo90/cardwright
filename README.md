@@ -22,16 +22,22 @@ with print-shop features.
 - Parallel processing, retry of failed cards, status filtering.
 
 ### Getting cards in
-- Card names and **Scryfall** links (any language).
-- **Gatherer** links — classic and new format, including foreign printings
-  (images come from Gatherer, not substituted).
+- Type a **card name** and a gallery opens with every printing of it,
+  thumbnails and all — you see what you are about to upscale before
+  committing to it.
+- **Switch source** without leaving the gallery: **Scryfall**, **Gatherer**,
+  **MPC Autofill** and **Yu-Gi-Oh** (YGOPRODeck). MPC bleed edges are trimmed
+  automatically; picking a Yu-Gi-Oh card switches the card size to 59×86 mm.
+- **Best scan** picks the sharpest printing of a searched name for you,
+  keeping the same artwork — a weak scan is exactly what upscaling magnifies.
+- **Card language**: fetch printings in any of the 11 languages Scryfall
+  carries. Applies to name lookups and decklists; cards never printed in that
+  language come back in English and are listed, rather than failing.
+- Pasting a **Scryfall or Gatherer link** goes straight to the queue — you
+  already chose the printing, so nothing second-guesses it. Gatherer links
+  use the Gatherer image, never a substitute.
 - **Decklist paste**: `1 Card Name (SET) 123 [matte] *F*`, exact printings
-  by set + collector number.
-- **Archidekt** deck URLs.
-- **MPC Autofill search** built in: search, browse versions, pick one, and
-  its bleed edge is trimmed automatically.
-- **Yu-Gi-Oh search** via the YGOPRODeck catalogue, with every artwork of a
-  card listed; the card size switches to 59×86 mm automatically.
+  by set + collector number. **Archidekt** deck URLs too.
 - Local files (PNG/JPG/WEBP/AVIF/…) and drag & drop.
 - Double-faced cards fetch both faces and stay paired.
 
@@ -61,9 +67,16 @@ The preview is a workspace, not a picture — what you see is what prints.
 ### Cutting machines (Silhouette / Cricut)
 - **Registration marks** for print & cut: 3-mark standard and 4-mark
   CAMEO 5a patterns, with adjustable inset, arm length and thickness.
-- Defaults are tuned so you **don't lose card slots** — A4 3×3 still prints
-  all 9. If a mark would sit on a card, that slot is left empty and the card
-  moves to the next sheet; a live hint tells you how many slots are usable.
+- Marks follow **Silhouette Studio's own published geometry** (0.394 in inset,
+  0.350 in length, 0.039 in thickness), so a sheet lands on a template built
+  in Studio.
+- Those marks reach onto the grid, which costs slots on some pairings — A4
+  3×3 fits 7 cards rather than 9. **On A4, the 4×2 and 7-card layouts keep
+  every slot** (8 and 7), so they are the best pairings for machine cutting.
+  If a mark would sit on a card, that slot is left empty and the card moves to
+  the next sheet; a live hint tells you how many are usable.
+- Guides and margin ticks never print inside a mark's clear area, and turning
+  guides off removes all of them.
 - **7-card Silhouette layout**: one vertically centred card in the left
   column plus a 3×2 block, clearing both left corners where a Cameo's key
   marks sit (clearance goes from ~5 mm to ~49 mm on Letter).
@@ -80,8 +93,12 @@ The preview is a workspace, not a picture — what you see is what prints.
 - **Calibration sheet** with 9 colour profiles to match your printer.
 - **Shadow-lift test sheet** — rescues dark details crushed by inkjet plus
   matte lamination.
-- **Black border deepening** for scans whose border prints as dark grey,
-  with automatic detection, per-card override and strength control.
+- **Black border deepening** for scans whose border prints as dark grey, in
+  two flavours: **Contrast edges** (the default) pushes the dark pixels inside
+  a fixed band at the card's edge, so nothing has to guess where the border
+  is; **Auto-detect** measures the frame and snaps it to black. Both take a
+  per-card override, and you choose which sources get treated at all — MPC
+  art already carries a true black edge, so it is left alone by default.
 - Output sharpening. All of it is applied at PDF time — your PNG masters
   stay untouched.
 
@@ -93,6 +110,9 @@ The preview is a workspace, not a picture — what you see is what prints.
 2. Run it. On first launch it downloads the AI engine and models
    (one time) from their official sources and detects your GPU.
 3. The app updates itself from within.
+
+Something misbehaving? The **Log** button in the header opens a log file with
+the full details of any failure — attach it to a bug report.
 
 ## Run from source
 
@@ -129,6 +149,9 @@ version, or sell it. See [LICENSE](LICENSE).
   (MIT); the 7-card arrangement matches the "SevenCard" template from
   [ProxySheet](https://github.com/Regenshire/ProxySheet) (GPL-3.0). No code
   from either project is used — only the published geometry.
+- The contrast-edges border treatment is a reimplementation of the approach
+  used by [Proxxied](https://github.com/acoreyj/proxies-at-home) (MIT). Their
+  code is GLSL; this is an independent numpy implementation.
 - Intended for personal playtesting. You are responsible for how you use
   the output.
 
