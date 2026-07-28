@@ -864,7 +864,7 @@ class App(_Root):
                 released_at=item.released_at,
                 set_code=item.set_code,
                 ai=self.ai_ok,
-                trim_bleed=trim,
+                trim_bleed=trim and _may_have_bleed(item),
                 card_size=card_size,
                 progress_callback=lambda v, it=item: self._ui(
                     it.set_status, "processing", None, v),
