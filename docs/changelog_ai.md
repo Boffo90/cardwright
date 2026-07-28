@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.14.0 (unreleased) — contrast-edges border mode
+## v2.14.0 — contrast-edges border mode
 - **New "Contrast edges" border mode, now the default.** It pushes the dark
   pixels inside a fixed band at the card's edge instead of measuring how deep
   the frame runs, so there is no detection to misjudge on artwork that reaches
