@@ -1218,13 +1218,12 @@ class ExportDialog(ctk.CTkToplevel):
         self._r += 1
         self.reg_pattern = row("Mark pattern", print_sheet.REG_PATTERNS,
                                s.get("reg_pattern", print_sheet.REG_PATTERNS[0]))
-        # Naming Studio's own default here is the difference between marks
-        # that land on a Studio-made template and marks that don't.
         self.reg_inset = entry_row(
             "Mark inset (mm)", "reg_inset", print_sheet.REG_INSET_DEFAULT_MM,
-            f"min 10 · Studio uses {print_sheet.REG_STUDIO_INSET_MM}")
+            "min 10 = Studio's")
         self.reg_length = entry_row("Mark length (mm)", "reg_length",
-                                    print_sheet.REG_LENGTH_DEFAULT_MM, "5–20")
+                                    print_sheet.REG_LENGTH_DEFAULT_MM,
+                                    "5–20 · 8.89 = Studio's")
         self.reg_thick = entry_row("Mark thickness (mm)", "reg_thick", 1.0,
                                    "0.5–1")
 
