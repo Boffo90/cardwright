@@ -53,6 +53,9 @@ One rotating file at `ROOT/cardwright.log`, no console handler (the build is win
 - **Contrast edges** detects nothing. The band is a fixed fraction of the card's shorter side (`CONTRAST_EDGE_WIDTH`, 8%), so there is no judgement to get wrong. Reimplemented in numpy from the approach Proxxied uses (MIT per its README, `acoreyj/proxies-at-home`); their code is GLSL, ours is not a copy.
 - Three things keep it off the artwork: **quadratic falloff** to the inner edge of the band (no seam), **tone weighting** so only pixels below `CONTRAST_TONE_KNEE` (140/255) are pushed, and a **contrast curve** `(v-0.5)*contrast + 0.5 + brightness` rather than a binary snap.
 - This does not overturn the "binary, not proportional" decision below — that one is about the auto-detect path, which still snaps. Contrast edges avoids mottling by the falloff instead.
+- **Border treatment is per source** (`BORDER_SOURCES`, checkboxes in Export → Image). MPC art already carries a true black edge and card backs are usually correct, so both are **off by default** — running the effect there is risk with no upside.
+- Resolution order for a card's mode, all in `_mode_for()`: an explicit per-card override (left-click in the preview) beats the source rule, which beats the global switch. The preview and the export both call it, so what you see is what prints.
+- Back images go through the same flatten path as fronts, so their paths are mapped to the `back` source or the checkbox would control nothing.
 - **Renaming a mode breaks saved settings.** "On (auto-detect)" became "Auto-detect"; without `config.border_mode()` mapping the old label, the picker falls back to "Off" and silently stops treating borders for every existing user. Any future rename needs the same migration.
 
 ## Footer options layout

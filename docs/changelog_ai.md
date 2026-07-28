@@ -14,6 +14,11 @@ Registro por versión. Actualizar en cada release.
   side), edge contrast and edge brightness.
 - Reimplemented in numpy from the approach Proxxied uses (MIT per its README,
   `acoreyj/proxies-at-home`) — their code is GLSL, this is not a copy.
+- **Apply to, per source.** Checkboxes in Export → Image decide which
+  catalogues get border treatment at all. **MPC and card backs are off by
+  default** — MPC art already carries a true black edge, so touching it is
+  risk with no upside. A per-card override from the preview still wins over
+  the source rule, and the preview reflects the same rules the export uses.
 - **Settings migration**: "On (auto-detect)" is mapped to "Auto-detect". The
   rename would otherwise drop existing users back to "Off" silently.
 

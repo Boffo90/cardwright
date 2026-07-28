@@ -43,6 +43,7 @@ from config import (
     SHADOW_LIFTS,
     SHADOW_DEFAULT,
     BORDER_MODES,
+    BORDER_SOURCES,
     border_mode,
     BORDER_DEFAULT,
     BORDER_AMOUNT_DEFAULT,
@@ -592,11 +593,14 @@ class App(_Root):
             item.grid_remove()
 
     def _add_item(self, ref, kind, downloads=None, label=None, qty=1,
-                  released_at=None, set_code=None):
+                  released_at=None, set_code=None, src=None):
         item = QueueItem(self.queue_frame, ref, kind, self._remove_item,
                          downloads=downloads, label=label, qty=qty,
                          released_at=released_at, set_code=set_code,
                          on_status=self._apply_filter)
+        # Which catalogue this came from, so border treatment can be skipped
+        # per source (MPC art already carries a true black edge).
+        item.src = src or ("file" if kind == "file" else "scryfall")
         item.grid(row=len(self.items) + 1, column=0, sticky="ew", padx=6, pady=4)
         self.items.append(item)
         self._apply_filter(item)
@@ -649,13 +653,14 @@ class App(_Root):
             # Gatherer: hand back the reference and let scryfall.fetch pull
             # the image, which also converts Gatherer's webp to PNG.
             self._add_item(card["ref"], "scryfall",
-                           label=f"{card['name']}  [{src.LABEL}]")
+                           label=f"{card['name']}  [{src.LABEL}]", src=src.ID)
             return
 
         base = f"{card['name']}  [{card['source'] or src.LABEL}]"
         safe = re.sub(r'[<>:"/\\|?*]', "", base)
         self._add_item(base, "card",
-                       downloads=[(safe, card["download"])], label=base)
+                       downloads=[(safe, card["download"])], label=base,
+                       src=src.ID)
 
         # A source printed at another size (Yu-Gi-Oh) has to move the card
         # size with it, or fit-to-card stretches it into Magic proportions.
@@ -721,21 +726,25 @@ class App(_Root):
         everything in the output folder."""
         images = [p for it in self.items if it.status == "done"
                   for p in it.outputs if Path(p).exists()]
+        srcs = {str(p): getattr(it, "src", "scryfall")
+                for it in self.items if it.status == "done"
+                for p in it.outputs if Path(p).exists()}
         source = "queue"
         if not images:
             images = sorted(OUTPUT_FOLDER.glob("*.png"))
             source = "output folder"
-        return images, source
+            srcs = {}          # nothing left to tell us where these came from
+        return images, source, srcs
 
     def _export_pdf(self):
         if self.running:
             return
-        images, source = self._export_images()
+        images, source, srcs = self._export_images()
         if not images:
             messagebox.showerror("Nothing to export",
                                  "No upscaled cards found. Run UPSCALE ALL first.")
             return
-        ExportDialog(self, images, source)
+        ExportDialog(self, images, source, card_sources=srcs)
 
     def _export_pdf_files(self):
         """Pick specific already-upscaled cards (from the output folder or
@@ -1047,10 +1056,12 @@ class ExportDialog(ctk.CTkToplevel):
     """Print-sheet export: layout, quality, color pipeline, duplex backs and
     a live preview of page 1. Choices persist in settings.json."""
 
-    def __init__(self, master, images, source):
+    def __init__(self, master, images, source, card_sources=None):
         super().__init__(master)
         self.images = images
         self.source = source
+        # path -> catalogue id, so border treatment can be skipped per source
+        self.card_sources = card_sources or {}
         self.title("Export print sheet")
         self.geometry("980x760")
         self.transient(master)
@@ -1267,6 +1278,33 @@ class ExportDialog(ctk.CTkToplevel):
                           s.get("shadow", SHADOW_DEFAULT))
         self.border = row("Deepen black border", BORDER_MODES,
                           border_mode(s.get("border")))
+        srcfr = ctk.CTkFrame(left, fg_color="transparent")
+        srcfr.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                   padx=(12, 8), pady=(0, 4))
+        self._r += 1
+        ctk.CTkLabel(srcfr, text="Apply to", anchor="w", text_color=TEXT_DIM,
+                     font=(UI, theme.TYPE["small"])).grid(
+            row=0, column=0, sticky="nw", padx=(0, 8), pady=(2, 0))
+        saved_srcs = s.get("border_sources") or {}
+        self.border_srcs = {}
+        # Three per row: all six on one line ran past the panel and clipped
+        # the last checkbox.
+        for i, (key, label) in enumerate(
+                (("scryfall", "Scryfall"), ("gatherer", "Gatherer"),
+                 ("mpc", "MPC"), ("ygo", "Yu-Gi-Oh"),
+                 ("file", "Uploads"), ("back", "Backs"))):
+            var = ctk.BooleanVar(
+                value=bool(saved_srcs.get(key, BORDER_SOURCES.get(key, True))))
+            ctk.CTkCheckBox(srcfr, text=label, variable=var, width=20,
+                            height=18, checkbox_width=16, checkbox_height=16,
+                            corner_radius=3, font=(UI, theme.TYPE["caption"]),
+                            fg_color=GOLD, hover_color=GOLD_HOVER,
+                            text_color=TEXT_DIM,
+                            command=self._refresh_preview).grid(
+                row=i // 3, column=1 + (i % 3), sticky="w",
+                padx=(0, 12), pady=1)
+            self.border_srcs[key] = var
+
         self.edge_width = entry_row(
             "Edge width (%)", "edge_width",
             round(print_sheet.CONTRAST_EDGE_WIDTH * 100, 1),
@@ -1487,6 +1525,23 @@ class ExportDialog(ctk.CTkToplevel):
     def _card_mm(self):
         return card_size_mm(self.card_size.get())
 
+    def _mode_for(self, key):
+        """Per-card border mode: an explicit override wins, then the source
+        rule, then 'auto' (follow the global switch)."""
+        override = self._border_modes.get(key)
+        if override:
+            return override
+        src = self.card_sources.get(str(key))
+        if src is not None:
+            var = self.border_srcs.get(src)
+            if var is not None and not var.get():
+                return "off"
+        return "auto"
+
+    def _effective_border_modes(self):
+        keys = set(self._border_modes) | {str(p) for p in self.images}
+        return {k: self._mode_for(k) for k in keys}
+
     def _border_style(self):
         """Which of the two border algorithms the mode picker selected."""
         if self.border.get() == BORDER_MODES[2]:
@@ -1568,6 +1623,8 @@ class ExportDialog(ctk.CTkToplevel):
             "border": self.border.get(),
             "border_amount": round(self.border_amount.get(), 1),
             "border_width": round(self.border_width.get(), 1),
+            "border_sources": {k: bool(v.get())
+                               for k, v in self.border_srcs.items()},
             "edge_width": round(self._edge_width() * 100, 1),
             "edge_contrast": round(self._edge_contrast() * 100),
             "edge_brightness": round(self._edge_brightness() * 255),
@@ -1700,6 +1757,11 @@ class ExportDialog(ctk.CTkToplevel):
         if self.backs.get() != BACKS_MODES[0]:
             default = self._custom_back or find_back_image()
             backs = [self._back_of.get(f) or default for f in fronts]
+            # Backs go through the same flatten path as fronts, so they need
+            # a source too or the "Backs" checkbox would control nothing.
+            for b in backs:
+                if b is not None:
+                    self.card_sources.setdefault(str(b), "back")
             return fronts, backs
         return fronts, None
 
@@ -1871,7 +1933,7 @@ class ExportDialog(ctk.CTkToplevel):
                                 fill=bleed_fill, outline=(210, 210, 215))
                 item = page_items[slot]
                 key = str(item) if item else None
-                mode = self._border_modes.get(key, "auto")
+                mode = self._mode_for(key)
                 treated = mode == "on" or (mode == "auto" and border_on)
                 if key:
                     t = self._treated_thumb(key) if treated else None
@@ -2119,7 +2181,7 @@ class ExportDialog(ctk.CTkToplevel):
         for x0, y0, x1, y1, key in self._slots:
             if not (key and x0 <= px <= x1 and y0 <= py <= y1):
                 continue
-            mode = self._border_modes.get(key, "auto")
+            mode = self._mode_for(key)
             treated = mode == "on" or (
                 mode == "auto" and self.border.get() != BORDER_MODES[0])
             src = (self._work_b if treated else {}).get(key)
@@ -2433,7 +2495,7 @@ class ExportDialog(ctk.CTkToplevel):
             profile_id=self._profile_id(),
             shadow_name=self.shadow.get(),
             deepen_border=self.border.get() != BORDER_MODES[0],
-            border_modes=dict(self._border_modes),
+            border_modes=self._effective_border_modes(),
             border_amount=self.border_amount.get() / 100.0,
             border_width=self.border_width.get() / 100.0,
             border_style=self._border_style(),
