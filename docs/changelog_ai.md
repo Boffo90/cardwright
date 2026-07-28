@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.15.0 (unreleased) — sharper results from small sources
+## v2.15.0 — Pokémon cards, sharper small sources
 - A source too small for one AI pass to reach the card is now **resized up to
   exactly target/scale before the pass**, so the AI lands on the card instead
   of leaving a plain stretch to do afterwards.
