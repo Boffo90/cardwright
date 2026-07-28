@@ -2,6 +2,18 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.15.0 (unreleased) — sharper results from small sources
+- A source too small for one AI pass to reach the card is now **resized up to
+  exactly target/scale before the pass**, so the AI lands on the card instead
+  of leaving a plain stretch to do afterwards.
+- Measured on a 600×825 scan: sharpness (Laplacian variance) goes from **54 to
+  84**, for **+0.5 s** and no extra memory.
+- Never fires for MTG — Scryfall's 745 px × 4 already clears the target. It is
+  for Gatherer (646 px) and the Pokémon catalogues (600 px).
+- Running the AI twice and downsampling scores much higher (331) but costs
+  15.3 s per card and a 125 MB intermediate. **Not implemented on purpose** —
+  staying light matters more than the last of the sharpness.
+
 ## v2.14.0 — contrast-edges border mode
 - **New "Contrast edges" border mode, now the default.** It pushes the dark
   pixels inside a fixed band at the card's edge instead of measuring how deep

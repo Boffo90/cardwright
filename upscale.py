@@ -228,6 +228,31 @@ def upscale(
             status_callback("Done (no AI needed)")
         return output
 
+    # A source too small for one AI pass to reach the card gets resized up to
+    # exactly target/scale FIRST, so the pass lands on the card instead of
+    # leaving a plain stretch to do afterwards. The interpolation happens
+    # before the reconstruction rather than after it, and that is the whole
+    # difference: measured on a 600x825 Pokemon scan, sharpness went from 54
+    # to 84 (Laplacian variance) for +0.5 s and no extra memory.
+    #
+    # For MTG this never fires — Scryfall's 745 px x4 already clears 2976.
+    # Gatherer (646) and the Pokemon catalogues (600) are what it is for.
+    #
+    # Running the AI twice and downsampling scores far higher (331) but costs
+    # 15.3 s per card and a 125 MB intermediate; at PARALLEL_JOBS that is the
+    # kind of load this app exists to avoid. Deliberately not done.
+    need_w = -(-card_w_px // scale)      # ceil, so the pass never lands short
+    need_h = -(-card_h_px // scale)
+    if w < need_w or h < need_h:
+        if status_callback:
+            status_callback("Small source — normalizing before AI…")
+        pre = TEMP_FOLDER / (source.stem + "_pre.png")
+        with Image.open(source) as im:
+            if im.mode not in ("RGB", "RGBA"):
+                im = im.convert("RGBA")
+            im.resize((max(w, need_w), max(h, need_h)), Image.LANCZOS).save(pre)
+        source = pre
+
     cmd = [
         str(REALESRGAN_EXE),
         "-i", str(source),

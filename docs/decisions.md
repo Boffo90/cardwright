@@ -59,6 +59,13 @@ One rotating file at `ROOT/cardwright.log`, no console handler (the build is win
 - Back images go through the same flatten path as fronts, so their paths are mapped to the `back` source or the checkbox would control nothing.
 - **Renaming a mode breaks saved settings.** "On (auto-detect)" became "Auto-detect"; without `config.border_mode()` mapping the old label, the picker falls back to "Off" and silently stops treating borders for every existing user. Any future rename needs the same migration.
 
+## Small sources: normalize before the AI, never a second pass (v2.15.0)
+A source too small for one x4 pass to reach the card is resized up to exactly `target/scale` **before** the pass, so the AI lands on the card instead of leaving a plain stretch behind it. The interpolation happens before the reconstruction rather than after, and that is the whole difference.
+- Measured on a 600×825 Pokémon scan taken to 2976×4160, sharpness by Laplacian variance: **current x4-then-stretch 54 · pre-scale-then-x4 84 · two x4 passes then downsample 331**. Halving the AI factor (the intuitive fix) scores **25** — worse than doing nothing, because less AI means *more* plain stretch, and the plain stretch is what softens.
+- **The double pass is deliberately not implemented.** 331 is by far the sharpest, but it costs **15.3 s per card against 2.0 s** and a **125 MB intermediate**; at `PARALLEL_JOBS = 3` that is ~375 MB concurrent and ~15 min for a 60-card deck. Staying light is the reason people move to this app, so the quality is not worth the risk. Pre-scaling gets +56% for +0.5 s and no extra memory.
+- Never fires for MTG: Scryfall's 745 px × 4 = 2980 already clears 2976. It exists for Gatherer (646) and the Pokémon catalogues (600).
+- `2976 / 4 = 744` is exactly Scryfall's native width, which is the size the whole pipeline was built around.
+
 ## Footer options layout
 The options panel keeps each row in its **own frame**. Tk's grid shares column widths across rows, so a wide label in one row silently widens the row above it: adding the Card language row directly to the shared grid pushed the panel from 903 px to 1027 against a 900 px minimum window — reintroducing exactly the clipping v2.12.0 fixed. Measure `winfo_reqwidth()` of the options frame after touching this area; it should stay under 900. Long help text goes on its own row with `wraplength` rebound on `<Configure>`, never inline beside controls.
 
