@@ -54,6 +54,31 @@ Registro por versión. Actualizar en cada release.
   tab — Gatherer's handler serves one full-size image per request, far too
   heavy for a grid.
 
+### Interface pass (same release)
+- Top bar down to three secondary buttons at one width and one colour:
+  **Browse cards… / Add files… / Import list…**. The per-catalogue buttons are
+  gone — every catalogue, Yu-Gi-Oh included, is now a tab in the gallery, so
+  picking one still switches the card size over.
+- Options panel rebuilt as an aligned label/control grid with the plain
+  toggles stacked beside it. It was one flat row of loose parts whose labels
+  never lined up; required width dropped 868 → 798 px.
+- Footer utilities are one ghost tier at one height. "Clear" was a filled
+  button 6 px taller than its neighbours, which made the row look crooked.
+- "From files…" renamed **"PDF from files…"** — it exports, and the old name
+  read like a second "Add files…".
+- The button no longer re-labels itself "UPSCALE ALL" in caps after a run.
+
+### Fixed — guides off left marks on the page
+- Turning guides off only gated the corner crosses; the dark tick marks in
+  the margins were drawn unconditionally, so pages still came out with marks
+  beside the registration corners.
+- Measuring that turned up an unreported collision: on **A4 at the default
+  10 mm inset, 5-6 margin ticks landed inside a registration mark's
+  keep-clear box**, where a stray line can throw the cutter's optical scan
+  off. Guides and ticks now both skip anything intersecting those boxes.
+- The mark inset field names Silhouette Studio's own default (15.875 mm),
+  which is what a Studio-made template is built around.
+
 ## v2.12.1 — keep copyright microtext crisp
 - Border deepening no longer eats the anti-aliasing of the white microtext in
   the bottom band (copyright / collector line). `BORDER_TONE_MAX` 100 → 58:

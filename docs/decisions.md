@@ -32,6 +32,11 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden — in a manual picker the user can see the thumbnail and judge.
 
+## Guides vs registration marks (v2.13.0)
+- **"Guides off" means every guide**, corner crosses *and* margin ticks. The ticks used to ignore the setting entirely.
+- **Nothing may intersect a registration mark's keep-clear box.** `_reg_geometry` already returned those boxes for card placement; `_draw_marks` now takes them too. Measured before the fix: A4 at the 10 mm default put 5-6 ticks inside one. Letter at the same inset was clean, which is why it went unnoticed.
+- **Silhouette Studio's own mark inset is 15.875 mm** (`REG_STUDIO_INSET_MM`), our default is 10. A template built in Studio is laid out around Studio's value, so marks exported at 10 will not land on it. The field's hint names 15.875; changing the default is still open.
+
 ## Footer options layout
 The options panel keeps each row in its **own frame**. Tk's grid shares column widths across rows, so a wide label in one row silently widens the row above it: adding the Card language row directly to the shared grid pushed the panel from 903 px to 1027 against a 900 px minimum window — reintroducing exactly the clipping v2.12.0 fixed. Measure `winfo_reqwidth()` of the options frame after touching this area; it should stay under 900. Long help text goes on its own row with `wraplength` rebound on `<Configure>`, never inline beside controls.
 

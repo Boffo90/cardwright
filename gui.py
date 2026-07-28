@@ -452,8 +452,11 @@ class App(_Root):
         MENU_W = 220
 
         def field(text, row, col, values, width=MENU_W, command=None):
+            # No fixed width: grid already aligns the column to the widest
+            # label in it, and padding it out just opens a gap after the
+            # shorter ones.
             ctk.CTkLabel(fields, text=text, font=(UI, theme.TYPE["small"]),
-                         text_color=TEXT_DIM, anchor="w", width=84).grid(
+                         text_color=TEXT_DIM, anchor="w").grid(
                 row=row, column=col * 2, sticky="w",
                 padx=(0 if col == 0 else pad["xl"], pad["sm"]),
                 pady=(0 if row == 0 else pad["sm"], 0))
