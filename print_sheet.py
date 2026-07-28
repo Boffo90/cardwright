@@ -489,9 +489,17 @@ REG_INSET_MIN_MM = 10.0
 # that footprint eats three card slots on a 3x3 sheet. The spec minimums
 # (10 mm inset, 5 mm arms) keep every card AND stay inside the readable
 # range, so they are our defaults; raise them if a machine fails to detect.
-REG_INSET_DEFAULT_MM = 10.0
-REG_LENGTH_DEFAULT_MM = 5.0
 REG_STUDIO_INSET_MM = 15.875    # what Silhouette Studio itself defaults to
+# Default to Studio's own inset so an exported sheet lands on a template built
+# in Studio — that mismatch is what made marks miss a ProxySheets template.
+#
+# It costs slots on some page/layout pairs, because a deeper inset pushes the
+# marks further onto the grid: A4 3x3 drops 9 usable cards to 6 (5 with
+# 4-mark), Letter 4x2 drops 8 to 5, Letter 7-card 7 to 6. A4 4x2 and A4
+# 7-card are unaffected. Anyone who has already exported keeps their saved
+# value, so this only moves fresh installs.
+REG_INSET_DEFAULT_MM = REG_STUDIO_INSET_MM
+REG_LENGTH_DEFAULT_MM = 5.0
 REG_PADDING_MM = 1.5            # clear space the sensor needs around a mark
 REG_PATTERNS = ["3 marks (standard)", "4 marks (CAMEO 5a)"]
 

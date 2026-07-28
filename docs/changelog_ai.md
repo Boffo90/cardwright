@@ -76,8 +76,13 @@ Registro por versión. Actualizar en cada release.
   10 mm inset, 5-6 margin ticks landed inside a registration mark's
   keep-clear box**, where a stray line can throw the cutter's optical scan
   off. Guides and ticks now both skip anything intersecting those boxes.
-- The mark inset field names Silhouette Studio's own default (15.875 mm),
-  which is what a Studio-made template is built around.
+- **The mark inset now defaults to Silhouette Studio's own 15.875 mm** (was
+  10), so an exported sheet lands on a template built in Studio.
+  That costs slots where the deeper inset pushes marks onto the grid: A4 3×3
+  drops 9 usable cards to 6 (5 with 4-mark), Letter 4×2 drops 8 to 5, Letter
+  7-card drops 7 to 6. A4 4×2 and A4 7-card are unaffected. The minimum is
+  still 10 for anyone who wants the density back, and a saved value wins over
+  the default, so only fresh installs move.
 
 ## v2.12.1 — keep copyright microtext crisp
 - Border deepening no longer eats the anti-aliasing of the white microtext in
