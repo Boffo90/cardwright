@@ -157,6 +157,22 @@ else:
 # --------------------------------------------------------------------------
 # a single row in the queue
 # --------------------------------------------------------------------------
+# Only images that could actually carry an MPC bleed edge are eligible for the
+# trim. The trim is decided by aspect ratio, and a 600x825 TCGdex Pokemon
+# image lands at 0.7273 — inside the 0.725-0.745 MPC window — so it was being
+# cropped by 4.4% a side, eating the card's border. Scryfall (0.7163) and
+# Gatherer (0.7162) sit outside the window, which is why this only ever showed
+# up on Pokemon.
+#
+# Local files keep the heuristic: someone can perfectly well feed in an MPC
+# download by hand, and there is nothing else to go on there.
+_BLEED_CAPABLE_SOURCES = {"mpc", "file"}
+
+
+def _may_have_bleed(item) -> bool:
+    return getattr(item, "src", "file") in _BLEED_CAPABLE_SOURCES
+
+
 class QueueItem(ctk.CTkFrame):
     def __init__(self, master, ref, kind, on_remove, downloads=None, label=None,
                  qty=1, released_at=None, set_code=None, on_status=None):

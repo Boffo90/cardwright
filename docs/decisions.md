@@ -33,6 +33,12 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden — in a manual picker the user can see the thumbnail and judge.
 
+## MPC bleed trim is source-gated (v2.15.0)
+The trim decides by aspect ratio, and **TCGdex's 600×825 Pokémon images land at 0.7273 — inside the 0.725-0.745 MPC window** — so every Pokémon card was cropped 4.4% a side, cutting its border off. Reported on Charizard (Base Set 4) and reproduced exactly.
+- Scryfall (0.7163) and Gatherer (0.7162) sit outside the window, which is why the heuristic survived this long unnoticed.
+- The trim now only runs for sources that **could** carry a bleed: `mpc` and local `file`. Local files keep the heuristic — someone can hand-feed an MPC download and there is nothing else to go on.
+- **Any new source must be checked against that ratio window** before being added. A catalogue whose images are not exactly the card's proportions will trip it.
+
 ## Pokémon source: TCGdex, not pokemontcg.io (v2.15.0)
 Both were measured before choosing. Resolution did **not** decide it — every Pokémon catalogue tops out at `600×825` ("high"), confirmed identical on pokemontcg.io and TCGdex and unchanged between a 1999 and a 2020 set. That is an ecosystem ceiling, not a vendor limit.
 - **No API key.** pokemontcg.io meters unauthenticated use (1000/day) and its terms allow one key per person — unworkable in a binary handed to strangers, where a shipped key is extractable and shared by everyone. TCGdex asks for nothing.

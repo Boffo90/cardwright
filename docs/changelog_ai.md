@@ -23,6 +23,15 @@ Registro por versión. Actualizar en cada release.
   absorbed into a commercial product. The gallery states the resolution limit
   rather than hiding it.
 
+### Fixed — Pokémon cards came out cropped
+- The MPC bleed trim decides by aspect ratio, and TCGdex's 600×825 images land
+  at 0.7273 — **inside the 0.725-0.745 MPC window** — so every Pokémon card was
+  cropped 4.4% a side and lost its border. Scryfall (0.7163) and Gatherer
+  (0.7162) fall outside it, which is why the heuristic had never misfired.
+- The trim now only runs for sources that could actually carry a bleed: MPC
+  and local files. Local files keep the heuristic, since a hand-fed MPC
+  download has nothing else to go on.
+
 ### Fixed — search errors arrived empty
 - `except Exception as e:` unbinds `e` when the block ends, so every deferred
   error handler (`self.after(0, lambda: self._failed(e))`) had lost it by the
