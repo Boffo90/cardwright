@@ -87,6 +87,21 @@ Registro por versión. Actualizar en cada release.
   usable cards to 7, Letter 4×2 8 to 6, Letter 7-card 7 to 6; A4 4×2 and A4
   7-card keep every slot. Both fields name Studio's value in their hint.
 
+### Logging
+- New **`applog.py`**: a rotating log file next to the app (`cardwright.log`,
+  512 KB × 3), plus a **Log** button in the header that opens it.
+- The app had no logging at all. The only error surface was a truncated line
+  in a queue row, so a report of "it doesn't fetch cards" was unactionable —
+  nothing recorded *why*. Failures now log the full traceback along with what
+  was being fetched.
+- Unhandled exceptions are hooked on the main thread **and in worker
+  threads**. The windowed build has no console, so a crash inside a download
+  or upscale thread previously vanished without a trace.
+- The finished-with-errors dialog points at the log and asks for it to be
+  attached to reports.
+- A read-only install directory degrades to no logging instead of stopping
+  the app from starting.
+
 ## v2.12.1 — keep copyright microtext crisp
 - Border deepening no longer eats the anti-aliasing of the white microtext in
   the bottom band (copyright / collector line). `BORDER_TONE_MAX` 100 → 58:

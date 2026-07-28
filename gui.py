@@ -61,6 +61,7 @@ from config import (
     save_settings,
 )
 from upscale import upscale
+import applog
 import scryfall
 import sources
 import mpcfill
@@ -365,6 +366,27 @@ class App(_Root):
                       font=(UI, 12),
                       command=lambda: webbrowser.open(DONATE_URL)).pack(
             side="right", padx=(4, 10), pady=(10, 0))
+        # A bug report is only as good as what the reporter can attach.
+        ctk.CTkButton(header, text="Log", width=52, height=28,
+                      fg_color="transparent", hover_color=GRAY_HOVER,
+                      border_width=1, border_color=BORDER_STRONG,
+                      text_color=TEXT_DIM, font=(UI, 12),
+                      command=self._open_log).pack(
+            side="right", padx=(4, 0), pady=(10, 0))
+
+    def _open_log(self):
+        """Show the log file in Explorer, selected, ready to drag onto a report."""
+        path = applog.LOG_PATH
+        if not path.exists():
+            messagebox.showinfo(
+                "No log yet",
+                f"Nothing has been logged yet.\n\nThe file will appear at:\n{path}")
+            return
+        try:
+            os.startfile(path.parent)
+        except OSError:
+            applog.log.error("Could not open the log folder", exc_info=True)
+            messagebox.showinfo("Log file", str(path))
 
     # ---------------------------------------------------------------- inputs
     def _build_inputs(self):
@@ -761,6 +783,10 @@ class App(_Root):
             except Exception as e:
                 with lock:
                     state["errors"] += 1
+                # The row can only hold a sentence; the log gets the traceback
+                # and what was actually being fetched.
+                applog.log.error("Failed on %r (kind=%s, model=%s, lang=%s)",
+                                 item.ref, item.kind, model, lang, exc_info=True)
                 self._ui(item.set_status, "error", f"Error: {e}")
             finally:
                 with lock:
@@ -842,7 +868,9 @@ class App(_Root):
                 "Finished with errors",
                 f"{ok} succeeded, {errors} failed:\n\n{names}\n\n"
                 f"Use the 'Error' filter above the queue to see them, "
-                f"then UPSCALE ALL retries only the failed ones.")
+                f"then 'Upscale all' retries only the failed ones.\n\n"
+                f"Full details were written to the log — the 'Log' button in "
+                f"the header opens it. Attach it if you report this.")
         else:
             messagebox.showinfo(
                 "Completed", f"{ok} image(s) upscaled to 1200 DPI.\nSaved to:\n{OUTPUT_FOLDER}")
@@ -988,6 +1016,7 @@ class ImportDialog(ctk.CTkToplevel):
             self.destroy()
 
     def _failed(self, e):
+        applog.log.error("Decklist import failed", exc_info=True)
         self.import_btn.configure(state="normal", text="Resolve & add")
         self.status.configure(text=f"Error: {e}", text_color="#fca5a5")
 
@@ -2769,6 +2798,8 @@ class CardSearchDialog(ctk.CTkToplevel):
         threading.Thread(target=work, daemon=True).start()
 
     def _failed(self, e):
+        applog.log.error("Card search failed on %s",
+                         getattr(self.backend, "LABEL", "?"), exc_info=True)
         self.search_btn.configure(state="normal")
         self.status.configure(text=f"Search failed: {e}", text_color="#fca5a5")
 

@@ -12,6 +12,8 @@ vcomp140d.dll
 models/
 
 # user data
+cardwright.log
+cardwright.log.*
 output/
 _temp/
 settings.json

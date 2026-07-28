@@ -40,6 +40,13 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - **15.875 mm (0.625 in) is not a Studio figure.** An unverified code comment claimed it was Studio's default; it appears nowhere in Studio's numbers and Proxxied ships 10 mm. Briefly shipped as the default in v2.13.0 and reverted. Do not reintroduce it without a primary source.
 - The 8.89 mm length costs slots where longer marks reach further onto the grid: A4 3×3 goes 9 usable → 7, Letter 4×2 8 → 6, Letter 7-card 7 → 6. A4 4×2 and A4 7-card keep every slot. Correctness wins here — marks the cutter cannot register are worth nothing, and anyone not using a cutter turns marks off entirely.
 
+## Logging (v2.13.0)
+One rotating file at `ROOT/cardwright.log`, no console handler (the build is windowed, there is nothing to write to). Added after a public bug report — "it doesn't fetch cards" — was unactionable because the only error surface was a truncated queue row.
+- **Hook worker threads, not just `sys.excepthook`.** Downloads and upscaling run in threads; without `threading.excepthook` those crashes were invisible.
+- Log the *context* with the traceback (what ref, which source, which model), because the reporter cannot be asked to reproduce on demand.
+- **Never let logging stop the app**: a read-only install directory degrades to no logging rather than raising at startup.
+- Keep it small (512 KB × 3). This is meant to be attached to a bug report, not archived.
+
 ## Footer options layout
 The options panel keeps each row in its **own frame**. Tk's grid shares column widths across rows, so a wide label in one row silently widens the row above it: adding the Card language row directly to the shared grid pushed the panel from 903 px to 1027 against a 900 px minimum window — reintroducing exactly the clipping v2.12.0 fixed. Measure `winfo_reqwidth()` of the options frame after touching this area; it should stay under 900. Long help text goes on its own row with `wraplength` rebound on `<Configure>`, never inline beside controls.
 
