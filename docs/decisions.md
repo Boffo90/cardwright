@@ -47,6 +47,14 @@ One rotating file at `ROOT/cardwright.log`, no console handler (the build is win
 - **Never let logging stop the app**: a read-only install directory degrades to no logging rather than raising at startup.
 - Keep it small (512 KB × 3). This is meant to be attached to a bug report, not archived.
 
+## Border deepening: two algorithms (v2.13.0)
+`Off` / `Contrast edges` / `Auto-detect`, defaulting to **Contrast edges**.
+- **Auto-detect** (the original) measures how deep the uniform dark frame runs, then snaps it to black. Its weakness is the measurement: artwork that reaches the cut edge is what it can misjudge.
+- **Contrast edges** detects nothing. The band is a fixed fraction of the card's shorter side (`CONTRAST_EDGE_WIDTH`, 8%), so there is no judgement to get wrong. Reimplemented in numpy from the approach Proxxied uses (MIT per its README, `acoreyj/proxies-at-home`); their code is GLSL, ours is not a copy.
+- Three things keep it off the artwork: **quadratic falloff** to the inner edge of the band (no seam), **tone weighting** so only pixels below `CONTRAST_TONE_KNEE` (140/255) are pushed, and a **contrast curve** `(v-0.5)*contrast + 0.5 + brightness` rather than a binary snap.
+- This does not overturn the "binary, not proportional" decision below — that one is about the auto-detect path, which still snaps. Contrast edges avoids mottling by the falloff instead.
+- **Renaming a mode breaks saved settings.** "On (auto-detect)" became "Auto-detect"; without `config.border_mode()` mapping the old label, the picker falls back to "Off" and silently stops treating borders for every existing user. Any future rename needs the same migration.
+
 ## Footer options layout
 The options panel keeps each row in its **own frame**. Tk's grid shares column widths across rows, so a wide label in one row silently widens the row above it: adding the Card language row directly to the shared grid pushed the panel from 903 px to 1027 against a 900 px minimum window — reintroducing exactly the clipping v2.12.0 fixed. Measure `winfo_reqwidth()` of the options frame after touching this area; it should stay under 900. Long help text goes on its own row with `wraplength` rebound on `<Configure>`, never inline beside controls.
 

@@ -2,6 +2,21 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.14.0 (unreleased) — contrast-edges border mode
+- **New "Contrast edges" border mode, now the default.** It pushes the dark
+  pixels inside a fixed band at the card's edge instead of measuring how deep
+  the frame runs, so there is no detection to misjudge on artwork that reaches
+  the cut edge. Quadratic falloff, tone weighting (only pixels below 140/255
+  move) and a contrast curve keep it off the artwork.
+- The old behaviour stays available as **"Auto-detect"**, no longer the
+  default. Off is unchanged.
+- Three new fields in Export → Image: edge width (% of the card's shorter
+  side), edge contrast and edge brightness.
+- Reimplemented in numpy from the approach Proxxied uses (MIT per its README,
+  `acoreyj/proxies-at-home`) — their code is GLSL, this is not a copy.
+- **Settings migration**: "On (auto-detect)" is mapped to "Auto-detect". The
+  rename would otherwise drop existing users back to "Off" silently.
+
 ## v2.13.0 — cards in other languages
 - New **Card language** picker in the main window (its own row under Model /
   Card size, so the row-0 width budget that v2.12.0 fixed stays intact).

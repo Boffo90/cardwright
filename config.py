@@ -298,9 +298,42 @@ SHADOW_TEST_LEVELS = [0, 4, 8, 12, 16, 20, 24, 28, 32]
 # It auto-detects a genuine black border and leaves borderless, full-art and
 # white-bordered cards completely untouched (no vignette).
 
-BORDER_MODES = ["Off", "On (auto-detect)"]
+# "Contrast edges" pushes the dark pixels inside a fixed band at the card's
+# edge; "Auto-detect" measures how deep the frame actually runs. Contrast
+# edges is the default because it detects nothing, so there is no judgement
+# to get wrong on artwork that reaches the cut edge — and its four sliders
+# let the user dial it, where auto-detect either fires or it doesn't.
+BORDER_MODES = ["Off", "Contrast edges", "Auto-detect"]
 
-BORDER_DEFAULT = "On (auto-detect)"
+BORDER_DEFAULT = "Contrast edges"
+
+# v2.13.0 renamed the auto mode and added a second algorithm. A settings file
+# written before that carries the old label, which is no longer in the list —
+# without this the picker silently falls back to "Off" and quietly stops
+# treating borders for everyone who already had it on.
+_BORDER_RENAMES = {
+    "On (auto-detect)": "Auto-detect",
+    "On": "Auto-detect",
+}
+
+
+def border_mode(saved=None):
+    """Saved label -> a mode that exists now."""
+    if saved in BORDER_MODES:
+        return saved
+    return _BORDER_RENAMES.get(saved, BORDER_DEFAULT)
+
+# Which sources get treated. MPC art already carries a true black edge, so
+# running anything over it is risk with no upside; card backs are usually
+# already correct too.
+BORDER_SOURCES = {
+    "scryfall": True,
+    "gatherer": True,
+    "mpc": False,
+    "ygo": True,
+    "file": True,
+    "back": False,
+}
 
 # Strength of the effect, and the width used for cards you force ON when
 # detection cannot tell frame from art (0 = keep measuring).

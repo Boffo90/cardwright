@@ -43,6 +43,7 @@ from config import (
     SHADOW_LIFTS,
     SHADOW_DEFAULT,
     BORDER_MODES,
+    border_mode,
     BORDER_DEFAULT,
     BORDER_AMOUNT_DEFAULT,
     BORDER_WIDTH_DEFAULT,
@@ -1265,7 +1266,19 @@ class ExportDialog(ctk.CTkToplevel):
         self.shadow = row("Shadow lift", list(SHADOW_LIFTS.keys()),
                           s.get("shadow", SHADOW_DEFAULT))
         self.border = row("Deepen black border", BORDER_MODES,
-                          s.get("border", BORDER_DEFAULT))
+                          border_mode(s.get("border")))
+        self.edge_width = entry_row(
+            "Edge width (%)", "edge_width",
+            round(print_sheet.CONTRAST_EDGE_WIDTH * 100, 1),
+            "contrast edges only")
+        self.edge_contrast = entry_row(
+            "Edge contrast (%)", "edge_contrast",
+            round(print_sheet.CONTRAST_CONTRAST * 100),
+            "100 = untouched")
+        self.edge_brightness = entry_row(
+            "Edge brightness", "edge_brightness",
+            round(print_sheet.CONTRAST_BRIGHTNESS * 255),
+            "-255…255")
 
         def slider_row(label, key, default, to, unit, fmt="{:.0f}"):
             ctk.CTkLabel(left, text=label, anchor="w", text_color=TEXT_DIM,
@@ -1474,6 +1487,27 @@ class ExportDialog(ctk.CTkToplevel):
     def _card_mm(self):
         return card_size_mm(self.card_size.get())
 
+    def _border_style(self):
+        """Which of the two border algorithms the mode picker selected."""
+        if self.border.get() == BORDER_MODES[2]:
+            return print_sheet.BORDER_STYLE_AUTO
+        return print_sheet.BORDER_STYLE_CONTRAST
+
+    def _edge_width(self):
+        return self._float(self.edge_width,
+                           print_sheet.CONTRAST_EDGE_WIDTH * 100,
+                           0.5, 50.0) / 100.0
+
+    def _edge_contrast(self):
+        return self._float(self.edge_contrast,
+                           print_sheet.CONTRAST_CONTRAST * 100,
+                           100.0, 400.0) / 100.0
+
+    def _edge_brightness(self):
+        return self._float(self.edge_brightness,
+                           print_sheet.CONTRAST_BRIGHTNESS * 255,
+                           -255.0, 255.0) / 255.0
+
     def _reg_inset(self):
         return self._float(self.reg_inset, print_sheet.REG_INSET_DEFAULT_MM,
                            print_sheet.REG_INSET_MIN_MM, 86.0)
@@ -1534,6 +1568,9 @@ class ExportDialog(ctk.CTkToplevel):
             "border": self.border.get(),
             "border_amount": round(self.border_amount.get(), 1),
             "border_width": round(self.border_width.get(), 1),
+            "edge_width": round(self._edge_width() * 100, 1),
+            "edge_contrast": round(self._edge_contrast() * 100),
+            "edge_brightness": round(self._edge_brightness() * 255),
             "backs": self.backs.get(),
             "back_dx": dx,
             "back_dy": dy,
@@ -2399,6 +2436,10 @@ class ExportDialog(ctk.CTkToplevel):
             border_modes=dict(self._border_modes),
             border_amount=self.border_amount.get() / 100.0,
             border_width=self.border_width.get() / 100.0,
+            border_style=self._border_style(),
+            edge_width=self._edge_width(),
+            edge_contrast=self._edge_contrast(),
+            edge_brightness=self._edge_brightness(),
             sheets_sel=self._sheets_sel(),
             card_size_mm=self._card_mm(),
             reg_marks=bool(self.reg_marks.get()),

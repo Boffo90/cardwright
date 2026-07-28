@@ -163,6 +163,73 @@ BORDER_FADE_FRAC = 0.005     # fade-out distance past the detected border
 BORDER_TONE_MAX = 58
 
 
+# --- contrast edges -------------------------------------------------------
+# The other way to fix a washed-out border, ported from the approach Proxxied
+# uses (MIT, github.com/acoreyj/proxies-at-home) and reimplemented here.
+#
+# The difference that matters: this DETECTS NOTHING. `_deepen_black_border`
+# has to work out how deep the frame runs, and that judgement is what breaks
+# on artwork that reaches the cut edge. Here the band is a fixed fraction of
+# the card, so there is no decision to get wrong. Three things keep it from
+# mauling artwork that happens to sit in the band:
+#
+#   quadratic falloff  the effect fades to nothing by the inner edge of the
+#                      band, so there is never a seam to see
+#   tone weighting     only dark pixels are pushed; bright art in the band is
+#                      left alone, which is what makes it safe on full-art
+#   contrast curve     a push, not a binary snap — so a near-black frame goes
+#                      black without flattening everything around it
+
+CONTRAST_TONE_KNEE = 140     # above this (0-255) a pixel is art, not frame
+
+BORDER_STYLE_CONTRAST = "contrast"   # fixed band, no detection (default)
+BORDER_STYLE_AUTO = "auto"           # measure how deep the frame runs
+
+CONTRAST_EDGE_WIDTH = 0.08           # fraction of the card's shorter side
+CONTRAST_CONTRAST = 2.0
+CONTRAST_BRIGHTNESS = -50 / 255
+
+
+def _contrast_edges(im: Image.Image, opaque=None, amount: float = 1.0,
+                    edge_width: float = 0.08, contrast: float = 2.0,
+                    brightness: float = -50 / 255) -> Image.Image:
+    """
+    Push the dark pixels inside a fixed edge band towards black.
+
+    edge_width  fraction of the card's SHORTER side, so the band is the same
+                physical width whatever resolution the scan came in at.
+    contrast    multiplier around mid-grey.
+    brightness  offset applied after the contrast, in 0-1 units.
+    amount      0..1 blend against the untouched pixel.
+    """
+    arr = np.asarray(im.convert("RGB"), dtype=np.float32) / 255.0
+    h, w = arr.shape[:2]
+
+    edge_px = max(1.0, edge_width * min(h, w))
+
+    ys = np.arange(h, dtype=np.float32).reshape(-1, 1)
+    xs = np.arange(w, dtype=np.float32).reshape(1, -1)
+    dist = np.minimum(np.minimum(ys, h - 1 - ys), np.minimum(xs, w - 1 - xs))
+
+    edge = np.clip(1.0 - dist / edge_px, 0.0, 1.0)
+    edge *= edge                                   # quadratic falloff
+
+    # Weight by how dark the pixel already is, so artwork inside the band
+    # keeps its brightness instead of being dragged down with the frame.
+    lum = arr.max(axis=2)
+    tone = np.clip((CONTRAST_TONE_KNEE / 255.0 - lum) /
+                   (CONTRAST_TONE_KNEE / 255.0), 0.0, 1.0)
+
+    effect = (edge * tone * float(np.clip(amount, 0.0, 1.0)))[..., None]
+    if opaque is not None:
+        effect = effect * opaque[..., None].astype(np.float32)
+
+    pushed = np.clip((arr - 0.5) * contrast + 0.5 + brightness, 0.0, 1.0)
+    out = arr * (1.0 - effect) + pushed * effect
+
+    return Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGB")
+
+
 def _apply_profile(im: Image.Image, profile, shadow=0) -> Image.Image:
     """
     profile = (label, brightness, gamma, saturation); shadow = lift at pure
@@ -418,7 +485,10 @@ def _round_corners(im: Image.Image, radius_mm: float) -> Image.Image:
 
 def _flatten(png_path: Path, jpeg_quality, profile=None, sharpen=None,
              shadow=0, deepen_border=False, border_amount=1.0,
-             border_width=0.0, corner_radius_mm=0.0, suffix="_sheet") -> Path:
+             border_width=0.0, corner_radius_mm=0.0, suffix="_sheet",
+             border_style=BORDER_STYLE_CONTRAST, edge_width=CONTRAST_EDGE_WIDTH,
+             edge_contrast=CONTRAST_CONTRAST,
+             edge_brightness=CONTRAST_BRIGHTNESS) -> Path:
     """
     Flatten transparent rounded corners onto black, apply the print-time
     adjustments, and write the temp file the PDF will embed.
@@ -441,7 +511,11 @@ def _flatten(png_path: Path, jpeg_quality, profile=None, sharpen=None,
     if deepen_border:
         # last, so it also undoes the shadow lift inside the border
         opaque = np.asarray(alpha) > 250
-        bg = _deepen_black_border(bg, opaque, border_amount, border_width)
+        if border_style == BORDER_STYLE_CONTRAST:
+            bg = _contrast_edges(bg, opaque, border_amount, edge_width,
+                                 edge_contrast, edge_brightness)
+        else:
+            bg = _deepen_black_border(bg, opaque, border_amount, border_width)
 
     if corner_radius_mm > 0:
         out = TEMP_FOLDER / (png_path.stem + suffix + ".png")
@@ -691,6 +765,10 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               guide_len_mm=4.0, guide_thick=0.4, guide_style="Cross",
               guide_offset_mm=0.0, corner_radius_mm=0.0,
               layout=DEFAULT_LAYOUT, deepen_border=False, border_modes=None,
+              border_style=BORDER_STYLE_CONTRAST,
+              edge_width=CONTRAST_EDGE_WIDTH,
+              edge_contrast=CONTRAST_CONTRAST,
+              edge_brightness=CONTRAST_BRIGHTNESS,
               border_amount=1.0, border_width=0.0, sheets_sel=None,
               card_size_mm=None, reg_marks=False,
               reg_inset_mm=REG_INSET_DEFAULT_MM,
@@ -827,11 +905,15 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         # a forced card uses the manual width, if one is set; auto cards
         # always measure their own
         width = border_width if mode == "on" else 0.0
-        key = (str(img), do_border, width)
+        key = (str(img), do_border, width, border_style)
         if key not in flat_cache:
             flat_cache[key] = _flatten(img, jpeg_quality, profile, sharpen,
                                        shadow, do_border, border_amount, width,
-                                       corner_radius_mm=corner_radius_mm)
+                                       corner_radius_mm=corner_radius_mm,
+                                       border_style=border_style,
+                                       edge_width=edge_width,
+                                       edge_contrast=edge_contrast,
+                                       edge_brightness=edge_brightness)
         return flat_cache[key]
 
     placed = 0
