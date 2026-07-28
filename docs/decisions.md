@@ -13,6 +13,7 @@ A global **Card language** picker (main window, under Model/Card size, persisted
 - **Scryfall has no bulk language lookup**: `/cards/collection` identifiers accept `id`/`set`/`collector_number`/etc. but *not* a language. So decklists resolve in bulk first (cheap) and then take one `/cards/{set}/{number}/{lang}` round trip per unique printing — ~0.1 s each at `SCRYFALL_DELAY`. Do not go looking for a batch endpoint; there isn't one.
 - **An explicit link beats the picker.** A `/card/m11/149/ja/...` URL or any Gatherer link is left alone (`_ref_pins_language`) — pasting a specific printing is a deliberate act.
 - Queue labels keep the **English card name** even for localized printings (Scryfall's `printed_name` holds the localized one); it matches the decklist the user pasted and stays searchable. Filenames carry the `-<lang>` suffix.
+- The picker is labelled **"Card language"**, never just "Language" — beside Model and Card size a bare "Language" reads as the app's own UI language. A user asking for French cards in July 2026 had 2.14.0 installed, where it said "Language", and did not find it. Qualify the noun.
 - A language fallback is **not** an import failure: it gets an info popup and neutral status text, not the red "Imported with issues" path.
 
 ## Best scan selection (v2.13.0)

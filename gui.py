@@ -507,7 +507,10 @@ class App(_Root):
         self.card_size_menu.set(
             load_settings().get("card_size", CARD_SIZE_DEFAULT))
 
-        self.card_lang_menu = field("Language", 1, 0, list(CARD_LANGS.keys()),
+        # "Language" alone reads as the app's own language — a user hunting
+        # for French cards did not recognise it. It qualifies the card, like
+        # "Card size" beside it.
+        self.card_lang_menu = field("Card language", 1, 0, list(CARD_LANGS.keys()),
                                     command=self._persist_card_lang)
         self.card_lang_menu.set(
             load_settings().get("card_lang", CARD_LANG_DEFAULT))
