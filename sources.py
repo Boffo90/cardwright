@@ -228,12 +228,44 @@ class _YGO:
         return ygoprodeck.fetch_thumb(url)
 
 
+# --------------------------------------------------------------------------
+# Pokemon (TCGdex)
+# --------------------------------------------------------------------------
+
+class _Pokemon:
+    ID = "pokemon"
+    LABEL = "Pokémon"
+    ADD_KIND = "card"
+    EMPTY = "No matches on TCGdex."
+    PLACEHOLDER = "Card name (e.g. Charizard)"
+    # No CARD_SIZE_HINT: a Pokemon card is 63x88 mm, the same as Magic, so the
+    # default card size is already right.
+    #
+    # Worth stating plainly — 600x825 is the ceiling across every Pokemon
+    # catalogue, not a TCGdex limitation, and it is below what a 63x88 mm card
+    # needs at 1200 DPI. The pipeline normalizes before the AI pass to make
+    # the most of it.
+    NOTE = ("Pokémon art tops out at 600×825 everywhere — below Scryfall's "
+            "745×1040, so expect a little less detail than Magic cards.")
+
+    @staticmethod
+    def search(query: str, limit: int = 60) -> list[dict]:
+        import pokemon
+        return pokemon.search(query, limit, lang=_lang())
+
+    @staticmethod
+    def fetch_thumb(url: str) -> bytes | None:
+        import pokemon
+        return pokemon.fetch_thumb(url)
+
+
 SCRYFALL = _Scryfall
 GATHERER = _Gatherer
 MPC = _MPC
 YGO = _YGO
+POKEMON = _Pokemon
 
-ALL = [SCRYFALL, GATHERER, MPC, YGO]
+ALL = [SCRYFALL, GATHERER, MPC, POKEMON, YGO]
 
 
 def by_id(source_id: str):

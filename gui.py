@@ -984,7 +984,7 @@ class ImportDialog(ctk.CTkToplevel):
                 text, status_callback=status, lang=lang)
             self.after(0, lambda: self._done(cards, not_found, bad, english_only))
         except Exception as e:
-            self.after(0, lambda: self._failed(e))
+            self.after(0, lambda err=e: self._failed(err))
 
     def _done(self, cards, not_found, bad, english_only=()):
         if cards:
@@ -1029,7 +1029,7 @@ class ImportDialog(ctk.CTkToplevel):
             self.destroy()
 
     def _failed(self, e):
-        applog.log.error("Decklist import failed", exc_info=True)
+        applog.log.error("Decklist import failed", exc_info=e)
         self.import_btn.configure(state="normal", text="Resolve & add")
         self.status.configure(text=f"Error: {e}", text_color="#fca5a5")
 
@@ -1294,8 +1294,9 @@ class ExportDialog(ctk.CTkToplevel):
         # the last checkbox.
         for i, (key, label) in enumerate(
                 (("scryfall", "Scryfall"), ("gatherer", "Gatherer"),
-                 ("mpc", "MPC"), ("ygo", "Yu-Gi-Oh"),
-                 ("file", "Uploads"), ("back", "Backs"))):
+                 ("mpc", "MPC"), ("pokemon", "Pokémon"),
+                 ("ygo", "Yu-Gi-Oh"), ("file", "Uploads"),
+                 ("back", "Backs"))):
             var = ctk.BooleanVar(
                 value=bool(saved_srcs.get(key, BORDER_SOURCES.get(key, True))))
             ctk.CTkCheckBox(srcfr, text=label, variable=var, width=20,
@@ -2535,7 +2536,7 @@ class ExportDialog(ctk.CTkToplevel):
                     status_callback=self._set_status, **args)
                 self.after(0, lambda: self._done(files))
             except Exception as e:
-                self.after(0, lambda: self._failed(e))
+                self.after(0, lambda err=e: self._failed(err))
 
         threading.Thread(target=build, daemon=True).start()
 
@@ -2596,7 +2597,7 @@ class ExportDialog(ctk.CTkToplevel):
                     status_callback=self._set_status)
                 self.after(0, lambda: self._cal_done(target))
             except Exception as e:
-                self.after(0, lambda: self._failed_cal(e))
+                self.after(0, lambda err=e: self._failed_cal(err))
 
         threading.Thread(target=build, daemon=True).start()
 
@@ -2635,7 +2636,7 @@ class ExportDialog(ctk.CTkToplevel):
                     status_callback=self._set_status)
                 self.after(0, lambda: self._shadow_done(target))
             except Exception as e:
-                self.after(0, lambda: self._shadow_failed(e))
+                self.after(0, lambda err=e: self._shadow_failed(err))
 
         threading.Thread(target=build, daemon=True).start()
 
@@ -2678,7 +2679,7 @@ class ExportDialog(ctk.CTkToplevel):
                     target, status_callback=self._set_status, **args)
                 self.after(0, lambda: self._duplex_done(target))
             except Exception as e:
-                self.after(0, lambda: self._duplex_failed(e))
+                self.after(0, lambda err=e: self._duplex_failed(err))
 
         threading.Thread(target=build, daemon=True).start()
 
@@ -2747,7 +2748,7 @@ class SetupDialog(ctk.CTkToplevel):
             self.master_app.ai_ok = ok
             self.after(0, lambda: self._finish(ok, name))
         except Exception as e:
-            self.after(0, lambda: self._fail(e))
+            self.after(0, lambda err=e: self._fail(err))
 
     def _finish(self, ok, name):
         self.grab_release()
@@ -2899,13 +2900,13 @@ class CardSearchDialog(ctk.CTkToplevel):
                 cards = self.backend.search(query)
                 self.after(0, lambda: self._show(cards, token))
             except Exception as e:
-                self.after(0, lambda: self._failed(e))
+                self.after(0, lambda err=e: self._failed(err))
 
         threading.Thread(target=work, daemon=True).start()
 
     def _failed(self, e):
         applog.log.error("Card search failed on %s",
-                         getattr(self.backend, "LABEL", "?"), exc_info=True)
+                         getattr(self.backend, "LABEL", "?"), exc_info=e)
         self.search_btn.configure(state="normal")
         self.status.configure(text=f"Search failed: {e}", text_color="#fca5a5")
 

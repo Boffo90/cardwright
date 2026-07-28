@@ -330,6 +330,7 @@ BORDER_SOURCES = {
     "scryfall": True,
     "gatherer": True,
     "mpc": False,
+    "pokemon": True,
     "ygo": True,
     "file": True,
     "back": False,

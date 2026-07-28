@@ -14,6 +14,21 @@ Registro por versión. Actualizar en cada release.
   15.3 s per card and a 125 MB intermediate. **Not implemented on purpose** —
   staying light matters more than the last of the sharpness.
 
+### Pokémon cards
+- New **Pokémon** tab in the card gallery, via the **TCGdex** API. No API key,
+  no account, and the card-language picker drives it (6 languages with real
+  images). Pokémon cards are 63×88 mm, so no card-size switch is needed.
+- Chosen over pokemontcg.io after measuring both: identical `600×825` image
+  ceiling, but TCGdex needs no key, is open source, and pokemontcg.io has been
+  absorbed into a commercial product. The gallery states the resolution limit
+  rather than hiding it.
+
+### Fixed — search errors arrived empty
+- `except Exception as e:` unbinds `e` when the block ends, so every deferred
+  error handler (`self.after(0, lambda: self._failed(e))`) had lost it by the
+  time it ran. Failures reached the user as **"Search failed: None"** and the
+  log recorded `NoneType: None` instead of a traceback. Seven handlers fixed.
+
 ## v2.14.0 — contrast-edges border mode
 - **New "Contrast edges" border mode, now the default.** It pushes the dark
   pixels inside a fixed band at the card's edge instead of measuring how deep

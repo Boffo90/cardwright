@@ -33,6 +33,16 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden — in a manual picker the user can see the thumbnail and judge.
 
+## Pokémon source: TCGdex, not pokemontcg.io (v2.15.0)
+Both were measured before choosing. Resolution did **not** decide it — every Pokémon catalogue tops out at `600×825` ("high"), confirmed identical on pokemontcg.io and TCGdex and unchanged between a 1999 and a 2020 set. That is an ecosystem ceiling, not a vendor limit.
+- **No API key.** pokemontcg.io meters unauthenticated use (1000/day) and its terms allow one key per person — unworkable in a binary handed to strangers, where a shipped key is extractable and shared by everyone. TCGdex asks for nothing.
+- **pokemontcg.io has been absorbed into Scrydex**, a commercial product. A free app should not depend on that.
+- **6 languages with real images** (en/fr/de/es/it/pt), so the card-language picker drives it. Japanese returns nothing for latin-script queries and falls back to English.
+- `low.webp` thumbnails are ~16 KB against pokemontcg.io's 161 KB small PNG.
+- Set names come from one cached `/sets` call (218 sets, 34 KB); a card's brief record carries no set, and per-card lookups would be one request per tile.
+- Records without an `image` are dropped — 14 of 125 in one search would have been empty tiles.
+- **API TCG** (apitcg.com) covers One Piece / Digimon / Dragon Ball but **requires a key for every call**, so it is blocked for the same reason. Recorded so it is not researched again from scratch.
+
 ## Guides vs registration marks (v2.13.0)
 - **"Guides off" means every guide**, corner crosses *and* margin ticks. The ticks used to ignore the setting entirely.
 - **Nothing may intersect a registration mark's keep-clear box.** `_reg_geometry` already returned those boxes for card placement; `_draw_marks` now takes them too. Measured before the fix: A4 at the 10 mm default put 5-6 ticks inside one. Letter at the same inset was clean, which is why it went unnoticed.

@@ -26,8 +26,9 @@ with print-shop features.
   thumbnails and all — you see what you are about to upscale before
   committing to it.
 - **Switch source** without leaving the gallery: **Scryfall**, **Gatherer**,
-  **MPC Autofill** and **Yu-Gi-Oh** (YGOPRODeck). MPC bleed edges are trimmed
-  automatically; picking a Yu-Gi-Oh card switches the card size to 59×86 mm.
+  **MPC Autofill**, **Pokémon** (TCGdex) and **Yu-Gi-Oh** (YGOPRODeck). MPC
+  bleed edges are trimmed automatically; picking a Yu-Gi-Oh card switches the
+  card size to 59×86 mm. Pokémon cards are 63×88 mm, the same as Magic.
 - **Best scan** picks the sharpest printing of a searched name for you,
   keeping the same artwork — a weak scan is exactly what upscaling magnifies.
 - **Card language**: fetch printings in any of the 11 languages Scryfall
