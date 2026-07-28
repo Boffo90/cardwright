@@ -141,6 +141,9 @@ version, or sell it. See [LICENSE](LICENSE).
   [YGOPRODeck](https://ygoprodeck.com); this app is not affiliated with them.
   Images are downloaded once to your machine rather than hotlinked, per their
   API terms.
+- Pokémon card data and images courtesy of [TCGdex](https://tcgdex.dev);
+  this app is not affiliated with them. Images are downloaded to your machine
+  rather than hotlinked.
 - AI engine: [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
   (BSD-3). Community models UltraSharp (Kim2091) and High Fidelity are
   fetched from the [Upscayl](https://github.com/upscayl/upscayl) project

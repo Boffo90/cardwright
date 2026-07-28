@@ -16,7 +16,7 @@
 
 ## From the Reddit launch (July 2026)
 - **Linux .deb** — requested. Real cost: Real-ESRGAN ncnn has Linux builds, but `update.py` (Windows `.bat` swap), `bootstrap.py` (downloads the Windows zip) and packaging all need a Linux path. A real port, not a tweak. Undecided.
-- **Card fetching for other TCGs** — Yu-Gi-Oh done via YGOPRODeck (v2.11.0). Pokémon/One Piece/Digimon/Dragon Ball have no open API found yet; revisit if one appears.
+- **Card fetching for other TCGs** — Yu-Gi-Oh via YGOPRODeck (v2.11.0), Pokémon via TCGdex (v2.15.0). **One Piece / Digimon / Dragon Ball**: `apitcg.com` covers all three but requires an API key on every call, which a binary handed to strangers cannot honour (shipped keys are extractable and shared). Blocked on that, not on the data existing — revisit only if they offer keyless access.
 - **mpcfill OCR fork (GPL)** — a user is building an OCR'd catalog + vote federation. Consuming their **HTTP API is fine** (GPL covers distributing code, not using a service); we must NOT vendor their GPL code into Cardwright. Wait for their API/spec.
 
 ## Reference projects — not adopted
