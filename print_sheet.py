@@ -630,6 +630,42 @@ def _draw_reg_marks(c, pw, ph, inset_mm, length_mm, thick_mm, four=False):
         c.rect(x0, y0, x1 - x0, y1 - y0, stroke=0, fill=1)
 
 
+def reg_headroom_mm(page_h_pt, rows, card_h_pt, inset_mm, length_mm):
+    """
+    Page height left over once `rows` of cards and a mark at each end are laid
+    out, in mm. Negative means the combination cannot fit at any setting — no
+    amount of centring or shifting will help.
+
+    Letter is the case that bites: 3 x 88 mm plus two 18.89 mm marks needs
+    301.8 mm against a 279.4 mm page, so a 3-row grid with marks is 22.4 mm
+    short. A4 is short too, by 4.8 mm.
+    """
+    return (page_h_pt - (rows * card_h_pt + 2 * (inset_mm + length_mm) * mm)) / mm
+
+
+def clean_layouts(page_name, card_w, card_h, inset_mm, length_mm, thick_mm,
+                  four=False):
+    """Names of the layouts that keep every slot on this page, marks and all.
+
+    Computed rather than remembered: which layouts stay clean depends on the
+    page, the card size and the mark geometry, and the advice went stale once
+    the marks moved to Silhouette Studio's dimensions.
+    """
+    page = PAGES.get(page_name, A4)
+    clean = []
+    for name, (cols, rows, landscape) in LAYOUTS.items():
+        pw, ph = (page[1], page[0]) if landscape else page
+        bw, bh = cols * card_w, rows * card_h
+        if bw > pw or bh > ph:
+            continue
+        ox, oy = _block_origin(pw, ph, bw, bh, 0.0)
+        pos = layout_positions(name, ox, oy, bh, 0.0, cols, rows, card_w, card_h)
+        if not _reg_blocked_slots(pos, card_w, card_h, pw, ph,
+                                  inset_mm, length_mm, thick_mm, four):
+            clean.append(name)
+    return clean
+
+
 def _reg_blocked_slots(positions, card_w, card_h, pw, ph,
                        inset_mm, length_mm, thick_mm, four=False):
     """Indices of `positions` whose card would collide with a mark's

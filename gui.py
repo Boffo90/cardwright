@@ -1922,11 +1922,27 @@ class ExportDialog(ctk.CTkToplevel):
             self.reg_hint.configure(
                 text="Off — cards use every slot.", text_color=MUTED)
         elif blocked:
+            # Say WHY, and only suggest layouts that actually survive on this
+            # page. The old wording promised that shorter marks or A4 would fit
+            # them all — neither is true since the marks moved to Silhouette
+            # Studio's dimensions, and Letter has no clean layout at all.
+            headroom = print_sheet.reg_headroom_mm(
+                ph * mm_pt, rows, CH * mm_pt, reg_args[0], reg_args[1])
+            clean = [n for n in print_sheet.clean_layouts(
+                self.page.get(), CW * mm_pt, CH * mm_pt, *reg_args, reg_four)
+                if n != self.layout.get()]
+
+            why = (f"{rows} rows of {CH:.0f} mm cards plus a mark at each end "
+                   f"need {abs(headroom):.0f} mm more than this page has, so "
+                   f"no mark setting can fit them"
+                   if headroom < 0 else
+                   "shorter marks or a smaller inset would fit more")
+            fix = (f" Try {' or '.join(clean)}." if clean else
+                   " No layout keeps every slot on this page — A4 does.")
             self.reg_hint.configure(
                 text=f"⚠ {len(usable)} of {len(all_pos)} slots usable — "
                      f"{len(blocked)} sit under a mark and stay empty (those "
-                     f"cards move to the next sheet). Shorter marks or a "
-                     f"smaller inset fit more; A4 or 4×2 fits them all.",
+                     f"cards move to the next sheet). Why: {why}.{fix}",
                 text_color="#e0b050")
         else:
             shift_note = (" Shift-down is ignored: the cutter aligns to the "

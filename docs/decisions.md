@@ -39,6 +39,12 @@ The trim decides by aspect ratio, and **TCGdex's 600×825 Pokémon images land a
 - The trim now only runs for sources that **could** carry a bleed: `mpc` and local `file`. Local files keep the heuristic — someone can hand-feed an MPC download and there is nothing else to go on.
 - **Any new source must be checked against that ratio window** before being added. A catalogue whose images are not exactly the card's proportions will trip it.
 
+## Registration marks vs page height (v2.15.0)
+Some page/layout pairs **cannot** carry marks, at any setting. `rows × 88 mm + 2 × (inset + length)` against the page height: Letter with 3 rows needs 301.8 mm against 279.4 (short by 22.4 mm at the shipped 10/8.89 geometry, still 14.6 mm short at the 5 mm minimum length). A4 with 3 rows is 4.8 mm short.
+- With the shipped geometry **Letter has no layout that keeps every slot** — its side margin (13.7 mm) is under the 18.89 mm the marks need too. A4 keeps 4×2 and 7-card clean.
+- The preview hint therefore **computes** its advice (`reg_headroom_mm`, `clean_layouts`) instead of stating it. The old wording promised "shorter marks or a smaller inset fit more; A4 or 4×2 fits them all", which stopped being true when the marks moved to Studio's dimensions.
+- Blocking the slots a mark would sit on is the correct outcome, not a bug. Reported from Reddit as a Letter margin problem; it is geometry.
+
 ## Pokémon source: TCGdex, not pokemontcg.io (v2.15.0)
 Both were measured before choosing. Resolution did **not** decide it — every Pokémon catalogue tops out at `600×825` ("high"), confirmed identical on pokemontcg.io and TCGdex and unchanged between a 1999 and a 2020 set. That is an ecosystem ceiling, not a vendor limit.
 - **No API key.** pokemontcg.io meters unauthenticated use (1000/day) and its terms allow one key per person — unworkable in a binary handed to strangers, where a shipped key is extractable and shared by everyone. TCGdex asks for nothing.

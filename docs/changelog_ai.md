@@ -2,6 +2,15 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.16.0 (unreleased) — the registration-mark hint explains itself
+- When marks cost you card slots, the preview now says **why** and names the
+  layouts that survive on that page, both computed from the current mark
+  geometry rather than remembered.
+- The old wording claimed shorter marks or A4 would fit them all. Neither has
+  been true since the marks moved to Silhouette Studio's dimensions: Letter
+  with 3 rows is 22.4 mm short of what marks need and **no** Letter layout
+  keeps every slot at the shipped geometry.
+
 ## v2.15.0 — Pokémon cards, sharper small sources
 - A source too small for one AI pass to reach the card is now **resized up to
   exactly target/scale before the pass**, so the AI lands on the card instead
