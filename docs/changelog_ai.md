@@ -2,7 +2,14 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.16.0 (unreleased) — get your card slots back
+## v2.16.0 (unreleased) — Moxfield decks, and your card slots back
+### Moxfield deck import
+- **Paste a Moxfield deck URL and it imports**, like Archidekt already did.
+  Commanders, companions and sideboards come along; the maybeboard does not.
+- The app used to refuse Moxfield links. If Moxfield ever closes the endpoint
+  off, every failure path points at their Export → paste route, which works
+  regardless.
+
 - **The mark inset can now go down to 3.5 mm** (was 10). That floor was ours,
   not the machine's: 10 mm is what Silhouette Studio documents as a minimum,
   but silhouette-card-maker ships 3.5 mm for its borderless layouts.

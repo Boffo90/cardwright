@@ -921,8 +921,8 @@ class ImportDialog(ctk.CTkToplevel):
                    "1 Winota, Joiner of Forces (PRM) 80807 [matte]\n"
                    "3 Plains (MSC) 866 [matte]\n"
                    "1 Ajani, Nacatl Pariah // Ajani, Nacatl Avenger (MH3) 442\n\n"
-                   "https://archidekt.com/decks/1234567/my-deck\n\n"
-                   "(Moxfield: use Export → copy the list and paste it here)")
+                   "https://archidekt.com/decks/1234567/my-deck\n"
+                   "https://www.moxfield.com/decks/aBcDeFgHiJkLmNoPqRsTuV")
 
     def __init__(self, master, on_resolved):
         super().__init__(master)
@@ -988,10 +988,7 @@ class ImportDialog(ctk.CTkToplevel):
             # deck site URLs
             kind = scryfall.deck_url_kind(text)
             if kind == "moxfield":
-                raise scryfall.ScryfallError(
-                    "Moxfield blocks external tools. In Moxfield use "
-                    "Export → copy the decklist text and paste it here "
-                    "instead — the format is supported directly.")
+                text = scryfall.fetch_moxfield(text, status_callback=status)
             if kind == "archidekt":
                 text = scryfall.fetch_archidekt(text, status_callback=status)
 

@@ -713,6 +713,87 @@ def deck_url_kind(text: str):
     return None
 
 
+# Moxfield deck import.
+#
+# HISTORY, so nobody re-litigates this from scratch: Moxfield's support was
+# asked for API access and declined, citing WotC concerns, and this project
+# recorded "do not scrape" as a result. That was revisited in July 2026 and
+# the call was deliberately reversed by the author — see decisions.md. What
+# follows uses the same unauthenticated endpoint their own web client calls.
+#
+# Because that access is theirs to withdraw, every failure path here has to
+# land the user somewhere useful rather than just erroring: pasting an export
+# has always worked and always will.
+MOXFIELD_API = "https://api2.moxfield.com/v3/decks/all/{deck_id}"
+
+_MOXFIELD_PASTE = ("In Moxfield use Export → copy the decklist text and "
+                   "paste it here instead — that format is supported "
+                   "directly.")
+
+# Everything except the maybeboard, which is by definition cards the author
+# has NOT put in the deck. Commanders and companions matter for Commander;
+# the oddball boards cost nothing and someone printing an Attraction deck
+# wants them.
+MOXFIELD_BOARDS = (
+    "commanders", "companions", "signatureSpells", "mainboard", "sideboard",
+    "attractions", "stickers", "contraptions", "planes", "schemes",
+)
+
+
+def fetch_moxfield(url: str, status_callback=None) -> str:
+    """
+    Fetch a public Moxfield deck and return it as decklist text
+    ("N Name (SET) number"), ready for resolve_decklist().
+    """
+    m = re.search(r"moxfield\.com/decks/([A-Za-z0-9_\-]+)", url, re.I)
+    if not m:
+        raise ScryfallError("Could not find a deck id in that Moxfield URL")
+
+    if status_callback:
+        status_callback("Fetching deck from Moxfield...")
+
+    try:
+        r = requests.get(MOXFIELD_API.format(deck_id=m.group(1)),
+                         headers={"User-Agent": SCRYFALL_HEADERS["User-Agent"]},
+                         timeout=30)
+    except requests.RequestException as e:
+        raise ScryfallError(
+            f"Could not reach Moxfield ({e}). {_MOXFIELD_PASTE}") from e
+
+    if r.status_code == 404:
+        raise ScryfallError(
+            "Moxfield returned 404 - check the link, and that the deck is "
+            "public rather than private or unlisted.")
+    if r.status_code in (401, 403, 429):
+        # They are within their rights to close this off at any time.
+        raise ScryfallError(
+            f"Moxfield refused the request ({r.status_code}). "
+            f"{_MOXFIELD_PASTE}")
+    if r.status_code != 200:
+        raise ScryfallError(
+            f"Moxfield returned {r.status_code}. {_MOXFIELD_PASTE}")
+
+    try:
+        boards = r.json().get("boards") or {}
+    except ValueError as e:
+        raise ScryfallError(
+            f"Moxfield sent something unreadable. {_MOXFIELD_PASTE}") from e
+
+    lines = []
+    for name in MOXFIELD_BOARDS:
+        for entry in ((boards.get(name) or {}).get("cards") or {}).values():
+            card = entry.get("card") or {}
+            setcode, number = card.get("set"), card.get("cn")
+            if not (card.get("name") and setcode and number):
+                continue
+            lines.append(f"{entry.get('quantity', 1)} {card['name']} "
+                         f"({setcode.upper()}) {number}")
+
+    if not lines:
+        raise ScryfallError("No printable cards found in that deck")
+    return chr(10).join(lines)
+
+
 def fetch_archidekt(url: str, status_callback=None) -> str:
     """
     Fetch a public Archidekt deck and return it as decklist text

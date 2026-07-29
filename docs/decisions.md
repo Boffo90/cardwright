@@ -149,8 +149,14 @@ The options panel keeps each row in its **own frame**. Tk's grid shares column w
 ## Export preview
 - The preview is an editable workspace, not a static image: a scrollable canvas stacks every sheet; the on-screen order IS the PDF order. `self._order` (list of front paths) is the source of truth; drag-and-drop reorders it, `self._back_of` keeps DFC backs paired. Built on a raw `tk.Canvas` (not a CTkLabel) so it can scroll, overlay the loupe, and show a drag ghost.
 
+## Moxfield deck import (v2.16.0)
+Moxfield URLs import directly, via `api2.moxfield.com/v3/decks/all/{id}` — the same unauthenticated endpoint their web client calls. A deck comes back with set and collector number per card, which is exactly `resolve_decklist`'s input.
+- **The history matters and is not hidden**: Moxfield's support was asked for API access and declined, citing WotC concerns, and this project recorded "do not scrape". Retested July 2026, the endpoint answers 200 for search and for a real deck. The author weighed that and **deliberately reversed the decision**, knowing it is an internal API after a refusal.
+- Because that access is theirs to withdraw at will, **every failure path names the fallback**: 401/403/429, a network error, unreadable JSON and a non-200 all tell the user to paste a Moxfield Export instead, which has always worked. If they do close it off, the app degrades to that rather than breaking.
+- The maybeboard is excluded (cards the author did *not* put in the deck); commanders, companions, signature spells and the oddball boards are included.
+
 ## Do NOT retry (known dead ends)
-- **Moxfield API**: rejected by their support (WotC concerns). Don't re-request or scrape.
+- **Moxfield API**: their support declined an official API request (WotC concerns). **Do not re-request.** Deck import was nevertheless implemented in July 2026 against the unauthenticated `api2.moxfield.com` endpoint their own web client uses — see "Moxfield deck import" below. Reversing that is the author's call, already taken; do not quietly undo it, and do not go asking them again.
 - **Integrating sales into the app / mentioning sales**: forbidden by the user.
 - **Argentine voseo**: user is Chilean, use neutral Spanish/tuteo.
 - **START/PowerShell/explorer to relaunch** the exe after update: fails on the user's PC; use direct exec (cmd child).
