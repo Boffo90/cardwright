@@ -22,6 +22,11 @@ Registro por versión. Actualizar en cada release.
 - A5 cannot hold a 63×88 grid at all and says so rather than exporting
   something broken; it is there for the mini card size.
 
+### Fixed — the registration square was a millimetre small
+- The 3-mark square is drawn 5 mm filled **plus half the line thickness on
+  every side**, matching silhouette-card-maker, which strokes its square with
+  the mark thickness. At the 1 mm default that is 6 mm across, not 5.
+
 ### Manual bleed override
 - "Trim MPC bleed" becomes **Auto-detect / Assume bleed / Assume none**.
   Turning the old switch off covered "wrongly detected", but there was no way

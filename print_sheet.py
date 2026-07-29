@@ -635,9 +635,17 @@ def _reg_geometry(pw, ph, inset_mm, length_mm, thick_mm, four=False):
     if four:
         L(ins, ph - ins, +1, -1)
     else:
-        x0, y0 = ins, ph - ins - sq
-        rects.append((x0, y0, x0 + sq, y0 + sq))
-        clear.append((x0 - pad, y0 - pad, x0 + sq + pad, y0 + sq + pad))
+        # 5x5 mm filled, then grown by half the line thickness on every side.
+        # silhouette-card-maker draws this as a Rectangle with edgecolor and
+        # linewidth=thickness, and a stroke is centred on the path — so their
+        # square reaches 5 + thickness across (6 mm at the 1 mm default) while
+        # a plain filled 5 mm rect, which is what this used to be, comes out a
+        # millimetre smaller. Reported from Reddit as "marks smaller than SCM's".
+        half = th / 2.0
+        x0, y0 = ins - half, ph - ins - sq - half
+        side = sq + th
+        rects.append((x0, y0, x0 + side, y0 + side))
+        clear.append((x0 - pad, y0 - pad, x0 + side + pad, y0 + side + pad))
 
     L(pw - ins, ph - ins, -1, -1)          # top-right
     L(ins, ins, +1, +1)                    # bottom-left
