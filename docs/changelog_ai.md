@@ -10,6 +10,7 @@ Registro por versión. Actualizar en cada release.
   off, every failure path points at their Export → paste route, which works
   regardless.
 
+### Get your card slots back
 - **The mark inset can now go down to 3.5 mm** (was 10). That floor was ours,
   not the machine's: 10 mm is what Silhouette Studio documents as a minimum,
   but silhouette-card-maker ships 3.5 mm for its borderless layouts.
