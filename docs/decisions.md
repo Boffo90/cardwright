@@ -39,11 +39,14 @@ The trim decides by aspect ratio, and **TCGdex's 600×825 Pokémon images land a
 - The trim now only runs for sources that **could** carry a bleed: `mpc` and local `file`. Local files keep the heuristic — someone can hand-feed an MPC download and there is nothing else to go on.
 - **Any new source must be checked against that ratio window** before being added. A catalogue whose images are not exactly the card's proportions will trip it.
 
-## Registration marks vs page height (v2.15.0)
-Some page/layout pairs **cannot** carry marks, at any setting. `rows × 88 mm + 2 × (inset + length)` against the page height: Letter with 3 rows needs 301.8 mm against 279.4 (short by 22.4 mm at the shipped 10/8.89 geometry, still 14.6 mm short at the 5 mm minimum length). A4 with 3 rows is 4.8 mm short.
-- With the shipped geometry **Letter has no layout that keeps every slot** — its side margin (13.7 mm) is under the 18.89 mm the marks need too. A4 keeps 4×2 and 7-card clean.
-- The preview hint therefore **computes** its advice (`reg_headroom_mm`, `clean_layouts`) instead of stating it. The old wording promised "shorter marks or a smaller inset fit more; A4 or 4×2 fits them all", which stopped being true when the marks moved to Studio's dimensions.
-- Blocking the slots a mark would sit on is the correct outcome, not a bug. Reported from Reddit as a Letter margin problem; it is geometry.
+## Registration mark inset vs card slots (v2.16.0)
+What blocks a card slot is a **corner mark landing on a corner card** — the marks are corner brackets, they do not span the page. An earlier note here modelled it as `rows × 88 mm + 2 × (inset + length)` against the page height and concluded Letter 3×3 was geometrically impossible. **That model was wrong** and the conclusion with it.
+- The real lever is the **inset**, and our own floor was the problem: `REG_INSET_MIN_MM` was 10 mm (Studio's documented minimum) and `_reg_geometry` clamps to it, so the UI could not go lower even when asked. Measured with the clamp lifted, at length 8.89: **Letter 4×2 goes 6 → 8 usable at 9.5 mm** (half a millimetre!), **A4 3×3 goes 7 → 9 at 6 mm**, Letter 3×3 needs about 2 mm.
+- silhouette-card-maker — the project this geometry came from — ships **3.5 mm** for its borderless layouts, so Studio's "minimum" is a recommendation, not a hard limit. The floor is now 3.5 mm.
+- **3.5 mm and no lower**: most inkjets cannot print within ~3 mm of the paper edge (the same reason `MIN_BOTTOM` exists), so a mark below that is simply clipped off.
+- **The default stays 10 mm.** Lowering it is a lever the user reaches for, not a silent change to everyone's output.
+- The preview hint calls `best_inset()`, which returns the **largest** inset that still keeps every slot — the gentlest move that works, since a mark further from the edge is the safer one.
+- Not verified on hardware: neither the author nor this analysis has a cutter. SCM shipping 3.5 mm in production is the evidence.
 
 ## Pokémon source: TCGdex, not pokemontcg.io (v2.15.0)
 Both were measured before choosing. Resolution did **not** decide it — every Pokémon catalogue tops out at `600×825` ("high"), confirmed identical on pokemontcg.io and TCGdex and unchanged between a 1999 and a 2020 set. That is an ecosystem ceiling, not a vendor limit.

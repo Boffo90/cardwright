@@ -558,11 +558,22 @@ REG_LENGTH_MIN_MM = 5.0
 REG_LENGTH_MAX_MM = 20.0
 REG_THICK_MIN_MM = 0.5
 REG_THICK_MAX_MM = 1.0
-REG_INSET_MIN_MM = 10.0
-# Silhouette Studio's own default is 0.625 in (15.875) with 20 mm arms, but
-# that footprint eats three card slots on a 3x3 sheet. The spec minimums
-# (10 mm inset, 5 mm arms) keep every card AND stay inside the readable
-# range, so they are our defaults; raise them if a machine fails to detect.
+# How close a mark may sit to the paper edge.
+#
+# Studio documents 0.394 in (10 mm) as its minimum, and that was our floor —
+# but it is what costs card slots, because the corner marks land on the corner
+# cards. Measured on our own layouts: Letter 3x3 goes from 6 usable cards to 9,
+# Letter 4x2 from 6 to 8, A4 3x3 from 7 to 9, purely by moving the marks
+# outward. silhouette-card-maker (the project this geometry came from) ships
+# 3.5 mm for its borderless layouts, so Studio's "minimum" is evidently a
+# recommendation rather than a hard limit.
+#
+# 3.5 mm is the floor rather than something smaller because most inkjets
+# cannot print within ~3 mm of the paper edge (the same reason MIN_BOTTOM
+# exists) — a mark below that would simply be clipped off by the printer.
+# The DEFAULT stays at Studio's 10 mm: lowering it is a lever the user can
+# reach for when they want the slots back, not a silent change to their output.
+REG_INSET_MIN_MM = 3.5
 # Silhouette Studio's published figures, cross-checked against the settings
 # panel Proxxied exposes (its numbers are in inches):
 #
@@ -628,19 +639,6 @@ def _draw_reg_marks(c, pw, ph, inset_mm, length_mm, thick_mm, four=False):
     c.setFillColorRGB(0, 0, 0)
     for x0, y0, x1, y1 in rects:
         c.rect(x0, y0, x1 - x0, y1 - y0, stroke=0, fill=1)
-
-
-def reg_headroom_mm(page_h_pt, rows, card_h_pt, inset_mm, length_mm):
-    """
-    Page height left over once `rows` of cards and a mark at each end are laid
-    out, in mm. Negative means the combination cannot fit at any setting — no
-    amount of centring or shifting will help.
-
-    Letter is the case that bites: 3 x 88 mm plus two 18.89 mm marks needs
-    301.8 mm against a 279.4 mm page, so a 3-row grid with marks is 22.4 mm
-    short. A4 is short too, by 4.8 mm.
-    """
-    return (page_h_pt - (rows * card_h_pt + 2 * (inset_mm + length_mm) * mm)) / mm
 
 
 def clean_layouts(page_name, card_w, card_h, inset_mm, length_mm, thick_mm,

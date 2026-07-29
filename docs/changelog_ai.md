@@ -2,14 +2,21 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.16.0 (unreleased) — the registration-mark hint explains itself
-- When marks cost you card slots, the preview now says **why** and names the
-  layouts that survive on that page, both computed from the current mark
-  geometry rather than remembered.
-- The old wording claimed shorter marks or A4 would fit them all. Neither has
-  been true since the marks moved to Silhouette Studio's dimensions: Letter
-  with 3 rows is 22.4 mm short of what marks need and **no** Letter layout
-  keeps every slot at the shipped geometry.
+## v2.16.0 (unreleased) — get your card slots back
+- **The mark inset can now go down to 3.5 mm** (was 10). That floor was ours,
+  not the machine's: 10 mm is what Silhouette Studio documents as a minimum,
+  but silhouette-card-maker ships 3.5 mm for its borderless layouts.
+- It is what was costing cards. Marks are corner brackets, so what blocks a
+  slot is a mark landing on a *corner card* — moving the marks outward frees
+  them. **Letter 4×2 goes from 6 usable cards to 8 by dropping the inset half
+  a millimetre**, to 9.5 mm. A4 3×3 goes from 7 to 9 at 6 mm.
+- The default stays at 10 mm, so nothing changes unless you reach for it.
+- When marks do cost you slots, the preview now **names the exact inset that
+  keeps them all**, picking the largest one that works — a mark further from
+  the paper edge is the safer one. If no inset helps, it names a layout that
+  does.
+- 3.5 mm is the floor because most inkjets cannot print closer than ~3 mm to
+  the paper edge; below that the mark is simply clipped off.
 
 ## v2.15.0 — Pokémon cards, sharper small sources
 - A source too small for one AI pass to reach the card is now **resized up to

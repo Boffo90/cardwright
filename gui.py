@@ -1922,27 +1922,30 @@ class ExportDialog(ctk.CTkToplevel):
             self.reg_hint.configure(
                 text="Off — cards use every slot.", text_color=MUTED)
         elif blocked:
-            # Say WHY, and only suggest layouts that actually survive on this
-            # page. The old wording promised that shorter marks or A4 would fit
-            # them all — neither is true since the marks moved to Silhouette
-            # Studio's dimensions, and Letter has no clean layout at all.
-            headroom = print_sheet.reg_headroom_mm(
-                ph * mm_pt, rows, CH * mm_pt, reg_args[0], reg_args[1])
+            # What blocks a slot is a CORNER mark landing on a CORNER card, so
+            # the fix is usually to move the marks outward — often by half a
+            # millimetre. Name the exact inset that works instead of leaving
+            # the user to hunt for it; fall back to naming a layout that fits.
+            fix_inset = print_sheet.best_inset(
+                self.page.get(), CW * mm_pt, CH * mm_pt, self.layout.get(),
+                reg_args[1], reg_args[2], reg_four, start_mm=reg_args[0])
             clean = [n for n in print_sheet.clean_layouts(
                 self.page.get(), CW * mm_pt, CH * mm_pt, *reg_args, reg_four)
                 if n != self.layout.get()]
 
-            why = (f"{rows} rows of {CH:.0f} mm cards plus a mark at each end "
-                   f"need {abs(headroom):.0f} mm more than this page has, so "
-                   f"no mark setting can fit them"
-                   if headroom < 0 else
-                   "shorter marks or a smaller inset would fit more")
-            fix = (f" Try {' or '.join(clean)}." if clean else
-                   " No layout keeps every slot on this page — A4 does.")
+            if fix_inset is not None:
+                fix = (f" Mark inset {fix_inset:g} mm keeps all "
+                       f"{len(all_pos)}.")
+            elif clean:
+                fix = f" {' or '.join(clean)} keeps every slot on this page."
+            else:
+                fix = (" No inset or layout keeps them all on this page — "
+                       "A4 has room.")
             self.reg_hint.configure(
                 text=f"⚠ {len(usable)} of {len(all_pos)} slots usable — "
-                     f"{len(blocked)} sit under a mark and stay empty (those "
-                     f"cards move to the next sheet). Why: {why}.{fix}",
+                     f"{len(blocked)} {'sits' if len(blocked) == 1 else 'sit'} "
+                     f"under a corner mark and stay empty "
+                     f"(those cards move to the next sheet).{fix}",
                 text_color="#e0b050")
         else:
             shift_note = (" Shift-down is ignored: the cutter aligns to the "
