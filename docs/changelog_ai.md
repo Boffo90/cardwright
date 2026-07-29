@@ -6,8 +6,13 @@ Registro por versión. Actualizar en cada release.
 ### Tokens
 - **"Also add the tokens these cards make"** in the decklist importer. Scryfall
   lists them in `all_parts`, so it is exact rather than guesswork — a card that
-  makes none contributes none. Deduped and fetched in one bulk call, appended
-  after the deck.
+  makes none contributes none. Fetched in one bulk call, appended after the
+  deck.
+- **Every card in the deck is scanned**, not just the commander.
+- Reprints of the same token collapse to one — three goblin-makers give you
+  one Goblin, the newest printing. Tokens that merely share a *name* do not:
+  "Elemental" has 26 genuinely different versions, and you get the ones your
+  deck actually makes.
 
 ### Paper and grids
 - Added **A3, Legal, Tabloid and A5** to the page sizes (was A4 / Letter only).

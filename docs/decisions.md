@@ -35,7 +35,8 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 
 ## Tokens, paper sizes, bleed modes (v2.17.0)
 Taken from a comparison against Proxy-PDF-Maker, fabricard.net and silhouette-card-maker. Tokens appeared in two of the three independently, which is what promoted it.
-- **Tokens come from Scryfall's `all_parts`**, filtered to `component == "token"`, deduped by id and fetched with one bulk `/collection` call (identifiers accept `id`). Never guess a token from the oracle text. A token failure never fails the import — they are a bonus.
+- **Tokens come from Scryfall's `all_parts`**, filtered to `component == "token"` and fetched with one bulk `/collection` call (identifiers accept `id`). Never guess a token from the oracle text. A token failure never fails the import — they are a bonus.
+- **Deduped by what makes a token different, not by id and not by name.** By id you get three Goblins from three goblin-makers, because each card points at the Goblin printed in its own set. By name alone you lose real tokens: "Elemental" has 94 printings but **26 genuinely distinct** tokens (3/1, 5/5, */*, 2/2 …). The key is `(name, type_line, power, toughness, oracle_text)`, keeping the newest printing — same best-scan reasoning as the card path.
 - **A bigger page needs a bigger grid or it buys nothing.** Adding A3 while the grids stayed at 3×3 would still print 9 cards on it. A3 and Tabloid hold 4×4 = 16; Legal does not hold 4 rows because 352 mm + 2×`MIN_BOTTOM` exceeds its 356 mm.
 - **A5 holds no 63×88 grid.** The existing "Card block too large" guard catches it, so it is offered for the mini card size rather than hidden.
 - **Bleed needs three states, not two.** Off only covers "wrongly detected"; "Assume bleed" covers an image whose proportions hide its bleed. `trim_bleed` still accepts `True`/`False` so nothing else had to change.

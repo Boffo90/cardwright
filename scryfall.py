@@ -622,14 +622,31 @@ def _related_tokens(card_objects, status_callback=None) -> list[dict]:
     if status_callback:
         status_callback(f"Fetching {len(ids)} token(s)…")
 
-    out = []
+    fetched = []
     for i in range(0, len(ids), 75):
         try:
             data = _post_collection(ids[i:i + 75])
         except ScryfallError:
             break          # tokens are a bonus; never fail the import over them
-        out.extend(data.get("data", []))
-    return out
+        fetched.extend(data.get("data", []))
+
+    # Three cards that each make a Goblin point at the Goblin printed in their
+    # own set — three different ids, one actual token. Collapse those, keeping
+    # the newest printing (the best scan, same reasoning as the Best scan
+    # switch).
+    #
+    # NOT by name alone: "Elemental" has 94 printings but 26 genuinely
+    # different tokens (3/1, 5/5, */*, 2/2 ...), and collapsing those would
+    # hand the user the wrong one. The key is what actually distinguishes a
+    # token on the table.
+    best = {}
+    for t in fetched:
+        key = (t.get("name"), t.get("type_line"), t.get("power"),
+               t.get("toughness"), t.get("oracle_text"))
+        prev = best.get(key)
+        if prev is None or (t.get("released_at") or "") > (prev.get("released_at") or ""):
+            best[key] = t
+    return list(best.values())
 
 
 def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
