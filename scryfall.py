@@ -601,7 +601,39 @@ def _post_collection(identifiers: list[dict]) -> dict:
     return r.json()
 
 
-def resolve_decklist(text: str, status_callback=None, lang: str | None = None):
+def _related_tokens(card_objects, status_callback=None) -> list[dict]:
+    """
+    The tokens a set of cards makes, deduped, as resolved card objects.
+
+    Scryfall hangs these off `all_parts`, so no guessing is involved — a card
+    that makes no tokens simply has none. Fetched with one bulk /collection
+    call rather than one request per token, since identifiers accept `id`.
+    """
+    ids, seen = [], set()
+    for c in card_objects:
+        for part in c.get("all_parts") or []:
+            tid = part.get("id")
+            if part.get("component") == "token" and tid and tid not in seen:
+                seen.add(tid)
+                ids.append({"id": tid})
+    if not ids:
+        return []
+
+    if status_callback:
+        status_callback(f"Fetching {len(ids)} token(s)…")
+
+    out = []
+    for i in range(0, len(ids), 75):
+        try:
+            data = _post_collection(ids[i:i + 75])
+        except ScryfallError:
+            break          # tokens are a bonus; never fail the import over them
+        out.extend(data.get("data", []))
+    return out
+
+
+def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
+                     tokens: bool = False):
     """
     Parse and resolve a decklist.
 
@@ -679,6 +711,25 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None):
             "released_at": c.get("released_at"),
             "set": c.get("set"),
         })
+
+    # Tokens last, so they land after the deck in the queue rather than
+    # interleaved with it. Only the cards that actually resolved can make any.
+    if tokens:
+        for t in _related_tokens(
+                [resolved[k] for k in order if k in resolved], status_callback):
+            base = f"{_slug(t['name'])}-{t.get('set','')}-{t.get('collector_number','')}"
+            try:
+                downloads = [(f"{base}{label}", url)
+                             for url, label in _png_urls(t)]
+            except ScryfallError:
+                continue
+            cards.append({
+                "display": f"{t['name']} (token)",
+                "qty": 1,
+                "downloads": downloads,
+                "released_at": t.get("released_at"),
+                "set": t.get("set"),
+            })
 
     return cards, not_found, bad, english_only
 

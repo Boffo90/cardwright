@@ -140,6 +140,24 @@ FIT_TO_CARD_DEFAULT = True
 # 93.58% of the image.
 MPC_TRIM_DEFAULT = True
 
+# Detection is by aspect ratio, which is a guess — a good one for MPC art, but
+# a guess. These let the user overrule it per run:
+#   Auto-detect  measure the proportions (what we always did)
+#   Assume bleed trim regardless, for a bleed image the ratio test misses
+#   Assume none  never trim, for an image the ratio test wrongly flags
+BLEED_MODES = ["Auto-detect", "Assume bleed", "Assume none"]
+BLEED_MODE_DEFAULT = "Auto-detect"
+
+BLEED_MODE_CODES = {
+    "Auto-detect": "auto",
+    "Assume bleed": "always",
+    "Assume none": "never",
+}
+
+
+def bleed_mode_code(name=None):
+    return BLEED_MODE_CODES.get(name or BLEED_MODE_DEFAULT, "auto")
+
 MPC_BLEED_RATIO_MIN = 0.725   # w/h above this (and below max) -> has bleed
 MPC_BLEED_RATIO_MAX = 0.745
 MPC_CARD_W_FRAC = 0.9124      # card area within the bleed image
@@ -216,7 +234,7 @@ PARALLEL_JOBS = 3
 
 # 3x3 cards of exactly 63x88 mm per page, no gutters (fewer cuts),
 # with crop tick marks in the margins.
-PDF_PAGE_SIZES = ["A4", "Letter"]
+PDF_PAGE_SIZES = ["A4", "Letter", "A3", "Legal", "Tabloid", "A5"]
 
 PDF_DEFAULT_PAGE = "Letter"
 

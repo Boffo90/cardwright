@@ -78,7 +78,7 @@ def _crop_mpc_bleed(im):
     return im.crop((x0, y0, round(x0 + cw), round(y0 + ch)))
 
 
-def _normalize_input(file: Path, trim_bleed: bool = False,
+def _normalize_input(file: Path, trim_bleed=False,
                      status_callback=None) -> Path:
     """
     Real-ESRGAN reads png/jpg/webp. Anything else (or images with odd modes)
@@ -87,9 +87,13 @@ def _normalize_input(file: Path, trim_bleed: bool = False,
     """
     plain = file.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
 
-    if trim_bleed:
+    # True/False stay valid so nothing else has to change; "always" skips the
+    # ratio test for an image that carries bleed it cannot recognise.
+    mode = {True: "auto", False: "never"}.get(trim_bleed, trim_bleed)
+
+    if mode in ("auto", "always"):
         im = Image.open(file)
-        if _has_mpc_bleed(im):
+        if mode == "always" or _has_mpc_bleed(im):
             if status_callback:
                 status_callback("Trimming MPC bleed...")
             if im.mode not in ("RGB", "RGBA"):

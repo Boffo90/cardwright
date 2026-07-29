@@ -33,6 +33,14 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden — in a manual picker the user can see the thumbnail and judge.
 
+## Tokens, paper sizes, bleed modes (v2.17.0)
+Taken from a comparison against Proxy-PDF-Maker, fabricard.net and silhouette-card-maker. Tokens appeared in two of the three independently, which is what promoted it.
+- **Tokens come from Scryfall's `all_parts`**, filtered to `component == "token"`, deduped by id and fetched with one bulk `/collection` call (identifiers accept `id`). Never guess a token from the oracle text. A token failure never fails the import — they are a bonus.
+- **A bigger page needs a bigger grid or it buys nothing.** Adding A3 while the grids stayed at 3×3 would still print 9 cards on it. A3 and Tabloid hold 4×4 = 16; Legal does not hold 4 rows because 352 mm + 2×`MIN_BOTTOM` exceeds its 356 mm.
+- **A5 holds no 63×88 grid.** The existing "Card block too large" guard catches it, so it is offered for the mini card size rather than hidden.
+- **Bleed needs three states, not two.** Off only covers "wrongly detected"; "Assume bleed" covers an image whose proportions hide its bleed. `trim_bleed` still accepts `True`/`False` so nothing else had to change.
+- Watch `and` with mode strings: `trim and _may_have_bleed(item)` collapses every mode to `True`, which would trim on "Assume none". Use a conditional.
+
 ## MPC bleed trim is source-gated (v2.15.0)
 The trim decides by aspect ratio, and **TCGdex's 600×825 Pokémon images land at 0.7273 — inside the 0.725-0.745 MPC window** — so every Pokémon card was cropped 4.4% a side, cutting its border off. Reported on Charizard (Base Set 4) and reproduced exactly.
 - Scryfall (0.7163) and Gatherer (0.7162) sit outside the window, which is why the heuristic survived this long unnoticed.

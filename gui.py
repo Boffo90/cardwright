@@ -31,6 +31,9 @@ from config import (
     SUPPORTED_INPUT,
     FIT_TO_CARD_DEFAULT,
     MPC_TRIM_DEFAULT,
+    BLEED_MODES,
+    BLEED_MODE_DEFAULT,
+    bleed_mode_code,
     PARALLEL_JOBS,
     PDF_PAGE_SIZES,
     PDF_DEFAULT_PAGE,
@@ -540,10 +543,21 @@ class App(_Root):
             self.fit_switch.select()
         self.fit_switch.grid(row=0, column=0, sticky="w")
 
-        self.trim_switch = _switch(toggles, "Trim MPC bleed")
-        if MPC_TRIM_DEFAULT:
-            self.trim_switch.select()
-        self.trim_switch.grid(row=1, column=0, sticky="w", pady=(pad["sm"], 0))
+        # Three states, not two: turning it off covers "wrongly detected", but
+        # not "has bleed the ratio test can't see". That needs its own mode.
+        bleedfr = ctk.CTkFrame(toggles, fg_color="transparent")
+        bleedfr.grid(row=1, column=0, sticky="w", pady=(pad["sm"], 0))
+        ctk.CTkLabel(bleedfr, text="MPC bleed", font=(UI, theme.TYPE["small"]),
+                     text_color=TEXT_DIM).pack(side="left", padx=(0, pad["sm"]))
+        self.trim_menu = ctk.CTkOptionMenu(
+            bleedfr, values=BLEED_MODES, width=132, height=theme.H_INPUT - 6,
+            font=(UI, theme.TYPE["small"]), corner_radius=theme.RADIUS_SM,
+            fg_color=ROW, button_color=CONTROL_ALT,
+            button_hover_color=GRAY_HOVER, text_color=TEXT,
+            dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+            dropdown_hover_color=GRAY_HOVER, command=self._persist_bleed_mode)
+        self.trim_menu.set(load_settings().get("bleed_mode", BLEED_MODE_DEFAULT))
+        self.trim_menu.pack(side="left")
 
         self.best_scan_switch = _switch(toggles, "Best scan")
         if load_settings().get("best_scan", BEST_SCAN_DEFAULT):
@@ -708,6 +722,11 @@ class App(_Root):
         s["card_lang"] = name
         save_settings(s)
 
+    def _persist_bleed_mode(self, name):
+        st = load_settings()
+        st["bleed_mode"] = name
+        save_settings(st)
+
     def _persist_best_scan(self):
         s = load_settings()
         s["best_scan"] = bool(self.best_scan_switch.get())
@@ -796,7 +815,7 @@ class App(_Root):
     def _worker(self):
         model = self.model_menu.get()
         fit = bool(self.fit_switch.get())
-        trim = bool(self.trim_switch.get())
+        trim = bleed_mode_code(load_settings().get("bleed_mode"))
         # fit-to-card resizes to the chosen TCG's size (set in Export)
         card = load_settings().get("card_size", CARD_SIZE_DEFAULT)
         lang = card_lang_code(load_settings().get("card_lang"))
@@ -864,7 +883,9 @@ class App(_Root):
                 released_at=item.released_at,
                 set_code=item.set_code,
                 ai=self.ai_ok,
-                trim_bleed=trim and _may_have_bleed(item),
+                # not `trim and ...`: with a mode string that collapses every
+                # mode to True, which would trim even on "Assume none"
+                trim_bleed=trim if _may_have_bleed(item) else "never",
                 card_size=card_size,
                 progress_callback=lambda v, it=item: self._ui(
                     it.set_status, "processing", None, v),
@@ -955,7 +976,18 @@ class ImportDialog(ctk.CTkToplevel):
         self.status.grid(row=2, column=0, sticky="w", padx=20, pady=2)
 
         btns = ctk.CTkFrame(self, fg_color="transparent")
-        btns.grid(row=3, column=0, sticky="e", padx=20, pady=(6, 16))
+        btns.grid(row=3, column=0, sticky="ew", padx=20, pady=(6, 16))
+        # Scryfall lists a card's tokens in `all_parts`, so this is exact
+        # rather than guesswork — and someone printing a Krenko deck wants
+        # the goblins.
+        self.tokens_var = ctk.BooleanVar(
+            value=bool(load_settings().get("import_tokens", False)))
+        ctk.CTkCheckBox(btns, text="Also add the tokens these cards make",
+                        variable=self.tokens_var, checkbox_width=16,
+                        checkbox_height=16, corner_radius=3,
+                        font=(UI, theme.TYPE["small"]), fg_color=GOLD,
+                        hover_color=GOLD_HOVER, text_color=TEXT_DIM).pack(
+            side="left")
         ctk.CTkButton(btns, text="Cancel", width=90, fg_color=GRAY_BTN,
                       hover_color=GRAY_HOVER, command=self.destroy).pack(
             side="left", padx=6)
@@ -978,6 +1010,9 @@ class ImportDialog(ctk.CTkToplevel):
         if not text:
             return
         self.import_btn.configure(state="disabled", text="Resolving…")
+        st = load_settings()
+        st["import_tokens"] = bool(self.tokens_var.get())
+        save_settings(st)
         threading.Thread(target=self._resolve, args=(text,), daemon=True).start()
 
     def _resolve(self, text):
@@ -994,7 +1029,8 @@ class ImportDialog(ctk.CTkToplevel):
 
             lang = card_lang_code(load_settings().get("card_lang"))
             cards, not_found, bad, english_only = scryfall.resolve_decklist(
-                text, status_callback=status, lang=lang)
+                text, status_callback=status, lang=lang,
+                tokens=bool(self.tokens_var.get()))
             self.after(0, lambda: self._done(cards, not_found, bad, english_only))
         except Exception as e:
             self.after(0, lambda err=e: self._failed(err))
@@ -1050,7 +1086,10 @@ class ImportDialog(ctk.CTkToplevel):
 # --------------------------------------------------------------------------
 # PDF export dialog with live preview
 # --------------------------------------------------------------------------
-_PAGE_MM = {"Letter": (215.9, 279.4), "A4": (210.0, 297.0)}
+_PAGE_MM = {
+    "Letter": (215.9, 279.4), "A4": (210.0, 297.0), "A3": (297.0, 420.0),
+    "A5": (148.0, 210.0), "Legal": (215.9, 355.6), "Tabloid": (279.4, 431.8),
+}
 
 # Cards are kept at WORK_SIZE in memory: big enough for the detector to
 # behave as it will at print resolution and for the loupe to magnify, small

@@ -24,7 +24,7 @@ from reportlab import rl_config
 # and lossless mode is heavy enough already)
 rl_config.useA85 = 0
 
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A3, A4, A5, LEGAL, letter, TABLOID
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
@@ -48,6 +48,13 @@ LAYOUTS = {
     "3×3 portrait": (3, 3, False),
     "4×2 landscape": (4, 2, True),
     "7-card Silhouette": (4, 2, True),
+    # For the bigger papers. Without these, choosing A3 buys a larger sheet
+    # and still prints 9 cards on it — A3 and Tabloid hold 16.
+    # Not Legal: 4 rows come to 352 mm and Legal is 356, which the 3 mm
+    # unprintable margin at each edge eats. They fall through the generic
+    # grid path, so no special casing is needed.
+    "3×4 portrait": (3, 4, False),
+    "4×4 portrait": (4, 4, False),
 }
 DEFAULT_LAYOUT = "3×3 portrait"
 
@@ -70,7 +77,12 @@ PER_PAGE = COLS * ROWS
 MARK_LEN = 4 * mm     # margin tick length
 MARK_GAP = 1 * mm     # gap between block edge and tick start
 
-PAGES = {"A4": A4, "Letter": letter}
+# A3 in particular is worth having: it fits far more cards per sheet and
+# the extra margin means registration marks stop competing with card slots.
+PAGES = {
+    "A4": A4, "Letter": letter, "A3": A3, "A5": A5,
+    "Legal": LEGAL, "Tabloid": TABLOID,
+}
 
 # The card block never gets closer than this to the paper's bottom edge
 # (typical inkjet unprintable margin).

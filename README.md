@@ -38,7 +38,9 @@ with print-shop features.
   already chose the printing, so nothing second-guesses it. Gatherer links
   use the Gatherer image, never a substitute.
 - **Decklist paste**: `1 Card Name (SET) 123 [matte] *F*`, exact printings
-  by set + collector number. **Archidekt** deck URLs too.
+  by set + collector number. **Archidekt and Moxfield** deck URLs too.
+- **Tokens**: optionally add every token the deck's cards make — taken from
+  Scryfall's own data, so it's exact.
 - Local files (PNG/JPG/WEBP/AVIF/…) and drag & drop.
 - Double-faced cards fetch both faces and stay paired.
 
@@ -56,11 +58,13 @@ The preview is a workspace, not a picture — what you see is what prints.
 - **Export presets** — save and reload named configurations.
 
 ### Print sheets
-- Layouts: **3×3 portrait**, **4×2 landscape**, and **7-card Silhouette**.
+- Layouts: **3×3 portrait**, **4×2 landscape**, **7-card Silhouette**, plus
+  **3×4** and **4×4** for the bigger sheets — A3 and Tabloid fit 16 cards.
 - Card sizes: **MTG / Pokémon (63×88)**, **Yu-Gi-Oh (59×86)**, mini (44×68),
   tarot (70×120). Pokémon cards are the same size as Magic cards, so they
   work as-is.
-- A4 / Letter, lossless or JPEG PDF, split into one file per N pages.
+- Pages: **A4, Letter, A3, Legal, Tabloid, A5**. Lossless or JPEG PDF, split
+  into one file per N pages.
 - Cut guides with adjustable style (cross or corner crop marks), length,
   thickness and offset; margin ticks; optional rounded corners.
 - Edge bleed with selectable colour, page shift for thick-stock feeding.

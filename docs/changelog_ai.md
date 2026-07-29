@@ -2,6 +2,28 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.0 (unreleased) — tokens, bigger paper, manual bleed
+### Tokens
+- **"Also add the tokens these cards make"** in the decklist importer. Scryfall
+  lists them in `all_parts`, so it is exact rather than guesswork — a card that
+  makes none contributes none. Deduped and fetched in one bulk call, appended
+  after the deck.
+
+### Paper and grids
+- Added **A3, Legal, Tabloid and A5** to the page sizes (was A4 / Letter only).
+- Added **3×4 and 4×4 portrait** grids, because otherwise a bigger sheet still
+  printed 9 cards: **A3 and Tabloid now hold 16**. Not Legal — 4 rows come to
+  352 mm against a 356 mm page, which the 3 mm unprintable margin eats.
+- A5 cannot hold a 63×88 grid at all and says so rather than exporting
+  something broken; it is there for the mini card size.
+
+### Manual bleed override
+- "Trim MPC bleed" becomes **Auto-detect / Assume bleed / Assume none**.
+  Turning the old switch off covered "wrongly detected", but there was no way
+  to say "this *does* carry bleed the ratio test can't see". Now there is.
+- Detection is still by aspect ratio, and still only runs on sources that can
+  carry a bleed (MPC and local files).
+
 ## v2.16.0 — Moxfield decks, and your card slots back
 ### Moxfield deck import
 - **Paste a Moxfield deck URL and it imports**, like Archidekt already did.
