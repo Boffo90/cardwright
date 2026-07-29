@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.16.0 (unreleased) — Moxfield decks, and your card slots back
+## v2.16.0 — Moxfield decks, and your card slots back
 ### Moxfield deck import
 - **Paste a Moxfield deck URL and it imports**, like Archidekt already did.
   Commanders, companions and sideboards come along; the maybeboard does not.
