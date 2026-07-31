@@ -41,6 +41,9 @@ with print-shop features.
   by set + collector number. **Archidekt and Moxfield** deck URLs too.
 - **Tokens**: optionally add every token the deck's cards make — taken from
   Scryfall's own data, so it's exact.
+- Import a decklist with the art coming from **Gatherer** instead of Scryfall,
+  or load an **MPC Autofill order `.xml`** to get exactly the art you picked
+  there.
 - Local files (PNG/JPG/WEBP/AVIF/…) and drag & drop.
 - Double-faced cards fetch both faces and stay paired.
 

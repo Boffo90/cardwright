@@ -2,7 +2,25 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.0 (unreleased) — tokens, bigger paper, manual bleed
+## v2.17.0 (unreleased) — help, more import routes, tokens, bigger paper
+
+### Help: FAQ and About
+- New **Help** button in the header. A FAQ answering the questions people
+  actually asked after release — why marks cost card slots and which inset
+  fixes it, which paper and layout to use with a cutter, why a Pokémon card is
+  less sharp, why a card came back in English, which border mode to use, the
+  unsigned-publisher warning, and where the log is.
+- An About tab with the version, links, licence, the card-data credits and
+  what the app is built on.
+
+### More ways in
+- The decklist importer can pull art from **Gatherer** instead of Scryfall.
+  Cards Gatherer does not carry (no multiverse id) are reported rather than
+  silently dropped.
+- **Load an MPC Autofill order `.xml`** and get exactly the art you already
+  picked there — a name search cannot reproduce that. Quantities come from the
+  slot count; entries missing an image id are listed instead of skipped
+  silently.
 ### Tokens
 - **"Also add the tokens these cards make"** in the decklist importer. Scryfall
   lists them in `all_parts`, so it is exact rather than guesswork — a card that

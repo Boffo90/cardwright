@@ -650,7 +650,7 @@ def _related_tokens(card_objects, status_callback=None) -> list[dict]:
 
 
 def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
-                     tokens: bool = False):
+                     tokens: bool = False, source: str = "scryfall"):
     """
     Parse and resolve a decklist.
 
@@ -721,13 +721,26 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
         display = f'{e["qty"]}x {c["name"]}' if e["qty"] > 1 else c["name"]
         if e.get("finish"):
             display += f' ({e["finish"]})'
-        cards.append({
+        entry = {
             "display": display,
             "qty": e["qty"],
             "downloads": downloads,
             "released_at": c.get("released_at"),
             "set": c.get("set"),
-        })
+        }
+        if source == "gatherer":
+            # Gatherer serves webp and only knows cards with a multiverse id,
+            # so these are queued as a reference for scryfall.fetch to resolve
+            # rather than as a direct download.
+            mids = c.get("multiverse_ids") or []
+            if not mids:
+                not_found.append(
+                    f'{c["name"]} ({c["set"].upper()}) {c["collector_number"]}'
+                    " — not on Gatherer (no multiverse id)")
+                continue
+            entry["ref"] = ("https://gatherer.wizards.com/Pages/Card/"
+                            f"Details.aspx?multiverseid={mids[0]}")
+        cards.append(entry)
 
     # Tokens last, so they land after the deck in the queue rather than
     # interleaved with it. Only the cards that actually resolved can make any.

@@ -129,3 +129,77 @@ def fetch_thumb(url: str) -> bytes | None:
         return r.content if r.status_code == 200 else None
     except requests.RequestException:
         return None
+
+
+# --------------------------------------------------------------------------
+# Order XML (the file MPC Autofill exports)
+# --------------------------------------------------------------------------
+# <order>
+#   <details><quantity/><bracket/><stock/><foil/></details>
+#   <fronts>
+#     <card><id/><slots/><name/><query/></card>
+#   </fronts>
+#   <backs>...</backs>
+#   <cardback>drive-id</cardback>
+# </order>
+#
+# `id` is a Google Drive file id, the same identifier the search returns, so
+# the existing download path works unchanged. `slots` is a comma-separated
+# list of positions in the order — its LENGTH is the quantity. Some generators
+# write <slot> singular, so both are accepted.
+#
+# The point of importing this rather than re-searching: an order file names
+# the exact art the user already chose, which a name search cannot reproduce.
+
+
+def parse_order_xml(text: str) -> tuple[list[dict], list[str]]:
+    """
+    Parse an MPC Autofill order into (cards, problems).
+
+    Each card: {name, qty, download, identifier, ext, source, dpi, size}
+    — the same shape search() returns, so the queue treats them identically.
+    """
+    import xml.etree.ElementTree as ET
+
+    try:
+        root = ET.fromstring(text.strip())
+    except ET.ParseError as e:
+        raise MPCError(f"That does not parse as XML: {e}") from e
+
+    if root.tag != "order":
+        raise MPCError(
+            f"Expected an MPC Autofill order file (root <order>), got <{root.tag}>")
+
+    fronts = root.find("fronts")
+    if fronts is None:
+        raise MPCError("No <fronts> section in that order file")
+
+    cards, problems = [], []
+    for el in fronts.findall("card"):
+        drive_id = (el.findtext("id") or "").strip()
+        name = (el.findtext("name") or el.findtext("query") or "?").strip()
+        if not drive_id:
+            problems.append(f"{name} — no image id in the file")
+            continue
+
+        slots = (el.findtext("slots") or el.findtext("slot") or "").strip()
+        qty = len([s for s in slots.split(",") if s.strip()]) or 1
+
+        # the <name> is a filename; the queue label reads better without it
+        label = name.rsplit(".", 1)[0] if "." in name else name
+
+        cards.append({
+            "name": label,
+            "qty": qty,
+            "source": "MPC order",
+            "dpi": 0,
+            "size": 0,
+            "thumb": "",
+            "download": f"https://drive.google.com/uc?id={drive_id}&export=download",
+            "ext": (name.rsplit(".", 1)[-1].lower() if "." in name else "png"),
+            "identifier": drive_id,
+        })
+
+    if not cards and not problems:
+        problems.append("The <fronts> section is empty")
+    return cards, problems

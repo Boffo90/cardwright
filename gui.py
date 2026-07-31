@@ -75,7 +75,7 @@ import print_sheet
 import bootstrap
 import update as app_update
 import theme
-from version import APP_NAME, APP_VERSION, DONATE_URL
+from version import APP_NAME, APP_VERSION, DONATE_URL, GITHUB_REPO
 
 
 ctk.set_appearance_mode("Dark")
@@ -387,6 +387,12 @@ class App(_Root):
                       font=(UI, 12),
                       command=lambda: webbrowser.open(DONATE_URL)).pack(
             side="right", padx=(4, 10), pady=(10, 0))
+        ctk.CTkButton(header, text="Help", width=58, height=28,
+                      fg_color="transparent", hover_color=GRAY_HOVER,
+                      border_width=1, border_color=BORDER_STRONG,
+                      text_color=TEXT_DIM, font=(UI, 12),
+                      command=lambda: HelpDialog(self)).pack(
+            side="right", padx=(4, 0), pady=(10, 0))
         # A bug report is only as good as what the reporter can attach.
         ctk.CTkButton(header, text="Log", width=52, height=28,
                       fg_color="transparent", hover_color=GRAY_HOVER,
@@ -734,10 +740,17 @@ class App(_Root):
 
     def _add_resolved_cards(self, cards):
         for c in cards:
+            if c.get("ref"):
+                # Gatherer import: a reference, so scryfall.fetch pulls the
+                # Gatherer image and converts its webp to PNG.
+                self._add_item(c["ref"], "scryfall", label=c["display"],
+                               qty=c["qty"], released_at=c.get("released_at"),
+                               set_code=c.get("set"), src="gatherer")
+                continue
             self._add_item(c["display"], "card",
                            downloads=c["downloads"], label=c["display"],
                            qty=c["qty"], released_at=c.get("released_at"),
-                           set_code=c.get("set"))
+                           set_code=c.get("set"), src=c.get("src"))
 
     def _on_drop(self, event):
         # event.data is a brace/space separated list of paths
@@ -938,7 +951,7 @@ class App(_Root):
 # decklist import dialog
 # --------------------------------------------------------------------------
 class ImportDialog(ctk.CTkToplevel):
-    PLACEHOLDER = ("Paste a decklist or an Archidekt deck URL, e.g.\n\n"
+    PLACEHOLDER = ("Paste a decklist, or an Archidekt or Moxfield deck URL:\n\n"
                    "1 Winota, Joiner of Forces (PRM) 80807 [matte]\n"
                    "3 Plains (MSC) 866 [matte]\n"
                    "1 Ajani, Nacatl Pariah // Ajani, Nacatl Avenger (MH3) 442\n\n"
@@ -970,33 +983,103 @@ class ImportDialog(ctk.CTkToplevel):
         self.textbox.bind("<FocusIn>", self._clear_placeholder)
         self._has_placeholder = True
 
-        self.status = ctk.CTkLabel(self, text="Fetches the exact printing "
-                                   "(set + number) from Scryfall.",
+        self.status = ctk.CTkLabel(self, text="Resolves the exact printing "
+                                   "(set + number), then pulls the art from "
+                                   "the source below.",
                                    text_color="#9ca3af", font=(UI, 12))
         self.status.grid(row=2, column=0, sticky="w", padx=20, pady=2)
 
-        btns = ctk.CTkFrame(self, fg_color="transparent")
-        btns.grid(row=3, column=0, sticky="ew", padx=20, pady=(6, 16))
+        # Two rows: options above, actions below. All of it on one line
+        # overflowed a 620 px dialog and pushed the primary button off screen.
+        opts = ctk.CTkFrame(self, fg_color="transparent")
+        opts.grid(row=3, column=0, sticky="ew", padx=20, pady=(6, 0))
+
+        ctk.CTkLabel(opts, text="Images from", font=(UI, theme.TYPE["small"]),
+                     text_color=TEXT_DIM).pack(side="left", padx=(0, 6))
+        self.src_menu = ctk.CTkOptionMenu(
+            opts, values=["Scryfall", "Gatherer"], width=104,
+            height=theme.H_INPUT - 6, font=(UI, theme.TYPE["small"]),
+            corner_radius=theme.RADIUS_SM, fg_color=ROW,
+            button_color=CONTROL_ALT, button_hover_color=GRAY_HOVER,
+            text_color=TEXT, dropdown_fg_color=ROW, dropdown_text_color=TEXT,
+            dropdown_hover_color=GRAY_HOVER)
+        self.src_menu.set(load_settings().get("import_source", "Scryfall"))
+        self.src_menu.pack(side="left", padx=(0, 16))
+
         # Scryfall lists a card's tokens in `all_parts`, so this is exact
         # rather than guesswork — and someone printing a Krenko deck wants
         # the goblins.
         self.tokens_var = ctk.BooleanVar(
             value=bool(load_settings().get("import_tokens", False)))
-        ctk.CTkCheckBox(btns, text="Also add the tokens these cards make",
+        ctk.CTkCheckBox(opts, text="Also add the tokens these cards make",
                         variable=self.tokens_var, checkbox_width=16,
                         checkbox_height=16, corner_radius=3,
                         font=(UI, theme.TYPE["small"]), fg_color=GOLD,
                         hover_color=GOLD_HOVER, text_color=TEXT_DIM).pack(
             side="left")
-        ctk.CTkButton(btns, text="Cancel", width=90, fg_color=GRAY_BTN,
-                      hover_color=GRAY_HOVER, command=self.destroy).pack(
-            side="left", padx=6)
+
+        btns = ctk.CTkFrame(self, fg_color="transparent")
+        btns.grid(row=4, column=0, sticky="ew", padx=20, pady=(10, 16))
+        ctk.CTkButton(btns, text="MPC XML…", width=104, height=theme.H_BUTTON,
+                      corner_radius=theme.RADIUS_SM, fg_color=CONTROL_ALT,
+                      hover_color=GRAY_HOVER, text_color=TEXT,
+                      font=(UI, theme.TYPE["small"]),
+                      command=self._load_mpc_xml).pack(side="left")
+
         self.import_btn = ctk.CTkButton(btns, text="Resolve & add", width=140,
+                                        height=theme.H_BUTTON,
+                                        corner_radius=theme.RADIUS_SM,
                                         fg_color=GOLD, hover_color=GOLD_HOVER,
                                         text_color=GOLD_TEXT,
                                         font=(UI, 13, "bold"),
                                         command=self._do_import)
-        self.import_btn.pack(side="left")
+        self.import_btn.pack(side="right")
+        ctk.CTkButton(btns, text="Cancel", width=90, height=theme.H_BUTTON,
+                      corner_radius=theme.RADIUS_SM, fg_color=CONTROL_ALT,
+                      hover_color=GRAY_HOVER, text_color=TEXT,
+                      command=self.destroy).pack(side="right", padx=8)
+
+    def _load_mpc_xml(self):
+        """Import an MPC Autofill order file.
+
+        Worth having over re-searching: the order names the exact art the user
+        already picked, which a name search cannot reproduce.
+        """
+        path = filedialog.askopenfilename(
+            title="Choose an MPC Autofill order file",
+            filetypes=[("MPC Autofill order", "*.xml"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            cards, problems = mpcfill.parse_order_xml(
+                Path(path).read_text(encoding="utf-8", errors="replace"))
+        except Exception as e:
+            applog.log.error("MPC order import failed", exc_info=e)
+            messagebox.showerror("Could not read that file", str(e), parent=self)
+            return
+
+        resolved = []
+        for c in cards:
+            base = f"{c['name']}  [{c['source']}]"
+            safe = re.sub(r'[<>:"/\\|?*]', "", base)
+            resolved.append({
+                "display": f"{c['qty']}x {c['name']}" if c["qty"] > 1 else c["name"],
+                "qty": c["qty"],
+                "downloads": [(safe, c["download"])],
+                "released_at": None,
+                "set": None,
+                "src": "mpc",
+            })
+        if resolved:
+            self.on_resolved(resolved)
+
+        if problems:
+            messagebox.showwarning(
+                "Imported with issues",
+                f"Added {len(resolved)} card(s).\n\nSkipped:\n  - "
+                + "\n  - ".join(problems), parent=self)
+        if resolved:
+            self.destroy()
 
     def _clear_placeholder(self, _=None):
         if self._has_placeholder:
@@ -1012,6 +1095,7 @@ class ImportDialog(ctk.CTkToplevel):
         self.import_btn.configure(state="disabled", text="Resolving…")
         st = load_settings()
         st["import_tokens"] = bool(self.tokens_var.get())
+        st["import_source"] = self.src_menu.get()
         save_settings(st)
         threading.Thread(target=self._resolve, args=(text,), daemon=True).start()
 
@@ -1030,7 +1114,8 @@ class ImportDialog(ctk.CTkToplevel):
             lang = card_lang_code(load_settings().get("card_lang"))
             cards, not_found, bad, english_only = scryfall.resolve_decklist(
                 text, status_callback=status, lang=lang,
-                tokens=bool(self.tokens_var.get()))
+                tokens=bool(self.tokens_var.get()),
+                source=self.src_menu.get().lower())
             self.after(0, lambda: self._done(cards, not_found, bad, english_only))
         except Exception as e:
             self.after(0, lambda err=e: self._failed(err))
@@ -3044,3 +3129,216 @@ class CardSearchDialog(ctk.CTkToplevel):
         card = {**card, "_source": getattr(self.backend, "ID", "mpc")}
         self.on_pick(card)
         self.status.configure(text=f"Added: {card['name']}", text_color=GOLD)
+
+
+# --------------------------------------------------------------------------
+# Help: FAQ + About
+# --------------------------------------------------------------------------
+
+# Written from the questions people actually asked after the public release,
+# not from what seemed likely to be asked. Most entries here cost someone a
+# confused hour or a wasted sheet of cardstock.
+FAQ = [
+    ("Registration marks are eating my card slots. Why?",
+     "The marks are corner brackets, so what blocks a slot is a mark landing "
+     "on a CORNER card. Moving the marks outward frees them: lowering Mark "
+     "inset from 10 mm to 9.5 mm takes Letter 4x2 from 6 usable cards to 8, "
+     "and A4 3x3 goes from 7 to 9 at 6 mm.\n\n"
+     "When marks do cost you slots, the hint under the preview names the exact "
+     "inset that keeps them all. The floor is 3.5 mm - below that most inkjets "
+     "cannot print, and the mark is simply clipped off."),
+
+    ("Which paper and layout should I use with a cutting machine?",
+     "On A4, the 4x2 landscape and 7-card Silhouette layouts keep every slot "
+     "at the default mark geometry. They are the safest pairings.\n\n"
+     "The 7-card layout exists for exactly this: it clears both left corners, "
+     "where a Cameo's key marks sit."),
+
+    ("My marks do not line up with a Silhouette Studio template.",
+     "Mark geometry follows Studio's published figures: 0.394 in inset, "
+     "0.350 in (8.89 mm) length, 0.039 in thickness. If your template was "
+     "built around different numbers, set them to match in Export > Cutting.\n\n"
+     "A template made in Studio also assumes a particular grid, so matching "
+     "the marks but not the layout will still misalign."),
+
+    ("Why is a Pokemon card less sharp than a Magic card?",
+     "Every Pokemon catalogue tops out at 600x825, against Scryfall's 745x1040 "
+     "for Magic. That is a limit of the source data, not of this app - no "
+     "Pokemon API has anything better.\n\n"
+     "Small sources are resized to the right size BEFORE the AI pass, so it "
+     "reconstructs at the target instead of stretching afterwards. That "
+     "recovers a good part of the difference."),
+
+    ("I chose a language but some cards came back in English.",
+     "Not every card was printed in every language. Promos, Secret Lairs and "
+     "older sets are frequently English-only.\n\n"
+     "Those cards are added in English and listed separately after the import, "
+     "so you know which ones rather than wondering why the deck came out "
+     "mixed. It is not a failure."),
+
+    ("What does Best scan actually do?",
+     "When you type a bare card name, it compares that card's printings and "
+     "picks the sharpest image, keeping the same artwork.\n\n"
+     "It never swaps the art for a different one, and it never overrides a "
+     "link or a decklist line - those already name a printing you chose."),
+
+    ("Which black border mode should I use?",
+     "Contrast edges (the default) pushes the dark pixels inside a fixed band "
+     "at the card's edge. It detects nothing, so there is no judgement to get "
+     "wrong on artwork that reaches the cut edge.\n\n"
+     "Auto-detect measures how deep the frame runs and snaps it to black. It "
+     "is crisper on a normal black-bordered scan but can misjudge full-art "
+     "cards. Both take a per-card override: left-click a card in the preview."),
+
+    ("A card came out cropped, or kept a bleed edge it should not have.",
+     "Bleed detection works by aspect ratio, which is a good guess but still a "
+     "guess. Set MPC bleed to Assume none for an image wrongly flagged, or "
+     "Assume bleed for one carrying bleed the proportions hide.\n\n"
+     "It only ever runs on MPC picks and local files - cards from Scryfall, "
+     "Gatherer, Pokemon and Yu-Gi-Oh are never touched."),
+
+    ("The two sides do not line up when I print double-sided.",
+     "Use Export > Tests > duplex alignment sheet. Print it double-sided, hold "
+     "it up to the light, and dial in Back offset and Back rotation from what "
+     "you actually see. Guessing those numbers rarely works.\n\n"
+     "Back bleed helps the cut survive whatever drift is left."),
+
+    ("Windows says unknown publisher. Is that a problem?",
+     "The app is not code-signed yet - a signing certificate is a recurring "
+     "cost this project has not taken on. SmartScreen flags any unsigned "
+     "executable regardless of what it does.\n\n"
+     "The source is published so anyone can read exactly what it does, and the "
+     "releases on GitHub are the only official builds."),
+
+    ("What does it download on first run?",
+     "The Real-ESRGAN engine and the AI models, once, from their official "
+     "sources - about 110 MB. After that the upscaling runs entirely on your "
+     "machine and needs no connection.\n\n"
+     "Card images are fetched only when you ask for a specific card."),
+
+    ("Something went wrong and the message was not enough.",
+     "The Log button in the header opens a log file with the full details of "
+     "any failure, including what was being fetched when it broke.\n\n"
+     "Attach it to a bug report on GitHub - it is the difference between a "
+     "guess and a fix."),
+
+    ("Is printing proxies allowed?",
+     "This is an unofficial fan project. It ships no publisher artwork: card "
+     "images are fetched from public APIs when you ask for them.\n\n"
+     "Proxies are for personal playtesting. Selling them, or passing them off "
+     "as real cards, is not what this tool is for, and what you do with the "
+     "output is your responsibility."),
+]
+
+
+class HelpDialog(ctk.CTkToplevel):
+    """FAQ and About, in one window reachable from the header."""
+
+    def __init__(self, master):
+        super().__init__(master)
+        self.title(f"{APP_NAME} - Help")
+        self.geometry("720x640")
+        self.transient(master)
+        self.after(60, self.grab_set)
+        self.configure(fg_color=BG)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(self, text="Help",
+                     font=(UI, theme.TYPE["title"], "bold"),
+                     text_color=TEXT).grid(row=0, column=0, sticky="w",
+                                           padx=20, pady=(16, 4))
+
+        tabs = ctk.CTkTabview(self, fg_color=PANEL,
+                              segmented_button_selected_color=GOLD,
+                              segmented_button_selected_hover_color=GOLD_HOVER,
+                              text_color=TEXT)
+        tabs.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
+        tabs.add("FAQ")
+        tabs.add("About")
+
+        self._build_faq(tabs.tab("FAQ"))
+        self._build_about(tabs.tab("About"))
+
+        ctk.CTkButton(self, text="Close", width=96, height=theme.H_BUTTON,
+                      corner_radius=theme.RADIUS_SM, fg_color=CONTROL_ALT,
+                      hover_color=GRAY_HOVER, text_color=TEXT,
+                      command=self.destroy).grid(row=2, column=0, sticky="e",
+                                                 padx=20, pady=(0, 14))
+
+    def _build_faq(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        box = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+        box.grid(row=0, column=0, sticky="nsew")
+        box.grid_columnconfigure(0, weight=1)
+
+        for i, (q, a) in enumerate(FAQ):
+            ctk.CTkLabel(box, text=q, font=(UI, theme.TYPE["body"], "bold"),
+                         text_color=TEXT, justify="left", anchor="w",
+                         wraplength=590).grid(row=i * 2, column=0, sticky="ew",
+                                              padx=6, pady=(14 if i else 2, 2))
+            ctk.CTkLabel(box, text=a, font=(UI, theme.TYPE["small"]),
+                         text_color=TEXT_DIM, justify="left", anchor="w",
+                         wraplength=590).grid(row=i * 2 + 1, column=0,
+                                              sticky="ew", padx=6, pady=(0, 2))
+
+    def _build_about(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        box = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+        box.grid(row=0, column=0, sticky="nsew")
+        box.grid_columnconfigure(0, weight=1)
+
+        def para(text, bold=False, muted=False, pad=(8, 2)):
+            ctk.CTkLabel(
+                box, text=text,
+                font=(UI, theme.TYPE["body"], "bold") if bold
+                else (UI, theme.TYPE["small"]),
+                text_color=TEXT if bold else (MUTED if muted else TEXT_DIM),
+                justify="left", anchor="w", wraplength=590).pack(
+                anchor="w", padx=6, pady=pad)
+
+        def link(text, url):
+            ctk.CTkButton(box, text=text, height=26, anchor="w", width=260,
+                          fg_color="transparent", hover_color=GRAY_HOVER,
+                          text_color=GOLD, font=(UI, theme.TYPE["small"]),
+                          command=lambda u=url: webbrowser.open(u)).pack(
+                anchor="w", padx=2, pady=1)
+
+        para(f"{APP_NAME} {APP_VERSION}", bold=True, pad=(10, 0))
+        para("Turns card images into true 1200 DPI print-ready proxies using "
+             "AI upscaling on your own GPU, then builds print-ready sheets. "
+             "Free, and offline once it has downloaded its engine.")
+
+        para("Links", bold=True)
+        link("Releases and source", f"https://github.com/{GITHUB_REPO}")
+        link("Report a bug", f"https://github.com/{GITHUB_REPO}/issues")
+        link("Donate", DONATE_URL)
+
+        para("Licence", bold=True)
+        para("Free to use, but not open source. The code is published so "
+             "anyone can read and audit what the app does. You may study it "
+             "and build it for your own use; you may not redistribute it, "
+             "publish a rebranded version, or sell it.")
+
+        para("Card data and images", bold=True)
+        para("Magic card data and images courtesy of Scryfall. Yu-Gi-Oh from "
+             "YGOPRODeck and Pokemon from TCGdex - images are downloaded to "
+             "your machine rather than hotlinked, per their terms. MPC "
+             "Autofill art comes from the community database.\n\n"
+             "This is an unofficial fan project, not affiliated with or "
+             "endorsed by Wizards of the Coast or any other publisher, and it "
+             "ships no publisher artwork.")
+
+        para("Built on", bold=True)
+        para("Real-ESRGAN (BSD-3) for the upscaling engine, with the "
+             "UltraSharp and High Fidelity community models fetched from the "
+             "Upscayl project. Registration-mark geometry follows the spec "
+             "used by silhouette-card-maker; the 7-card arrangement matches "
+             "ProxySheet's SevenCard template; the contrast-edges border "
+             "treatment is a reimplementation of the approach Proxxied uses. "
+             "No code from those projects is used.")
+
+        para("Intended for personal playtesting. What you do with the output "
+             "is your responsibility.", muted=True, pad=(10, 12))

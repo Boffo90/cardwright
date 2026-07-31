@@ -33,6 +33,14 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden — in a manual picker the user can see the thumbnail and judge.
 
+## Import routes (v2.17.0)
+- **Gatherer decklist import** resolves through Scryfall as usual (set + collector number) and then queues a *reference*, not a download — `scryfall.fetch` pulls the Gatherer image and converts its webp. Cards with no `multiverse_ids` cannot come from Gatherer and are reported.
+- **MPC Autofill order XML** (`<order><fronts><card><id><slots><name>`): `id` is a Google Drive file id, the same identifier the search returns, so the existing download path is unchanged. Quantity is the *length* of the comma-separated `slots` list. `<slot>` singular is accepted too — some generators write it that way. The point of importing the file rather than re-searching is that it names the exact art the user already chose.
+- Both are tagged with their `src` (`gatherer`, `mpc`) so the bleed trim and border rules apply correctly — MPC art does carry a bleed, Gatherer art does not.
+
+## Help dialog (v2.17.0)
+The FAQ is written from questions people actually asked after the public release, not from what seemed likely. When a support answer gets given twice, it belongs there.
+
 ## Tokens, paper sizes, bleed modes (v2.17.0)
 Taken from a comparison against Proxy-PDF-Maker, fabricard.net and silhouette-card-maker. Tokens appeared in two of the three independently, which is what promoted it.
 - **Tokens come from Scryfall's `all_parts`**, filtered to `component == "token"` and fetched with one bulk `/collection` call (identifiers accept `id`). Never guess a token from the oracle text. A token failure never fails the import — they are a bonus.
