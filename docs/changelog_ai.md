@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.0 (unreleased) — help, more import routes, tokens, bigger paper
+## v2.17.0 — help, more import routes, tokens, bigger paper
 
 ### Help: FAQ and About
 - New **Help** button in the header. A FAQ answering the questions people
