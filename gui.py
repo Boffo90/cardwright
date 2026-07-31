@@ -696,7 +696,15 @@ class App(_Root):
             return
 
         base = f"{card['name']}  [{card['source'] or src.LABEL}]"
+        # Same hazard as the MPC order import: two picks that share a name and
+        # a source write the same file and one silently replaces the other.
+        # Two MPC arts by one contributor, or two Yu-Gi-Oh artworks from one
+        # set, do exactly that. The catalogue's own id is unique, so tack a
+        # slice of it on.
         safe = re.sub(r'[<>:"/\\|?*]', "", base)
+        ident = str(card.get("identifier") or "")[:10]
+        if ident:
+            safe = f"{safe} {re.sub(r'[^A-Za-z0-9_-]', '', ident)}"
         self._add_item(base, "card",
                        downloads=[(safe, card["download"])], label=base,
                        src=src.ID)
@@ -1061,7 +1069,13 @@ class ImportDialog(ctk.CTkToplevel):
         resolved = []
         for c in cards:
             base = f"{c['name']}  [{c['source']}]"
+            # The download name has to carry the slot. An MPC order names every
+            # entry by card alone, so an order with three different Islands
+            # repeats "Island.png" three times — without this they all write
+            # the same file and two of the three arts are silently lost.
             safe = re.sub(r'[<>:"/\\|?*]', "", base)
+            if c.get("slot"):
+                safe = f"{safe} {c['slot']}"
             resolved.append({
                 "display": f"{c['qty']}x {c['name']}" if c["qty"] > 1 else c["name"],
                 "qty": c["qty"],

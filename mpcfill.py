@@ -182,14 +182,21 @@ def parse_order_xml(text: str) -> tuple[list[dict], list[str]]:
             problems.append(f"{name} — no image id in the file")
             continue
 
-        slots = (el.findtext("slots") or el.findtext("slot") or "").strip()
-        qty = len([s for s in slots.split(",") if s.strip()]) or 1
+        slots = [x.strip() for x in
+                 (el.findtext("slots") or el.findtext("slot") or "").split(",")
+                 if x.strip()]
+        qty = len(slots) or 1
 
         # the <name> is a filename; the queue label reads better without it
         label = name.rsplit(".", 1)[0] if "." in name else name
 
         cards.append({
             "name": label,
+            # The slot is the only thing in the file that is unique per entry:
+            # <name> is just the card name, so an order with three different
+            # Islands repeats "Island.png" three times. Callers must fold this
+            # into the download filename or those three overwrite each other.
+            "slot": slots[0] if slots else "",
             "qty": qty,
             "source": "MPC order",
             "dpi": 0,

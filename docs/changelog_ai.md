@@ -2,6 +2,16 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.1 (unreleased) — cards no longer vanish on repeated names
+- **An MPC order with the same card twice lost all but one copy.** The download
+  filename came from the card name alone, so an order with 2 Plains, 3 Islands
+  and 2 Arcane Signets wrote 85 files instead of 89 — and the survivors were
+  the wrong art. The order's slot number is now part of the name. Reported on a
+  real 89-card order.
+- The card gallery had the same flaw: two Yu-Gi-Oh artworks from one set, or
+  two MPC arts by one contributor, shared a filename and one replaced the
+  other. Picks now carry the catalogue's own id.
+
 ## v2.17.0 — help, more import routes, tokens, bigger paper
 
 ### Help: FAQ and About
