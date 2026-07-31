@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.1 (unreleased) — cards no longer vanish on repeated names
+## v2.17.1 — cards no longer vanish on repeated names
 - **An MPC order with the same card twice lost all but one copy.** The download
   filename came from the card name alone, so an order with 2 Plains, 3 Islands
   and 2 Arcane Signets wrote 85 files instead of 89 — and the survivors were
