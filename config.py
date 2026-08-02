@@ -112,8 +112,57 @@ CARD_SIZES = {
 CARD_SIZE_DEFAULT = "MTG / Pokémon (63×88 mm)"
 
 
+# One user-defined size, stored in settings as [w_mm, h_mm]. Everything
+# downstream reads card_size_mm/card_size_px, so teaching those two about it is
+# enough — the upscaler, the sheet builder and the preview all follow.
+CUSTOM_SIZE_EDIT = "Custom size…"       # picker entry that opens the editor
+CUSTOM_SIZE_PREFIX = "Custom ("         # how a saved one is labelled
+
+CUSTOM_SIZE_MIN_MM = 20.0
+CUSTOM_SIZE_MAX_MM = 200.0
+
+
+def custom_card_size():
+    """The saved custom size as (w_mm, h_mm), or None."""
+    v = load_settings().get("custom_card_size")
+    try:
+        w, h = float(v[0]), float(v[1])
+    except (TypeError, ValueError, IndexError, KeyError):
+        return None
+    if not (CUSTOM_SIZE_MIN_MM <= w <= CUSTOM_SIZE_MAX_MM
+            and CUSTOM_SIZE_MIN_MM <= h <= CUSTOM_SIZE_MAX_MM):
+        return None
+    return w, h
+
+
+def custom_card_label():
+    c = custom_card_size()
+    return f"{CUSTOM_SIZE_PREFIX}{c[0]:g}×{c[1]:g} mm)" if c else None
+
+
+def save_custom_card_size(w_mm, h_mm):
+    s = load_settings()
+    s["custom_card_size"] = [round(float(w_mm), 2), round(float(h_mm), 2)]
+    save_settings(s)
+    return custom_card_label()
+
+
+def card_size_options():
+    """Picker values: the built-ins, the saved custom if any, then the editor."""
+    names = list(CARD_SIZES)
+    label = custom_card_label()
+    if label:
+        names.append(label)
+    names.append(CUSTOM_SIZE_EDIT)
+    return names
+
+
 def card_size_mm(name=None):
     """(width_mm, height_mm) of the chosen card size."""
+    if name and name.startswith(CUSTOM_SIZE_PREFIX):
+        custom = custom_card_size()
+        if custom:
+            return custom
     return CARD_SIZES.get(name or CARD_SIZE_DEFAULT, CARD_SIZES[CARD_SIZE_DEFAULT])
 
 

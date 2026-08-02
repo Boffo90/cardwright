@@ -64,8 +64,8 @@ The preview is a workspace, not a picture — what you see is what prints.
 - Layouts: **3×3 portrait**, **4×2 landscape**, **7-card Silhouette**, plus
   **3×4** and **4×4** for the bigger sheets — A3 and Tabloid fit 16 cards.
 - Card sizes: **MTG / Pokémon (63×88)**, **Yu-Gi-Oh (59×86)**, mini (44×68),
-  tarot (70×120). Pokémon cards are the same size as Magic cards, so they
-  work as-is.
+  tarot (70×120), plus **any custom size** you enter in mm. Pokémon cards are
+  the same size as Magic cards, so they work as-is.
 - Pages: **A4, Letter, A3, Legal, Tabloid, A5**. Lossless or JPEG PDF, split
   into one file per N pages.
 - Cut guides with adjustable style (cross or corner crop marks), length,

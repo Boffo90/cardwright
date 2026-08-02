@@ -33,6 +33,12 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden — in a manual picker the user can see the thumbnail and judge.
 
+## Custom card size (v2.17.3)
+**One** user-defined size, stored in settings as `custom_card_size: [w, h]`. Everything downstream already went through `card_size_mm` / `card_size_px`, so teaching those two about it was the whole change — the upscaler, the sheet builder and the preview followed for free.
+- A managed list of named sizes was considered and skipped: the request was "can I set my own", and a list is a lot of interface for a need nobody has described. Revisit if someone asks for two at once.
+- Clamped to 20-200 mm a side, and an out-of-range or malformed value reads back as `None` so a corrupt settings file degrades to the default rather than exporting something absurd.
+- The picker carries the saved size **and** a `Custom size…` editor entry. Cancelling the editor restores the previous selection — never leave the picker displaying the editor entry as though it were a size.
+
 ## Import routes (v2.17.0)
 - **Gatherer decklist import** resolves through Scryfall as usual (set + collector number) and then queues a *reference*, not a download — `scryfall.fetch` pulls the Gatherer image and converts its webp.
 - **Cards Gatherer lacks fall back to the Scryfall image, they are not dropped.** Gatherer has no entry for Secret Lairs, promos, or **any foil printing**: Scryfall numbers foils with a star (`198` nonfoil vs `198★` foil, verified on 40K — the starred one has `finishes: ['foil']` and an empty `multiverse_ids`) because Gatherer never catalogued foils separately. A real import rejected 24 of 100 cards this way before the fallback existed. Reported as a substitution, not a failure — info popup and neutral status, the same treatment as the language fallback.

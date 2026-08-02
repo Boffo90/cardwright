@@ -55,6 +55,12 @@ from config import (
     BACKS_MODES,
     CARD_SIZES,
     CARD_SIZE_DEFAULT,
+    CUSTOM_SIZE_EDIT,
+    CUSTOM_SIZE_MIN_MM,
+    CUSTOM_SIZE_MAX_MM,
+    card_size_options,
+    custom_card_size,
+    save_custom_card_size,
     CARD_LANGS,
     CARD_LANG_DEFAULT,
     BEST_SCAN_DEFAULT,
@@ -527,7 +533,7 @@ class App(_Root):
         # Card size drives what fit-to-card resizes to, so it lives here and
         # not only in Export — a Yu-Gi-Oh card forced into Magic proportions
         # comes out stretched.
-        self.card_size_menu = field("Card size", 0, 1, list(CARD_SIZES.keys()),
+        self.card_size_menu = field("Card size", 0, 1, card_size_options(),
                                     command=self._persist_card_size)
         self.card_size_menu.set(
             load_settings().get("card_size", CARD_SIZE_DEFAULT))
@@ -726,6 +732,15 @@ class App(_Root):
 
     def _persist_card_size(self, name):
         """Card size is one setting shared with the Export dialog."""
+        if name == CUSTOM_SIZE_EDIT:
+            label = ask_custom_card_size(self)
+            # Cancelled: fall back to whatever was selected before, never
+            # leave the picker showing the editor entry as if it were a size.
+            name = label or load_settings().get("card_size", CARD_SIZE_DEFAULT)
+            self.card_size_menu.configure(values=card_size_options())
+            self.card_size_menu.set(name)
+            if not label:
+                return
         s = load_settings()
         s["card_size"] = name
         save_settings(s)
@@ -1380,8 +1395,9 @@ class ExportDialog(ctk.CTkToplevel):
                           command=_c).pack(side="left", padx=(6, 0))
 
         tab("Layout")
-        self.card_size = row("Card size", list(CARD_SIZES.keys()),
+        self.card_size = row("Card size", card_size_options(),
                              s.get("card_size", CARD_SIZE_DEFAULT))
+        self.card_size.configure(command=self._pick_card_size)
         self.layout = row("Card grid", list(print_sheet.LAYOUTS.keys()),
                           s.get("layout", print_sheet.DEFAULT_LAYOUT))
         self.page = row("Page size", PDF_PAGE_SIZES,
@@ -1686,6 +1702,17 @@ class ExportDialog(ctk.CTkToplevel):
 
     def _corner_radius(self):
         return self._float(self.corner_radius, 0.0, 0.0, 6.0)
+
+    def _pick_card_size(self, name):
+        """Same editor as the main window, so either place can define one."""
+        if name != CUSTOM_SIZE_EDIT:
+            self._refresh_preview()
+            return
+        label = ask_custom_card_size(self)
+        self.card_size.configure(values=card_size_options())
+        self.card_size.set(label or load_settings().get("card_size",
+                                                        CARD_SIZE_DEFAULT))
+        self._refresh_preview()
 
     def _card_mm(self):
         return card_size_mm(self.card_size.get())
@@ -3172,6 +3199,15 @@ FAQ = [
      "inset that keeps them all. The floor is 3.5 mm - below that most inkjets "
      "cannot print, and the mark is simply clipped off."),
 
+    ("Can I print a card size that is not in the list?",
+     "Yes. Pick \"Custom size...\" in the Card size dropdown and enter the "
+     "printed width and height in millimetres, 20-200 mm a side. It is "
+     "remembered and appears in the list from then on.\n\n"
+     "The size drives the upscale target as well as the sheet, so set it "
+     "before running the cards, not after. If the grid you picked will not "
+     "fit on the page at that size, the export says so - use a bigger paper "
+     "or a smaller grid."),
+
     ("Which paper and layout should I use with a cutting machine?",
      "On A4, the 4x2 landscape and 7-card Silhouette layouts keep every slot "
      "at the default mark geometry. They are the safest pairings.\n\n"
@@ -3375,3 +3411,84 @@ class HelpDialog(ctk.CTkToplevel):
 
         para("Intended for personal playtesting. What you do with the output "
              "is your responsibility.", muted=True, pad=(10, 12))
+
+
+def ask_custom_card_size(master):
+    """Ask for a card size in mm. Returns the new picker label, or None.
+
+    One saved size rather than a list: the ask was "can I set my own", and a
+    managed list of named sizes is a lot of interface for a need nobody has
+    described yet.
+    """
+    current = custom_card_size() or (63.0, 88.0)
+
+    win = ctk.CTkToplevel(master)
+    win.title("Custom card size")
+    win.geometry("360x210")
+    win.transient(master)
+    win.configure(fg_color=BG)
+    win.resizable(False, False)
+    win.after(60, win.grab_set)
+
+    ctk.CTkLabel(win, text="Card size in millimetres",
+                 font=(UI, theme.TYPE["body"], "bold"),
+                 text_color=TEXT).pack(anchor="w", padx=20, pady=(16, 2))
+    ctk.CTkLabel(win, text=f"The printed size of one card, "
+                           f"{CUSTOM_SIZE_MIN_MM:g}-{CUSTOM_SIZE_MAX_MM:g} mm "
+                           f"a side.",
+                 font=(UI, theme.TYPE["small"]), text_color=MUTED,
+                 justify="left", wraplength=310).pack(anchor="w", padx=20)
+
+    row = ctk.CTkFrame(win, fg_color="transparent")
+    row.pack(anchor="w", padx=20, pady=(12, 0))
+
+    def field(label, value):
+        ctk.CTkLabel(row, text=label, font=(UI, theme.TYPE["small"]),
+                     text_color=TEXT_DIM).pack(side="left", padx=(0, 6))
+        e = ctk.CTkEntry(row, width=76, height=theme.H_INPUT,
+                         fg_color=SURFACE_INPUT, border_color=BORDER_STRONG,
+                         corner_radius=theme.RADIUS_SM,
+                         font=(UI, theme.TYPE["body"]), text_color=TEXT)
+        e.insert(0, f"{value:g}")
+        e.pack(side="left", padx=(0, 16))
+        return e
+
+    w_entry = field("Width", current[0])
+    h_entry = field("Height", current[1])
+
+    err = ctk.CTkLabel(win, text="", font=(UI, theme.TYPE["small"]),
+                       text_color="#fca5a5", justify="left", wraplength=310)
+    err.pack(anchor="w", padx=20, pady=(6, 0))
+
+    result = {}
+
+    def save():
+        try:
+            w = float(w_entry.get().replace(",", "."))
+            h = float(h_entry.get().replace(",", "."))
+        except ValueError:
+            err.configure(text="Both values have to be numbers.")
+            return
+        lo, hi = CUSTOM_SIZE_MIN_MM, CUSTOM_SIZE_MAX_MM
+        if not (lo <= w <= hi and lo <= h <= hi):
+            err.configure(text=f"Keep each side between {lo:g} and {hi:g} mm.")
+            return
+        result["label"] = save_custom_card_size(w, h)
+        win.destroy()
+
+    btns = ctk.CTkFrame(win, fg_color="transparent")
+    btns.pack(fill="x", padx=20, pady=(10, 14))
+    ctk.CTkButton(btns, text="Cancel", width=90, height=theme.H_BUTTON,
+                  corner_radius=theme.RADIUS_SM, fg_color=CONTROL_ALT,
+                  hover_color=GRAY_HOVER, text_color=TEXT,
+                  command=win.destroy).pack(side="right", padx=(8, 0))
+    ctk.CTkButton(btns, text="Save", width=90, height=theme.H_BUTTON,
+                  corner_radius=theme.RADIUS_SM, fg_color=GOLD,
+                  hover_color=GOLD_HOVER, text_color=GOLD_TEXT,
+                  font=(UI, theme.TYPE["body"], "bold"),
+                  command=save).pack(side="right")
+
+    w_entry.bind("<Return>", lambda _: save())
+    h_entry.bind("<Return>", lambda _: save())
+    master.wait_window(win)
+    return result.get("label")

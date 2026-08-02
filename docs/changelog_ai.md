@@ -2,7 +2,18 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.3 (unreleased) — honest progress when exporting some sheets
+## v2.17.3 (unreleased) — custom card sizes
+
+### Custom card sizes
+- **"Custom size…"** in the Card size dropdown takes a width and height in mm
+  (20-200 a side), remembers it, and lists it from then on. Requested on
+  r/mtgproxies.
+- It drives the upscale target as well as the sheet, since everything reads
+  `card_size_mm` / `card_size_px`. Verified end to end at 63.5×88.9 on A4 3×3,
+  70×120 on A3 4×2 and 44×68 on A4 4×4.
+- Reachable from the main window and from Export, since both show the picker.
+
+### Fixed
 - Exporting a subset of sheets counted against **every** card in the queue, so
   printing sheet 1 of a 90-card deck read "Placing card 3/90" while only 9 were
   going into the PDF. It now counts what is actually being placed.
