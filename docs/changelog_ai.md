@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.2 (unreleased) — Gatherer imports stop dropping cards
+## v2.17.2 — Gatherer imports stop dropping cards
 - **A Gatherer import no longer rejects cards Gatherer does not carry.** It
   falls back to the Scryfall image and tells you which ones, instead of
   leaving you with an incomplete deck.
