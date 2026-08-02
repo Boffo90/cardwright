@@ -1126,15 +1126,16 @@ class ImportDialog(ctk.CTkToplevel):
                 text = scryfall.fetch_archidekt(text, status_callback=status)
 
             lang = card_lang_code(load_settings().get("card_lang"))
-            cards, not_found, bad, english_only = scryfall.resolve_decklist(
-                text, status_callback=status, lang=lang,
-                tokens=bool(self.tokens_var.get()),
-                source=self.src_menu.get().lower())
-            self.after(0, lambda: self._done(cards, not_found, bad, english_only))
+            cards, not_found, bad, english_only, from_scryfall =                 scryfall.resolve_decklist(
+                    text, status_callback=status, lang=lang,
+                    tokens=bool(self.tokens_var.get()),
+                    source=self.src_menu.get().lower())
+            self.after(0, lambda: self._done(cards, not_found, bad,
+                                             english_only, from_scryfall))
         except Exception as e:
             self.after(0, lambda err=e: self._failed(err))
 
-    def _done(self, cards, not_found, bad, english_only=()):
+    def _done(self, cards, not_found, bad, english_only=(), from_scryfall=()):
         if cards:
             self.on_resolved(cards)
 
@@ -1149,6 +1150,14 @@ class ImportDialog(ctk.CTkToplevel):
             problems.append(
                 "No printing in the selected language (added in English):\n  - "
                 + "\n  - ".join(english_only))
+        if from_scryfall:
+            # Also not a failure. Gatherer has no entry for Secret Lairs,
+            # promos, or any foil printing — Scryfall numbers those with a star
+            # (198★) and gives them no multiverse id — so they come from
+            # Scryfall instead of being dropped.
+            problems.append(
+                "Not on Gatherer, so these came from Scryfall instead:\n  - "
+                + "\n  - ".join(from_scryfall))
 
         # A language fallback is not a failure, so it must not turn the whole
         # import red — it only gets the neutral wording when nothing else
@@ -1162,7 +1171,8 @@ class ImportDialog(ctk.CTkToplevel):
                 title = "Imported with issues"
                 popup = messagebox.showwarning
             else:
-                note = f"{len(english_only)} in English"
+                soft = len(english_only) + len(from_scryfall)
+                note = f"{soft} substituted"
                 colour = MUTED
                 title = "Imported"
                 popup = messagebox.showinfo
@@ -3189,6 +3199,15 @@ FAQ = [
      "Those cards are added in English and listed separately after the import, "
      "so you know which ones rather than wondering why the deck came out "
      "mixed. It is not a failure."),
+
+    ("I imported with Gatherer and some cards came from Scryfall.",
+     "Gatherer has no entry for Secret Lairs, promos, or any foil printing. "
+     "Scryfall numbers foils with a star - 198 is the normal card, 198* is the "
+     "foil - and gives the starred one no Gatherer id, because Gatherer never "
+     "catalogued foils separately.\\n\\n"
+     "Rather than drop those, the import falls back to the Scryfall image and "
+     "lists which ones. You still get the whole deck; only those cards come "
+     "from the other source."),
 
     ("What does Best scan actually do?",
      "When you type a bare card name, it compares that card's printings and "

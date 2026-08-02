@@ -654,7 +654,8 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
     """
     Parse and resolve a decklist.
 
-    Returns (cards, not_found, bad_lines, english_only) where each card is:
+    Returns (cards, not_found, bad_lines, english_only, from_scryfall)
+    where each card is:
         {
           "display":   "3x Plains"  (or just the name),
           "qty":       int,
@@ -691,6 +692,7 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
 
     cards = []
     english_only = []
+    from_scryfall = []
     for i, key in enumerate(order):
         e = seen[key]
         c = resolved.get(key)
@@ -729,17 +731,21 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
             "set": c.get("set"),
         }
         if source == "gatherer":
-            # Gatherer serves webp and only knows cards with a multiverse id,
-            # so these are queued as a reference for scryfall.fetch to resolve
-            # rather than as a direct download.
+            # Gatherer only knows cards with a multiverse id. Plenty do not:
+            # every Secret Lair and promo, and — less obviously — every foil
+            # printing, which Scryfall numbers with a star (198★) and gives no
+            # multiverse id because Gatherer never catalogued foils separately.
+            #
+            # Dropping those left the user with an incomplete deck and a wall
+            # of rejections. They fall back to the Scryfall image instead: the
+            # right card, from the other source, reported rather than silent.
             mids = c.get("multiverse_ids") or []
-            if not mids:
-                not_found.append(
-                    f'{c["name"]} ({c["set"].upper()}) {c["collector_number"]}'
-                    " — not on Gatherer (no multiverse id)")
-                continue
-            entry["ref"] = ("https://gatherer.wizards.com/Pages/Card/"
-                            f"Details.aspx?multiverseid={mids[0]}")
+            if mids:
+                entry["ref"] = ("https://gatherer.wizards.com/Pages/Card/"
+                                f"Details.aspx?multiverseid={mids[0]}")
+            else:
+                from_scryfall.append(
+                    f'{c["name"]} ({c["set"].upper()}) {c["collector_number"]}')
         cards.append(entry)
 
     # Tokens last, so they land after the deck in the queue rather than
@@ -761,7 +767,7 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
                 "set": t.get("set"),
             })
 
-    return cards, not_found, bad, english_only
+    return cards, not_found, bad, english_only, from_scryfall
 
 
 def download_to_temp(basename: str, url: str) -> Path:

@@ -2,6 +2,18 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.2 (unreleased) — Gatherer imports stop dropping cards
+- **A Gatherer import no longer rejects cards Gatherer does not carry.** It
+  falls back to the Scryfall image and tells you which ones, instead of
+  leaving you with an incomplete deck.
+- That was hitting hard: Gatherer has no entry for Secret Lairs, promos, or
+  **any foil printing** — Scryfall numbers foils with a star (`198` vs `198★`)
+  and gives the starred one no Gatherer id. One real 100-card import lost 24
+  cards to this.
+- The substitution is reported the way the language fallback is: an info
+  popup, not the red "issues" path, because it isn't a failure.
+- New FAQ entry explaining the star.
+
 ## v2.17.1 — cards no longer vanish on repeated names
 - **An MPC order with the same card twice lost all but one copy.** The download
   filename came from the card name alone, so an order with 2 Plains, 3 Islands
