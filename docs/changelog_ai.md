@@ -2,6 +2,11 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.3 (unreleased) — honest progress when exporting some sheets
+- Exporting a subset of sheets counted against **every** card in the queue, so
+  printing sheet 1 of a 90-card deck read "Placing card 3/90" while only 9 were
+  going into the PDF. It now counts what is actually being placed.
+
 ## v2.17.2 — Gatherer imports stop dropping cards
 - **A Gatherer import no longer rejects cards Gatherer does not carry.** It
   falls back to the Scryfall image and tells you which ones, instead of

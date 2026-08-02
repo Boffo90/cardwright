@@ -940,6 +940,11 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         batches = [b for i, b in enumerate(batches) if i in sheets_sel]
         if not batches:
             raise ValueError("The selected sheet range has no sheets")
+
+    # Count what will ACTUALLY be placed, not how many cards exist: with a
+    # sheet selection the progress read "card 3/90" while only 9 were going
+    # into the PDF.
+    to_place = sum(len(b) for b in batches)
     if pages_per_file and pages_per_file > 0:
         groups = [batches[i:i + pages_per_file]
                   for i in range(0, len(batches), pages_per_file)]
@@ -992,7 +997,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
             for k, i in enumerate(batch):
                 placed += 1
                 if status_callback:
-                    status_callback(f"Placing card {placed}/{len(images)}…")
+                    status_callback(f"Placing card {placed}/{to_place}…")
                 x, y = usable[k]
                 c.drawImage(ImageReader(str(flat(images[i]))), x, y,
                             card_w, card_h, mask=img_mask)
