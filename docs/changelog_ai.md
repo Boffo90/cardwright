@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.3 (unreleased) — custom card sizes
+## v2.17.3 — custom card sizes
 
 ### Custom card sizes
 - **"Custom size…"** in the Card size dropdown takes a width and height in mm

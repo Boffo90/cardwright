@@ -2,7 +2,7 @@
 
 APP_NAME = "Cardwright"
 
-APP_VERSION = "2.17.2"
+APP_VERSION = "2.17.3"
 
 # GitHub repository used for auto-updates ("owner/repo").
 # Point this at the real repo once it exists; update checks fail silently
