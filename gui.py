@@ -2112,12 +2112,15 @@ class ExportDialog(ctk.CTkToplevel):
                 fix = f" {' or '.join(clean)} keeps every slot on this page."
             else:
                 fix = (" No inset or layout keeps them all on this page — "
-                       "A4 has room.")
+                       "A3, Legal or Tabloid has the margin for it.")
+            n = len(blocked)
+            lost = (f"{n} sits under a corner mark and stays empty "
+                    "(that card moves to the next sheet)" if n == 1 else
+                    f"{n} sit under a corner mark and stay empty "
+                    "(those cards move to the next sheet)")
             self.reg_hint.configure(
                 text=f"⚠ {len(usable)} of {len(all_pos)} slots usable — "
-                     f"{len(blocked)} {'sits' if len(blocked) == 1 else 'sit'} "
-                     f"under a corner mark and stay empty "
-                     f"(those cards move to the next sheet).{fix}",
+                     f"{lost}.{fix}",
                 text_color="#e0b050")
         else:
             shift_note = (" Shift-down is ignored: the cutter aligns to the "
@@ -3192,9 +3195,9 @@ class CardSearchDialog(ctk.CTkToplevel):
 FAQ = [
     ("Registration marks are eating my card slots. Why?",
      "The marks are corner brackets, so what blocks a slot is a mark landing "
-     "on a CORNER card. Moving the marks outward frees them: lowering Mark "
-     "inset from 10 mm to 9.5 mm takes Letter 4x2 from 6 usable cards to 8, "
-     "and A4 3x3 goes from 7 to 9 at 6 mm.\n\n"
+     "on a CORNER card. Moving the marks outward frees them: on A4 3x3, "
+     "lowering Mark inset from 10 mm to 6 mm takes you from 6 usable cards "
+     "back to 9.\n\n"
      "When marks do cost you slots, the hint under the preview names the exact "
      "inset that keeps them all. The floor is 3.5 mm - below that most inkjets "
      "cannot print, and the mark is simply clipped off."),
@@ -3209,8 +3212,14 @@ FAQ = [
      "or a smaller grid."),
 
     ("Which paper and layout should I use with a cutting machine?",
-     "On A4, the 4x2 landscape and 7-card Silhouette layouts keep every slot "
-     "at the default mark geometry. They are the safest pairings.\n\n"
+     "A3 or Tabloid, if your printer takes them. At the default mark geometry "
+     "every layout keeps every slot on those, including 4x4 - sixteen cards a "
+     "sheet with nothing lost to the marks. The bigger margin is what does it: "
+     "the marks stop competing with the card grid.\n\n"
+     "On Legal, 3x3 keeps all nine. On A4, use 4x2 landscape (8) or the 7-card "
+     "Silhouette layout (7) - A4 3x3 drops to 6. On Letter no layout keeps "
+     "every slot at the defaults; lower the mark inset a little and the hint "
+     "under the preview will tell you the value that works.\n\n"
      "The 7-card layout exists for exactly this: it clears both left corners, "
      "where a Cameo's key marks sit."),
 

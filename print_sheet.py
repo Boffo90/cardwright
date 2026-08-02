@@ -661,6 +661,37 @@ def _draw_reg_marks(c, pw, ph, inset_mm, length_mm, thick_mm, four=False):
         c.rect(x0, y0, x1 - x0, y1 - y0, stroke=0, fill=1)
 
 
+def best_inset(page_name, card_w, card_h, layout, length_mm, thick_mm,
+               four=False, start_mm=None):
+    """
+    The LARGEST mark inset that still keeps every slot on this layout, or None
+    if no allowed inset does.
+
+    Largest, not smallest: a mark further from the paper edge is the safer one
+    (more margin before the printer's unprintable border), so the useful advice
+    is the gentlest move that recovers the cards rather than the extreme.
+    """
+    page = PAGES.get(page_name, A4)
+    cols, rows, landscape = LAYOUTS.get(layout, LAYOUTS[DEFAULT_LAYOUT])
+    pw, ph = (page[1], page[0]) if landscape else page
+    bw, bh = cols * card_w, rows * card_h
+    if bw > pw or bh > ph:
+        return None
+    ox, oy = _block_origin(pw, ph, bw, bh, 0.0)
+    pos = layout_positions(layout, ox, oy, bh, 0.0, cols, rows, card_w, card_h)
+
+    top = start_mm if start_mm is not None else REG_INSET_DEFAULT_MM
+    steps = int((top - REG_INSET_MIN_MM) / 0.5)
+    for i in range(steps + 1):
+        inset = round(top - i * 0.5, 2)
+        if inset < REG_INSET_MIN_MM:
+            break
+        if not _reg_blocked_slots(pos, card_w, card_h, pw, ph,
+                                  inset, length_mm, thick_mm, four):
+            return inset
+    return None
+
+
 def clean_layouts(page_name, card_w, card_h, inset_mm, length_mm, thick_mm,
                   four=False):
     """Names of the layouts that keep every slot on this page, marks and all.

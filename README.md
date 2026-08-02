@@ -78,11 +78,13 @@ The preview is a workspace, not a picture — what you see is what prints.
 - Marks follow **Silhouette Studio's own published geometry** (0.394 in inset,
   0.350 in length, 0.039 in thickness), so a sheet lands on a template built
   in Studio.
-- Those marks reach onto the grid, which costs slots on some pairings — A4
-  3×3 fits 7 cards rather than 9. **On A4, the 4×2 and 7-card layouts keep
-  every slot** (8 and 7), so they are the best pairings for machine cutting.
+- Those marks reach onto the grid, so on a small page they cost card slots.
+  **On A3 or Tabloid every layout keeps every slot** — including 4×4, sixteen
+  cards a sheet — which makes them the best pairings for machine cutting.
+  Legal keeps all nine in 3×3; on A4 use 4×2 (8) or the 7-card layout (7).
   If a mark would sit on a card, that slot is left empty and the card moves to
-  the next sheet; a live hint tells you how many are usable.
+  the next sheet, and a live hint names the mark inset that would keep them
+  all.
 - Guides and margin ticks never print inside a mark's clear area, and turning
   guides off removes all of them.
 - **7-card Silhouette layout**: one vertically centred card in the left

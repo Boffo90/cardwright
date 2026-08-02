@@ -2,6 +2,18 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.4 (unreleased) — the export preview stopped drawing
+- **Fixed a crash.** Whenever registration marks cost a card slot — A4 3×3,
+  anything on Letter — the preview raised `AttributeError` and stopped
+  redrawing. `best_inset()` had been deleted by accident along with a
+  neighbouring helper in v2.16.0 while the code calling it stayed. Present in
+  every release from 2.16.0 to 2.17.3.
+- The cutting-machine guidance is current again: **A3 and Tabloid keep every
+  slot in every layout**, 16 cards a sheet at 4×4. Legal keeps all nine in
+  3×3. A4 wants 4×2 or the 7-card layout. The FAQ, the README and the
+  preview hint all said A4 was the best answer, which stopped being true when
+  A3 and the bigger grids arrived in v2.17.0.
+
 ## v2.17.3 — custom card sizes
 
 ### Custom card sizes
