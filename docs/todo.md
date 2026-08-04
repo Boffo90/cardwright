@@ -27,6 +27,13 @@ the top of `gui.py`.
 - **salmetore** was asked whether the 8.89 mm mark length fixed their
   ProxySheets template alignment.
 
+## Print-sheet UX revamp (opened 2026-08-04)
+The export dialog matches or beats the competition on features but not on how it
+feels to use. `ux_audit.md` compares it against Proxxied and proxy-print,
+prioritises the twelve real gaps and concludes that Tier 1 and Tier 2 are all
+reachable in CustomTkinter — a Qt rewrite is not justified yet. **Start with the
+`_copy_of` file-per-duplicate model**, which blocks a proper quantity control.
+
 ## Next up (nothing blocking)
 From the July 2026 comparison against Proxy-PDF-Maker, fabricard.net and
 silhouette-card-maker. Tier 1 was done in v2.17.0; these are what was ranked
