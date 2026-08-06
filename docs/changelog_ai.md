@@ -2,7 +2,29 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.4 (unreleased) — duplex cut guides, and copies stop being files
+## v2.17.4 — duplex cut guides, and copies stop being files
+
+### Cutting
+- **Duplex offset now moves the cut guides with the cards.** Setting a back
+  offset shifted the back page's cards but left its guides on the front's
+  grid, so they missed the cards by exactly the drift the offset was
+  correcting — cutting the back by them came out crooked. Back rotation had
+  the same fault. Cards and guides are now drawn under one transform, the way
+  the duplex test sheet already did it. Registration marks stay square to the
+  page on purpose: the cutter's sensor hunts for them at a fixed inset.
+- **The preview's Backs view shows the offset and rotation too.** It used to
+  draw backs on the unshifted grid, which is why a wrong offset only turned up
+  at the cut. The sheet caption now names the correction in force — "backs,
+  mirrored · offset +4/−3 mm" — so a crooked preview reads as a crooked
+  setting rather than a broken preview. Hover, the loupe and right-click
+  follow the moved cards.
+
+### Fixed
+- **A crash in the preview.** Whenever registration marks cost a card slot —
+  A4 3×3, anything on Letter — the preview raised `AttributeError` and stopped
+  redrawing. `best_inset()` had been deleted by accident along with a
+  neighbouring helper in v2.16.0 while the code calling it stayed. Present in
+  every release from 2.16.0 to 2.17.3.
 - **Pasted Gatherer links stop failing on two whole classes of card.** Two
   separate faults, both ending in "Could not find a Gatherer image id":
   - **Gatherer's set codes are not Scryfall's.** Urza's Saga is `UZ` on
@@ -21,6 +43,7 @@ Registro por versión. Actualizar en cada release.
 
   A link only fails now when neither site recognises the card at all.
 
+### Copies
 - **A copy of a card is no longer a file on disk.** Quantity wrote one PNG per
   copy — a 4-of left four identical images in the output folder, and
   *Duplicate* in the preview wrote another every time it was used. Copies are
@@ -34,30 +57,13 @@ Registro por versión. Actualizar en cada release.
 - Deleting a card's file from the output folder now removes every copy of it
   from the sheet, and says so before asking, instead of leaving copies behind
   pointing at a file that is gone.
+
+### Docs
 - **New FAQ entry: "insufficient memory" on the printer.** Reported on
   r/mtgproxies with a Brother 3240 CDW, which has 128 MB against a ~217 MB
   lossless sheet. The answer is Adobe Reader's *Print as Image*, with the
   warning that its resolution dropdown defaults to 300 dpi — leaving it there
   rasterises away the 1200 DPI the app exists to produce.
-
-- **Duplex offset now moves the cut guides with the cards.** Setting a back
-  offset shifted the back page's cards but left its guides on the front's
-  grid, so they missed the cards by exactly the drift the offset was
-  correcting — cutting the back by them came out crooked. Back rotation had
-  the same fault. Cards and guides are now drawn under one transform, the way
-  the duplex test sheet already did it. Registration marks stay square to the
-  page on purpose: the cutter's sensor hunts for them at a fixed inset.
-- **The preview's Backs view shows the offset and rotation too.** It used to
-  draw backs on the unshifted grid, which is why a wrong offset only turned up
-  at the cut. The sheet caption now names the correction in force — "backs,
-  mirrored · offset +4/−3 mm" — so a crooked preview reads as a crooked
-  setting rather than a broken preview. Hover, the loupe and right-click
-  follow the moved cards.
-- **Fixed a crash.** Whenever registration marks cost a card slot — A4 3×3,
-  anything on Letter — the preview raised `AttributeError` and stopped
-  redrawing. `best_inset()` had been deleted by accident along with a
-  neighbouring helper in v2.16.0 while the code calling it stayed. Present in
-  every release from 2.16.0 to 2.17.3.
 - The cutting-machine guidance is current again: **A3 and Tabloid keep every
   slot in every layout**, 16 cards a sheet at 4×4. Legal keeps all nine in
   3×3. A4 wants 4×2 or the 7-card layout. The FAQ, the README and the
