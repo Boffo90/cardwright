@@ -2039,6 +2039,12 @@ class ExportDialog(ctk.CTkToplevel):
         showing_backs = duplex and self.side_btn.get() == "Backs"
         self._showing_backs = showing_backs
         page_items = backs if showing_backs else fronts
+        # A back page prints offset and rotated to cancel duplex drift. Showing
+        # it square was how a wrong offset stayed invisible until the cut.
+        # The PDF's y runs up and the preview's runs down, so dy flips.
+        boff = self._offsets() if showing_backs else (0.0, 0.0)
+        brot = self._back_rot() if showing_backs else 0.0
+        bdx, bdy = boff[0], -boff[1]
         eb = self._edge_bleed()
         g = 2 * eb
         bw = cols * CW + (cols - 1) * g
@@ -2132,7 +2138,15 @@ class ExportDialog(ctk.CTkToplevel):
         def render_sheet(page):
             """One sheet as a (W,H) image plus its local card hit-boxes."""
             img = PILImage.new("RGB", (W, H), (255, 255, 255))
-            d = PILDraw.Draw(img)
+            # Cards and cut guides move together: the offset is what makes the
+            # back's ink land where the front's did, so a guide left behind
+            # would mark a cut that is not there. Composing them on their own
+            # layer moves the lot as one, the way the PDF's transform does.
+            # Registration marks and the page edge are drawn on `img` after,
+            # because those stay square to the paper.
+            moved = showing_backs and (bdx or bdy or brot)
+            surf = PILImage.new("RGBA", (W, H), (0, 0, 0, 0)) if moved else img
+            d = PILDraw.Draw(surf)
             slots = []
             for k, (px, py) in enumerate(usable):
                 slot = page * per_sheet + k
@@ -2155,11 +2169,11 @@ class ExportDialog(ctk.CTkToplevel):
                 else:
                     t = None
                 if t:
-                    img.paste(t.resize((cw, ch)), (X(x), X(y)), corner_mask)
+                    surf.paste(t.resize((cw, ch)), (X(x), X(y)), corner_mask)
                     slots.append((X(x), X(y), X(x + CW), X(y + CH), key))
                     if key in self._excluded:
                         ov = PILImage.new("RGBA", (cw, ch), (20, 20, 25, 150))
-                        img.paste(ov, (X(x), X(y)), ov)
+                        surf.paste(ov, (X(x), X(y)), ov)
                         d.line([X(x), X(y), X(x + CW), X(y + CH)],
                                fill=(220, 70, 70), width=3)
                         d.line([X(x + CW), X(y), X(x), X(y + CH)],
@@ -2209,6 +2223,12 @@ class ExportDialog(ctk.CTkToplevel):
                 d.line([X(left - 5), X(y), X(left - 1), X(y)], fill=(120, 125, 135))
                 d.line([X(left + bw + 1), X(y), X(left + bw + 5), X(y)],
                        fill=(120, 125, 135))
+            if moved:
+                if brot:
+                    surf = surf.rotate(brot, resample=PILImage.BICUBIC,
+                                       center=(W / 2, H / 2))
+                img.paste(surf, (X(bdx), X(bdy)), surf)
+                d = PILDraw.Draw(img)
             if reg_on:
                 # same rects the PDF draws, converted from points back to mm
                 rects, _ = print_sheet._reg_geometry(
@@ -2226,7 +2246,15 @@ class ExportDialog(ctk.CTkToplevel):
         # are all computed here for drag / loupe / right-click.
         gap = self._SHEET_GAP
         total_h = sheets * H + (sheets + 1) * gap
-        side = "backs, mirrored" if showing_backs else "fronts"
+        side = "fronts"
+        if showing_backs:
+            # name the correction on the caption: it is the difference between
+            # "the preview looks crooked" and "my offset is crooked"
+            side = "backs, mirrored"
+            if boff[0] or boff[1]:
+                side += f" · offset {boff[0]:+g}/{boff[1]:+g} mm"
+            if brot:
+                side += f" · rotated {brot:+g}°"
         self._sheet_tops = [gap + p * (H + gap) for p in range(sheets)]
 
         self._slots = []
@@ -2239,8 +2267,11 @@ class ExportDialog(ctk.CTkToplevel):
                 item = page_items[slot]
                 if not item:
                     continue
-                x = print_sheet.mirror_x(px, left, bw, CW) if showing_backs else px
-                y = ph - py - CH
+                # the hit-box follows the drawn card, so hover and right-click
+                # keep landing on an offset back page
+                x = (print_sheet.mirror_x(px, left, bw, CW) + bdx
+                     if showing_backs else px)
+                y = ph - py - CH + bdy
                 self._slots.append((X(x), st + X(y),
                                     X(x + CW), st + X(y + CH), str(item)))
 

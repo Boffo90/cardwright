@@ -2,7 +2,20 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.4 (unreleased) — the export preview stopped drawing
+## v2.17.4 (unreleased) — duplex cut guides, and the export preview
+- **Duplex offset now moves the cut guides with the cards.** Setting a back
+  offset shifted the back page's cards but left its guides on the front's
+  grid, so they missed the cards by exactly the drift the offset was
+  correcting — cutting the back by them came out crooked. Back rotation had
+  the same fault. Cards and guides are now drawn under one transform, the way
+  the duplex test sheet already did it. Registration marks stay square to the
+  page on purpose: the cutter's sensor hunts for them at a fixed inset.
+- **The preview's Backs view shows the offset and rotation too.** It used to
+  draw backs on the unshifted grid, which is why a wrong offset only turned up
+  at the cut. The sheet caption now names the correction in force — "backs,
+  mirrored · offset +4/−3 mm" — so a crooked preview reads as a crooked
+  setting rather than a broken preview. Hover, the loupe and right-click
+  follow the moved cards.
 - **Fixed a crash.** Whenever registration marks cost a card slot — A4 3×3,
   anything on Letter — the preview raised `AttributeError` and stopped
   redrawing. `best_inset()` had been deleted by accident along with a

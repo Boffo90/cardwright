@@ -871,7 +871,9 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     column-mirrored back page for duplex printing
                     (flip on long edge).
     back_offset:    (dx_mm, dy_mm) shift applied to the back pages only, to
-                    compensate the printer's duplex misalignment.
+                    compensate the printer's duplex misalignment. The back's
+                    cut guides move with its cards — they mark where those
+                    cards will be, not where the fronts are.
     back_bleed_mm:  backs are drawn oversized by this much on every edge, so
                     duplex drift up to ~that amount never exposes a white
                     sliver when cutting along the FRONT's marks.
@@ -952,6 +954,12 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     if reg_marks:
         _, reg_clear = _reg_geometry(pw, ph, reg_inset_mm, reg_length_mm,
                                      reg_thick_mm, reg_four)
+
+    # The back page draws its guides inside the offset transform (below), so
+    # the keep-clear boxes — which are page coordinates — have to be restated
+    # in that frame or the shift would walk a guide into a mark.
+    back_clear = tuple((x0 - dx, y0 - dy, x1 - dx, y1 - dy)
+                       for x0, y0, x1, y1 in reg_clear)
 
     blocked = _reg_blocked_slots(
         all_pos, card_w, card_h, pw, ph, reg_inset_mm, reg_length_mm,
@@ -1046,23 +1054,31 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 c.saveState()
                 if back_rotation_deg:
                     # rotate the whole back layout about the page centre to
-                    # cancel angular duplex drift (marks stay put, drawn after)
+                    # cancel angular duplex drift. Registration marks are the
+                    # one thing left square to the page — the cutter's sensor
+                    # hunts for them at a fixed inset.
                     c.translate(pw / 2, ph / 2)
                     c.rotate(back_rotation_deg)
                     c.translate(-pw / 2, -ph / 2)
+                # The offset moves the cards AND their cut guides together. A
+                # guide left on the front's grid is a guide the scissors follow
+                # to the wrong place: the whole point of the offset is that the
+                # back's ink lands somewhere else on the paper, so a guide that
+                # does not carry it is off by exactly the drift being corrected.
+                c.translate(dx, dy)
                 for k, i in enumerate(batch):
                     x, y = usable[k]
                     x = mirror_x(x, ox, block_w, card_w)
                     # oversized by the bleed on every edge: small duplex
                     # drift stays covered when cutting along the front
                     c.drawImage(ImageReader(str(flat(backs[i]))),
-                                x + dx - bleed, y + dy - bleed,
+                                x - bleed, y - bleed,
                                 card_w + 2 * bleed, card_h + 2 * bleed,
                                 mask=img_mask)
-                c.restoreState()
                 _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
                             cols, rows, guide_len_mm, guide_thick, guide_style,
-                            guide_offset_mm, card_w, card_h, reg_clear)
+                            guide_offset_mm, card_w, card_h, back_clear)
+                c.restoreState()
                 if reg_marks:
                     _draw_reg_marks(c, pw, ph, reg_inset_mm, reg_length_mm,
                                     reg_thick_mm, reg_four)
