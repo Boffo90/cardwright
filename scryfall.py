@@ -440,7 +440,9 @@ _GATHERER_LOCALES = {
 
 
 def _gatherer_parse(ref: str):
-    """Returns {'mid': int} or {'set','number','lang'} for Gatherer URLs."""
+    """Returns {'mid': int} or {'set','number','lang','name'} for Gatherer
+    URLs. The trailing name slug is kept because it is the only part of a
+    new-style link Scryfall is guaranteed to understand — see _fetch_gatherer."""
     if "gatherer.wizards.com" not in ref.lower():
         return None
 
@@ -449,21 +451,55 @@ def _gatherer_parse(ref: str):
         return {"mid": int(m.group(1))}
 
     m = re.search(
-        r"gatherer\.wizards\.com/([^/?#]+)/([^/?#]+)/([^/?#]+)", ref, re.I)
+        r"gatherer\.wizards\.com/([^/?#]+)/([^/?#]+)/([^/?#]+)(?:/([^/?#]+))?",
+        ref, re.I)
     if m and m.group(1).lower() not in ("pages", "handlers"):
-        setcode, locale, number = m.groups()
+        setcode, locale, number, slug = m.groups()
         lang = _GATHERER_LOCALES.get(locale.lower(), locale.lower()[:2])
-        return {"set": setcode.lower(), "number": number, "lang": lang}
+        return {"set": setcode.lower(), "number": number, "lang": lang,
+                "name": (slug or "").replace("-", " ").strip()}
 
     return None
 
 
+def _printing_by_name(name: str, number=None, lang=None, status_callback=None):
+    """Resolve a card by name, preferring the printing with `number`.
+
+    Fuzzy, deliberately: the name comes out of a URL slug, so apostrophes and
+    commas are already gone ("tyvars-stand" -> "Tyvar's Stand").
+    """
+    if status_callback:
+        status_callback("Set code not on Scryfall — looking up by name...")
+    r = _get(f"{SCRYFALL_API}/cards/named", params={"fuzzy": name})
+    if r.status_code != 200:
+        return None
+    card = r.json()
+
+    if number:
+        prints = card.get("prints_search_uri")
+        if prints:
+            pr = _get(prints)
+            if pr.status_code == 200:
+                for c in pr.json().get("data", []):
+                    if str(c.get("collector_number")) == str(number):
+                        card = c
+                        break
+
+    if lang and lang != "en":
+        card, _ = _localize(card, lang)
+    return card
+
+
 def _fetch_gatherer(g: dict, status_callback=None):
     """
-    A Gatherer link always yields the GATHERER image — that is the whole
-    point of pasting one. Scryfall is consulted only for the multiverse id
-    (needed to fetch the image) and for naming / Auto-mode metadata; its
-    own image is never used here.
+    A Gatherer link yields the GATHERER image where one exists — that is the
+    whole point of pasting one. Scryfall is consulted for the multiverse id
+    (needed to fetch the image) and for naming / Auto-mode metadata.
+
+    Where Gatherer has no image, Scryfall's is served instead rather than
+    refusing the card: Gatherer never catalogued Secret Lairs, promos or foil
+    printings, so a link to one has no multiverse id behind it. That is the
+    same policy the decklist import already follows.
     """
     if status_callback:
         status_callback("Resolving Gatherer link...")
@@ -483,13 +519,25 @@ def _fetch_gatherer(g: dict, status_callback=None):
         r = _get(url)
         if r.status_code == 200:
             card = r.json()
+        elif g.get("name"):
+            # Gatherer's set abbreviations are its own and do not always match
+            # Scryfall's: Urza's Saga is UZ on Gatherer and usg on Scryfall, so
+            # set+number never resolves. The card name is in the link too, and
+            # it is the part both sites agree on.
+            card = _printing_by_name(g["name"], g.get("number"), g.get("lang"),
+                                     status_callback)
+        if card:
             mids = card.get("multiverse_ids") or []
             mid = mids[0] if mids else None
 
     if mid is None:
+        if card:
+            if status_callback:
+                status_callback("Not on Gatherer — using the Scryfall image...")
+            return _download_card(card, status_callback)
         raise ScryfallError(
-            "Could not find a Gatherer image id for that link "
-            "(the card may not be on Gatherer).")
+            "Could not find that card from the Gatherer link — neither "
+            "Gatherer nor Scryfall recognises it.")
 
     if card:
         base = f"{_slug(card['name'])}-{card.get('set','')}-{card.get('collector_number','')}"
@@ -500,7 +548,16 @@ def _fetch_gatherer(g: dict, status_callback=None):
         base = f"gatherer-{mid}"
         meta = {"released_at": None, "set": None}
 
-    return _gatherer_image(mid, base, status_callback), meta
+    try:
+        return _gatherer_image(mid, base, status_callback), meta
+    except ScryfallError:
+        # the id resolved but the handler served no image; if Scryfall knows
+        # the card, that beats handing back an error
+        if card is None:
+            raise
+        if status_callback:
+            status_callback("Gatherer has no image — using Scryfall's...")
+        return _download_card(card, status_callback)
 
 
 def _gatherer_image(mid: int, base: str, status_callback=None) -> list[Path]:

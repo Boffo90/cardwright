@@ -3,6 +3,24 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.4 (unreleased) — duplex cut guides, and copies stop being files
+- **Pasted Gatherer links stop failing on two whole classes of card.** Two
+  separate faults, both ending in "Could not find a Gatherer image id":
+  - **Gatherer's set codes are not Scryfall's.** Urza's Saga is `UZ` on
+    Gatherer and `usg` on Scryfall, so `/cards/uz/291` 404'd for Copper
+    Gnomes — a card both sites have. New-style links carry the card's name
+    slug too, and that is the part they agree on, so it is now the fallback
+    lookup: name, then the printing whose collector number matches. Verified
+    on `UZ/en-us/291/copper-gnomes`, which resolves to usg/291 and downloads
+    the Gatherer image as intended.
+  - **No multiverse id was still fatal here.** The decklist import learned to
+    fall back to the Scryfall image in v2.17.1, but a link pasted straight
+    into the box still raised. Secret Lairs, promos and foils have no
+    Gatherer entry, so `SOC/en-us/291/tyvars-stand` simply failed. It now
+    serves the Scryfall image, as the import does. Same for a link whose id
+    resolves but whose image Gatherer will not serve.
+
+  A link only fails now when neither site recognises the card at all.
+
 - **A copy of a card is no longer a file on disk.** Quantity wrote one PNG per
   copy — a 4-of left four identical images in the output folder, and
   *Duplicate* in the preview wrote another every time it was used. Copies are
