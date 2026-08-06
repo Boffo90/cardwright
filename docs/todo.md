@@ -31,8 +31,12 @@ the top of `gui.py`.
 The export dialog matches or beats the competition on features but not on how it
 feels to use. `ux_audit.md` compares it against Proxxied and proxy-print,
 prioritises the twelve real gaps and concludes that Tier 1 and Tier 2 are all
-reachable in CustomTkinter — a Qt rewrite is not justified yet. **Start with the
-`_copy_of` file-per-duplicate model**, which blocks a proper quantity control.
+reachable in CustomTkinter — a Qt rewrite is not justified yet.
+
+The file-per-copy model is **done** (v2.17.4): copies are instances sharing an
+image, so a quantity control is now just a number. Next from Tier 1: undo/redo,
+a drop indicator with droppable empty slots, dragging between sheets, and
+changing a card's art without leaving the dialog.
 
 ## Next up (nothing blocking)
 From the July 2026 comparison against Proxy-PDF-Maker, fabricard.net and

@@ -115,7 +115,12 @@ Revisit PySide6 only if something on that list actually proves impossible — th
 would be a decision made on evidence instead of on feel, and the backend
 (`print_sheet.py`, `upscale.py`, the source modules) is untouched either way.
 
-## One thing to fix first
-`_copy_of` (`gui.py:2594`) writes a real PNG per duplicate. A quantity control
-would multiply output-folder clutter by the deck size. Convert copies to a count
-carried in `_order` before building anything on top of duplication.
+## One thing to fix first — done in v2.17.4
+`_copy_of` wrote a real PNG per duplicate, and the queue's quantity wrote one
+per copy, so a 4-of cost four identical files. Copies are now `_Card` instances
+sharing one path: identity for the copy, path for the image. `_copy_of` is gone.
+Quantity is a number now, so Tier 1's per-card quantity control has nothing left
+in its way.
+
+One consequence to keep in mind: border treatment is per **image**, not per
+copy, because `build_pdf`'s `border_modes` is keyed by path and always was.

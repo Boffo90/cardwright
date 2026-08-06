@@ -1,7 +1,6 @@
 import io
 import os
 import re
-import shutil
 import threading
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -928,12 +927,11 @@ class App(_Root):
                 status_callback=lambda s, it=item: self._ui(
                     it.set_status, "processing", s),
             ))
-            item.outputs.append(out)
-            # one output file per requested copy (upscale once, copy)
-            for n in range(2, item.qty + 1):
-                copy = out.with_name(f"{out.stem} ({n}){out.suffix}")
-                shutil.copy2(out, copy)
-                item.outputs.append(copy)
+            # Quantity is a count, not files. The sheet lists the same path
+            # once per copy and build_pdf flattens it once, so a 4-of no longer
+            # leaves four identical PNGs in the output folder.
+            for _ in range(item.qty):
+                item.outputs.append(out)
 
         done_msg = f"Done ({item.qty} copies)" if item.qty > 1 else "Done"
         self._ui(item.set_status, "done", done_msg, 1)
@@ -1231,6 +1229,29 @@ GUIDE_STYLE_CHOICES = ["Cross", "Corner"]
 BLEED_COLOR_CHOICES = ["Black", "White"]
 
 
+class _Card:
+    """One card as it sits on a sheet.
+
+    Two copies of the same art are two instances sharing one path. Copies used
+    to be physical files — `name (2).png` written next to the original — purely
+    so each copy had an identity the preview could address. The PDF never
+    needed them: `build_pdf` takes a path list and caches its flattened images
+    by path, so the same file listed twice costs one flatten and prints twice.
+
+    So `path` is what gets drawn and exported, and keys everything about the
+    *image* — thumbnails, border treatment. `uid` addresses this one copy: the
+    drag, the exclusion set, the hit-boxes, its assigned back.
+    """
+
+    __slots__ = ("path", "uid")
+    _seq = 0
+
+    def __init__(self, path):
+        _Card._seq += 1
+        self.path = Path(path)
+        self.uid = f"card{_Card._seq}"
+
+
 class ExportDialog(ctk.CTkToplevel):
     """Print-sheet export: layout, quality, color pipeline, duplex backs and
     a live preview of page 1. Choices persist in settings.json."""
@@ -1256,7 +1277,7 @@ class ExportDialog(ctk.CTkToplevel):
         self._slots = []           # preview hit-boxes: (x0, y0, x1, y1, path)
         self._prev_job = None
         self._page = 0             # sheet the ◀▶ nav is pointing at
-        self._excluded = set()     # paths dropped from the export
+        self._excluded = set()     # card ids dropped from the export
         self._custom_back = None   # chosen card back for non-DFC cards
         self._img_xoff = 0         # x offset of the sheets inside the canvas
         self._sheet_tops = []      # y of each sheet in canvas coordinates
@@ -1275,10 +1296,11 @@ class ExportDialog(ctk.CTkToplevel):
         self._showing_backs = False
 
         # explicit print order (the source of truth for the PDF); backs follow
-        # their front via _back_of. Drag-and-drop reorders _order.
+        # their front via _back_of, keyed by card id so two copies of one card
+        # can carry different backs. Drag-and-drop reorders _order.
         fronts0, backs0 = self._pairs()
-        self._order = list(fronts0)
-        self._back_of = {f: b for f, b in zip(fronts0, backs0)}
+        self._order = [_Card(f) for f in fronts0]
+        self._back_of = {c.uid: b for c, b in zip(self._order, backs0)}
 
         s = load_settings()
 
@@ -1717,13 +1739,25 @@ class ExportDialog(ctk.CTkToplevel):
     def _card_mm(self):
         return card_size_mm(self.card_size.get())
 
-    def _mode_for(self, key):
-        """Per-card border mode: an explicit override wins, then the source
-        rule, then 'auto' (follow the global switch)."""
-        override = self._border_modes.get(key)
+    def _path_for(self, key):
+        """The image a preview key stands for. Front keys are card ids; back
+        keys are already paths, and so is anything unknown."""
+        for c in self._order:
+            if c.uid == key:
+                return str(c.path)
+        return key
+
+    def _mode_for(self, path):
+        """Per-image border mode: an explicit override wins, then the source
+        rule, then 'auto' (follow the global switch).
+
+        Keyed by path, not by copy, because build_pdf's border_modes is keyed
+        by path — two copies of one card cannot be treated differently, and
+        pretending otherwise in the preview would lie about the export."""
+        override = self._border_modes.get(path)
         if override:
             return override
-        src = self.card_sources.get(str(key))
+        src = self.card_sources.get(str(path))
         if src is not None:
             var = self.border_srcs.get(src)
             if var is not None and not var.get():
@@ -1731,7 +1765,9 @@ class ExportDialog(ctk.CTkToplevel):
         return "auto"
 
     def _effective_border_modes(self):
-        keys = set(self._border_modes) | {str(p) for p in self.images}
+        # the working set, not the dialog's opening arguments: cards added
+        # through "Add cards…" have a source rule too
+        keys = set(self._border_modes) | {str(c.path) for c in self._order}
         return {k: self._mode_for(k) for k in keys}
 
     def _border_style(self):
@@ -1936,19 +1972,21 @@ class ExportDialog(ctk.CTkToplevel):
 
     def _sheet_images(self, drop_excluded=True):
         """
-        What goes on the sheets: (fronts, backs), backs=None when duplex is
-        off. In duplex a card's own back face stops being a front. A chosen
-        card back overrides back.png. When drop_excluded is True the cards the
-        user right-clicked out are removed (the export view); when False they
-        are kept so the preview can still show and restore them.
+        What goes on the sheets: (fronts, backs). Fronts are _Card instances,
+        backs are image paths (or None when duplex is off) — a back is not
+        something the user reorders, so it needs no identity of its own. In
+        duplex a card's own back face stops being a front. A chosen card back
+        overrides back.png. When drop_excluded is True the cards the user
+        right-clicked out are removed (the export view); when False they are
+        kept so the preview can still show and restore them.
         """
-        def keep(f):
-            return not drop_excluded or str(f) not in self._excluded
+        def keep(c):
+            return not drop_excluded or c.uid not in self._excluded
 
-        fronts = [f for f in self._order if keep(f)]
+        fronts = [c for c in self._order if keep(c)]
         if self.backs.get() != BACKS_MODES[0]:
             default = self._custom_back or find_back_image()
-            backs = [self._back_of.get(f) or default for f in fronts]
+            backs = [self._back_of.get(c.uid) or default for c in fronts]
             # Backs go through the same flatten path as fronts, so they need
             # a source too or the "Backs" checkbox would control nothing.
             for b in backs:
@@ -1960,7 +1998,8 @@ class ExportDialog(ctk.CTkToplevel):
     def _load_thumbs(self):
         self._loading = True
         fronts, backs = self._sheet_images()
-        wanted = list(fronts) + [b for b in (backs or []) if b]
+        # by path: copies of one card share a thumbnail
+        wanted = [c.path for c in fronts] + [b for b in (backs or []) if b]
         for p in wanted:
             key = str(p)
             if key in self._thumbs:
@@ -2038,7 +2077,16 @@ class ExportDialog(ctk.CTkToplevel):
         duplex = backs is not None
         showing_backs = duplex and self.side_btn.get() == "Backs"
         self._showing_backs = showing_backs
-        page_items = backs if showing_backs else fronts
+        # Two identities per slot. `keys` address the copy (hit-boxes, drag,
+        # exclusion), `paths` address the image (thumbnail, border treatment).
+        # They differ only on the fronts, where two copies share one path;
+        # a back is addressed by its path either way.
+        if showing_backs:
+            page_keys = [str(b) if b else None for b in backs]
+            page_paths = list(page_keys)
+        else:
+            page_keys = [c.uid for c in fronts]
+            page_paths = [str(c.path) for c in fronts]
         # A back page prints offset and rotated to cancel duplex drift. Showing
         # it square was how a wrong offset stayed invisible until the cut.
         # The PDF's y runs up and the preview's runs down, so dy flips.
@@ -2153,19 +2201,19 @@ class ExportDialog(ctk.CTkToplevel):
                 # backs print mirrored so they land behind their front
                 x = print_sheet.mirror_x(px, left, bw, CW) if showing_backs else px
                 y = ph - py - CH          # bottom-left origin -> preview's top
-                if slot >= len(page_items):
+                if slot >= len(page_keys):
                     continue
                 if eb > 0:
                     d.rectangle([X(x - eb), X(y - eb),
                                  X(x + CW + eb), X(y + CH + eb)],
                                 fill=bleed_fill, outline=(210, 210, 215))
-                item = page_items[slot]
-                key = str(item) if item else None
-                mode = self._mode_for(key)
+                key = page_keys[slot]
+                path = page_paths[slot]
+                mode = self._mode_for(path)
                 treated = mode == "on" or (mode == "auto" and border_on)
-                if key:
-                    t = self._treated_thumb(key) if treated else None
-                    t = t or self._thumbs.get(key)
+                if path:
+                    t = self._treated_thumb(path) if treated else None
+                    t = t or self._thumbs.get(path)
                 else:
                     t = None
                 if t:
@@ -2187,7 +2235,7 @@ class ExportDialog(ctk.CTkToplevel):
                 else:
                     d.rectangle([X(x), X(y), X(x + CW), X(y + CH)],
                                 fill=(55, 60, 76))
-                    if showing_backs and not item:
+                    if showing_backs and not path:
                         d.text((X(x) + cw // 2 - 26, X(y) + ch // 2),
                                "back.png\nmissing", fill=(190, 120, 120))
 
@@ -2262,10 +2310,10 @@ class ExportDialog(ctk.CTkToplevel):
             st = self._sheet_tops[p]
             for k, (px, py) in enumerate(usable):
                 slot = p * per_sheet + k
-                if slot >= len(page_items):
+                if slot >= len(page_keys):
                     continue
-                item = page_items[slot]
-                if not item:
+                key = page_keys[slot]
+                if not key:
                     continue
                 # the hit-box follows the drawn card, so hover and right-click
                 # keep landing on an offset back page
@@ -2273,7 +2321,7 @@ class ExportDialog(ctk.CTkToplevel):
                      if showing_backs else px)
                 y = ph - py - CH + bdy
                 self._slots.append((X(x), st + X(y),
-                                    X(x + CW), st + X(y + CH), str(item)))
+                                    X(x + CW), st + X(y + CH), key))
 
         self._render_sheet = lambda p: render_sheet(p)[0]
         self._sheet_geom = (W, H, gap, sheets)
@@ -2426,12 +2474,13 @@ class ExportDialog(ctk.CTkToplevel):
         for x0, y0, x1, y1, key in self._slots:
             if not (key and x0 <= px <= x1 and y0 <= py <= y1):
                 continue
-            mode = self._mode_for(key)
+            path = self._path_for(key)
+            mode = self._mode_for(path)
             treated = mode == "on" or (
                 mode == "auto" and self.border.get() != BORDER_MODES[0])
-            src = (self._work_b if treated else {}).get(key)
+            src = (self._work_b if treated else {}).get(path)
             if src is None:
-                pair = self._thumbs_raw.get(key)
+                pair = self._thumbs_raw.get(path)
                 src = pair[0] if pair else None
             if src is None:
                 return None
@@ -2581,10 +2630,12 @@ class ExportDialog(ctk.CTkToplevel):
         if not d:
             return
         if not d["moved"]:
-            # a plain click cycles the black border: auto -> off -> on
-            key = d["key"]
+            # a plain click cycles the black border: auto -> off -> on.
+            # Per image, so every copy of the card follows — that is what
+            # gets exported.
+            path = self._path_for(d["key"])
             nxt = {"auto": "off", "off": "on", "on": "auto"}
-            self._border_modes[key] = nxt[self._border_modes.get(key, "auto")]
+            self._border_modes[path] = nxt[self._border_modes.get(path, "auto")]
             self._draw_preview()
             return
         cx, cy = self._event_xy(event)
@@ -2594,8 +2645,8 @@ class ExportDialog(ctk.CTkToplevel):
         """Move the dragged card to sit just before the card it was dropped on."""
         if not tgt_key or tgt_key == src_key:
             return
-        src = next((f for f in self._order if str(f) == src_key), None)
-        tgt = next((f for f in self._order if str(f) == tgt_key), None)
+        src = next((c for c in self._order if c.uid == src_key), None)
+        tgt = next((c for c in self._order if c.uid == tgt_key), None)
         if src is None or tgt is None:
             return
         order = list(self._order)
@@ -2622,89 +2673,72 @@ class ExportDialog(ctk.CTkToplevel):
         finally:
             menu.grab_release()
 
-    def _copy_of(self, src):
-        """Make a physical 'name (n).png' copy next to src (a free name) so the
-        copy has its own identity in the preview and its own file for the PDF
-        (same idea as quantity copies). Returns the new Path."""
-        src = Path(src)
-        n = 2
-        while True:
-            dst = src.with_name(f"{src.stem} ({n}){src.suffix}")
-            if not dst.exists() and all(str(f) != str(dst) for f in self._order):
-                break
-            n += 1
-        shutil.copy2(src, dst)
-        return dst
-
     def _duplicate_card(self, key):
-        """Add another copy of the card right after it."""
-        src = next((f for f in self._order if str(f) == key), None)
-        if src is None:
+        """Add another copy of the card right after it. Nothing is written to
+        disk: the copy is a second _Card pointing at the same image."""
+        idx = next((i for i, c in enumerate(self._order) if c.uid == key), None)
+        if idx is None:
             return
-        try:
-            dst = self._copy_of(src)
-        except OSError as e:
-            messagebox.showerror("Duplicate", str(e), parent=self)
-            return
-        idx = next(i for i, f in enumerate(self._order) if str(f) == key)
-        self._order.insert(idx + 1, dst)
-        self._back_of[dst] = self._back_of.get(src)
-        threading.Thread(target=self._load_thumbs, daemon=True).start()
+        src = self._order[idx]
+        dup = _Card(src.path)
+        self._order.insert(idx + 1, dup)
+        self._back_of[dup.uid] = self._back_of.get(src.uid)
         self._draw_preview()
 
     def _remove_card(self, key):
         """Take the card out of the working set entirely (the sheets recompact);
         the file on disk is untouched. Add it back later with 'Add cards…'."""
-        self._order = [f for f in self._order if str(f) != key]
+        self._order = [c for c in self._order if c.uid != key]
         self._excluded.discard(key)
+        self._back_of.pop(key, None)
         threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._draw_preview()
 
     def _delete_card_file(self, key):
         """Permanently delete the card's PNG (and its DFC back, if any) from the
         output folder, then drop it from the PDF. Asks first."""
-        front = next((f for f in self._order if str(f) == key), None)
+        front = next((c for c in self._order if c.uid == key), None)
         if front is None:
             return
-        files = [Path(key)]
-        back = self._back_of.get(front)
+        files = [front.path]
+        back = self._back_of.get(key)
         if back:
             files.append(Path(back))
         names = "\n".join(f.name for f in files)
+        # Every copy of the card points at the file being deleted, so they all
+        # go — leaving one behind would put a missing image on the sheet.
+        copies = [c for c in self._order if c.path == front.path]
+        extra = (f"\n\n{len(copies)} copies of this card are on the sheet; "
+                 "all of them will be removed." if len(copies) > 1 else "")
         if not messagebox.askyesno(
                 "Delete from output folder",
-                f"Permanently delete from disk?\n\n{names}", parent=self):
+                f"Permanently delete from disk?\n\n{names}{extra}", parent=self):
             return
         for f in files:
             try:
                 f.unlink()
             except OSError:
                 pass
-        self._remove_card(key)
+        for c in copies:
+            self._remove_card(c.uid)
 
     def _add_cards(self):
         """Append more already-upscaled cards to the current PDF set. Picking a
-        card that is already in the set adds a duplicate (a physical copy), so
-        'Add cards…' doubles as another way to duplicate."""
+        card that is already in the set adds another copy of it, so 'Add cards…'
+        doubles as another way to duplicate."""
         files = filedialog.askopenfilenames(
             parent=self, title="Add cards to the PDF",
             initialdir=OUTPUT_FOLDER,
             filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
-        present = {str(f): f for f in self._order}
+        present = {str(c.path): c for c in self._order}
         added = False
         for f in files:
             p = Path(f)
-            try:
-                if str(p) in present:                 # already here -> duplicate
-                    dst = self._copy_of(p)
-                    self._back_of[dst] = self._back_of.get(present[str(p)])
-                    self._order.append(dst)
-                else:
-                    self._order.append(p)
-                    self._back_of.setdefault(p, None)
-            except OSError as e:
-                messagebox.showerror("Add cards", str(e), parent=self)
-                continue
+            card = _Card(p)
+            self._order.append(card)
+            # a second copy inherits the first one's back; a new card has none
+            twin = present.get(str(p))
+            self._back_of[card.uid] = self._back_of.get(twin.uid) if twin else None
             added = True
         if added:
             threading.Thread(target=self._load_thumbs, daemon=True).start()
@@ -2724,8 +2758,11 @@ class ExportDialog(ctk.CTkToplevel):
         self._persist()
         self.export_btn.configure(state="disabled", text="Exporting...")
 
-        # honours dropped cards, the chosen card back and DFC pairing
-        images, backs = self._sheet_images(drop_excluded=True)
+        # honours dropped cards, the chosen card back and DFC pairing.
+        # build_pdf takes paths and caches its flattens by path, so a card
+        # listed n times is flattened once and printed n times.
+        fronts, backs = self._sheet_images(drop_excluded=True)
+        images = [c.path for c in fronts]
         if not images:
             self.export_btn.configure(state="normal", text="Export")
             messagebox.showwarning("Nothing to export",
@@ -3224,6 +3261,21 @@ class CardSearchDialog(ctk.CTkToplevel):
 # not from what seemed likely to be asked. Most entries here cost someone a
 # confused hour or a wasted sheet of cardstock.
 FAQ = [
+    ("My printer says \"insufficient memory\" or spits out an error page.",
+     "A print sheet is a real 1200 DPI page - lossless, that is around 217 MB - "
+     "and a home printer has to rasterise the whole thing in its own RAM. Most "
+     "do not have it. The Brother 3240 CDW, where this was first reported, "
+     "ships with 128 MB.\n\n"
+     "Make the PC do the rasterising instead: in Adobe Reader, "
+     "Print > Advanced > tick \"Print as Image\". The printer then receives "
+     "finished pixels rather than a document it has to render.\n\n"
+     "That dialog has its own resolution dropdown, and it often defaults to "
+     "300 dpi. Set it to the highest your printer offers - 600 or 1200 - or "
+     "you will have thrown away the resolution you came here for.\n\n"
+     "Still choking? Lower PDF quality to JPEG q97: near-lossless, roughly a "
+     "third the size. File split (one page per PDF) helps too, since the "
+     "printer then only ever holds one sheet."),
+
     ("Registration marks are eating my card slots. Why?",
      "The marks are corner brackets, so what blocks a slot is a mark landing "
      "on a CORNER card. Moving the marks outward frees them: on A4 3x3, "

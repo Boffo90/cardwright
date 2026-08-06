@@ -2,7 +2,26 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.4 (unreleased) — duplex cut guides, and the export preview
+## v2.17.4 (unreleased) — duplex cut guides, and copies stop being files
+- **A copy of a card is no longer a file on disk.** Quantity wrote one PNG per
+  copy — a 4-of left four identical images in the output folder, and
+  *Duplicate* in the preview wrote another every time it was used. Copies are
+  now instances pointing at the same image: the sheet lists that path once per
+  copy and `build_pdf` flattens it once and draws it as many times as asked
+  (verified: a sheet with a duplicate draws 3 cards from 1 distinct image).
+  Reordering, removing and assigning a back still act on the single copy you
+  clicked. **Border treatment is now per image rather than per copy**, because
+  that is how the export has always keyed it — two copies of one card could
+  never really print with different borders.
+- Deleting a card's file from the output folder now removes every copy of it
+  from the sheet, and says so before asking, instead of leaving copies behind
+  pointing at a file that is gone.
+- **New FAQ entry: "insufficient memory" on the printer.** Reported on
+  r/mtgproxies with a Brother 3240 CDW, which has 128 MB against a ~217 MB
+  lossless sheet. The answer is Adobe Reader's *Print as Image*, with the
+  warning that its resolution dropdown defaults to 300 dpi — leaving it there
+  rasterises away the 1200 DPI the app exists to produce.
+
 - **Duplex offset now moves the cut guides with the cards.** Setting a back
   offset shifted the back page's cards but left its guides on the front's
   grid, so they missed the cards by exactly the drift the offset was
