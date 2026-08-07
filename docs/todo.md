@@ -33,10 +33,10 @@ feels to use. `ux_audit.md` compares it against Proxxied and proxy-print,
 prioritises the twelve real gaps and concludes that Tier 1 and Tier 2 are all
 reachable in CustomTkinter — a Qt rewrite is not justified yet.
 
-The file-per-copy model is **done** (v2.17.4): copies are instances sharing an
-image, so a quantity control is now just a number. Next from Tier 1: undo/redo,
-a drop indicator with droppable empty slots, dragging between sheets, and
-changing a card's art without leaving the dialog.
+Done so far: the file-per-copy model (v2.17.4) — copies are instances sharing an
+image, so a quantity control is now just a number — and **undo/redo** (v2.17.5).
+Next from Tier 1: a drop indicator with droppable empty slots, dragging between
+sheets, quantity per card, and changing a card's art without leaving the dialog.
 
 ## Next up (nothing blocking)
 From the July 2026 comparison against Proxy-PDF-Maker, fabricard.net and

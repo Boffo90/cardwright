@@ -42,10 +42,10 @@ analysis that names the inset which fixes it.
    *Center Cards Across Disabled Gaps* for layouts like 3×3 minus the middle.
 
 ### B — Getting out of a mistake
-6. **No undo.** This is the single largest one. Proxxied has a visible **Action
-   History** panel with Undo/Redo. Here, a misdrag silently rewrites `_order` and
-   the only recovery is to drag it back by hand — and *Delete from output folder*
-   sits in the same right-click menu as *Remove*, one row apart, unrecoverable.
+6. ~~**No undo.**~~ **Done in v2.17.5.** Ctrl+Z / Ctrl+Y plus buttons that name
+   what they would take back. Deleting a file clears the history rather than
+   pretending to be undoable. What is still missing against Proxxied is the
+   *visible* Action History list — the buttons show one step, not the trail.
 
 ### C — Changing a card without leaving the sheet
 7. **Art cannot be changed from the preview.** Seeing the wrong printing means
@@ -86,8 +86,9 @@ that names the fixing inset rather than just warning, and a preview that scrolls
 **every sheet at once** where both references paginate one page at a time.
 
 ## Priority
-**Tier 1 — the "feels bad" core.** Undo/redo · drop indicator + droppable empty
-slots · drag between sheets · quantity per card · change art from the preview.
+**Tier 1 — the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · drop indicator +
+droppable empty slots · drag between sheets · quantity per card · change art
+from the preview.
 
 **Tier 2.** Multi-select · keybinds printed in the context menu · a real border-mode
 indicator · per-slot disable.

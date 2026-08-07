@@ -2,6 +2,25 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.5 (unreleased) — undo
+
+### Undo/redo in the export preview
+- **Ctrl+Z / Ctrl+Y**, and a pair of buttons beside the page nav. Covers
+  everything you can do to the working set: reorder, duplicate, remove, add
+  cards, and the black-border cycle — which matters most, because a stray
+  left-click on a card changed its border with nothing to say so and no way
+  back.
+- The buttons **name what they would take back** ("Undo move card") on hover,
+  and disable when there is nothing there. Undoing reports what it did in the
+  status line, so it is never a silent jump.
+- **Deleting a card's file clears the history instead of being undoable.** The
+  file is gone; undoing past it would put cards on the sheet pointing at
+  nothing. Refusing to offer the undo is the honest answer.
+- Ctrl+Z inside a text field still belongs to the text field.
+- History is 50 steps deep. A snapshot is a shallow copy of the four
+  containers that hold the working set, so no action has to know how to invert
+  itself.
+
 ## v2.17.4 — duplex cut guides, and copies stop being files
 
 ### Cutting

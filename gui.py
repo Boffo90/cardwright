@@ -1229,6 +1229,52 @@ GUIDE_STYLE_CHOICES = ["Cross", "Corner"]
 BLEED_COLOR_CHOICES = ["Black", "White"]
 
 
+def _tooltip(widget, text):
+    """Attach a hover tooltip, or retarget an existing one.
+
+    Deliberately defensive: a tooltip is a nicety, and CustomTkinter widgets
+    are composites whose bind() does not accept every sequence. A failure here
+    must never take the dialog down with it.
+    """
+    state = getattr(widget, "_tip", None)
+    if state is not None:
+        state["text"] = text
+        return
+    state = {"text": text, "win": None, "job": None}
+
+    def show():
+        state["job"] = None
+        if state["win"] or not widget.winfo_exists():
+            return
+        win = tk.Toplevel(widget)
+        win.wm_overrideredirect(True)
+        win.configure(bg=BORDER_STRONG)
+        tk.Label(win, text=state["text"], bg=ROW, fg=TEXT, font=(UI, 10),
+                 padx=8, pady=4, bd=0).pack(padx=1, pady=1)
+        win.wm_geometry(f"+{widget.winfo_rootx()}"
+                        f"+{widget.winfo_rooty() + widget.winfo_height() + 6}")
+        state["win"] = win
+
+    def hide(_e=None):
+        if state["job"]:
+            widget.after_cancel(state["job"])
+            state["job"] = None
+        if state["win"]:
+            state["win"].destroy()
+            state["win"] = None
+
+    def enter(_e=None):
+        state["job"] = widget.after(450, show)
+
+    try:
+        widget.bind("<Enter>", enter, add="+")
+        widget.bind("<Leave>", hide, add="+")
+        widget.bind("<ButtonPress>", hide, add="+")
+    except Exception:
+        return
+    widget._tip = state
+
+
 class _Card:
     """One card as it sits on a sheet.
 
@@ -1291,6 +1337,8 @@ class ExportDialog(ctk.CTkToplevel):
         self._tall_w = 0           # sheet width / total stacked height, for
         self._tall_h = 0           #   loupe clamping and scroll math
         self._drag = None          # in-progress card drag
+        self._undo_stack = []      # [(label, snapshot)], newest last
+        self._redo_stack = []
         self._loupe_item = None    # canvas id of the magnifier overlay
         self._drag_item = None     # canvas id of the dragged thumbnail
         self._showing_backs = False
@@ -1607,18 +1655,32 @@ class ExportDialog(ctk.CTkToplevel):
         head = ctk.CTkFrame(right, fg_color="transparent")
         head.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10,
                   pady=(10, 2))
-        head.grid_columnconfigure(1, weight=1)
+        head.grid_columnconfigure(2, weight=1)
         self.prev_page_btn = ctk.CTkButton(head, text="◀", width=30, height=24,
                                            fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
                                            command=lambda: self._flip_page(-1))
         self.prev_page_btn.grid(row=0, column=0, sticky="w")
+        # Undo sits with the page nav rather than the export buttons: it acts
+        # on the sheet, and the sheet is what you are looking at.
+        hist = ctk.CTkFrame(head, fg_color="transparent")
+        hist.grid(row=0, column=1, sticky="w", padx=(10, 0))
+        self.undo_btn = ctk.CTkButton(hist, text="↶", width=30, height=24,
+                                      font=(UI, 14), state="disabled",
+                                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                                      command=self._undo)
+        self.undo_btn.pack(side="left")
+        self.redo_btn = ctk.CTkButton(hist, text="↷", width=30, height=24,
+                                      font=(UI, 14), state="disabled",
+                                      fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
+                                      command=self._redo)
+        self.redo_btn.pack(side="left", padx=(4, 0))
         self.preview_title = ctk.CTkLabel(head, text="Preview",
                                           text_color=MUTED, font=(UI, 12))
-        self.preview_title.grid(row=0, column=1)
+        self.preview_title.grid(row=0, column=2)
         self.next_page_btn = ctk.CTkButton(head, text="▶", width=30, height=24,
                                            fg_color=GRAY_BTN, hover_color=GRAY_HOVER,
                                            command=lambda: self._flip_page(1))
-        self.next_page_btn.grid(row=0, column=2, sticky="e")
+        self.next_page_btn.grid(row=0, column=3, sticky="e")
         self.side_btn = ctk.CTkSegmentedButton(
             head, values=["Fronts", "Backs"], height=24,
             font=(UI, 11), command=lambda _v: self._draw_preview(),
@@ -1626,7 +1688,7 @@ class ExportDialog(ctk.CTkToplevel):
             selected_color=GOLD, selected_hover_color=GOLD_HOVER,
             text_color="#d7dbe4")
         self.side_btn.set("Fronts")
-        self.side_btn.grid(row=0, column=3, sticky="e", padx=(8, 0))
+        self.side_btn.grid(row=0, column=4, sticky="e", padx=(8, 0))
         self.canvas = tk.Canvas(right, bg=PANEL, highlightthickness=0, bd=0)
         self.canvas.grid(row=1, column=0, sticky="nsew", padx=(10, 0),
                          pady=(0, 6))
@@ -1643,9 +1705,14 @@ class ExportDialog(ctk.CTkToplevel):
                          lambda e: self.canvas.yview_scroll(
                              int(-e.delta / 120), "units"))
         self.canvas.bind("<Configure>", self._recenter_preview)
+        for seq in ("<Control-z>", "<Control-Z>"):
+            self.bind(seq, self._undo)
+        for seq in ("<Control-y>", "<Control-Y>", "<Control-Shift-Z>"):
+            self.bind(seq, self._redo)
         ctk.CTkLabel(right, text="Scroll through every sheet · drag a card to "
                      "reorder · left-click cycles the black border · "
-                     "right-click: duplicate / remove / delete a card",
+                     "right-click: duplicate / remove / delete a card · "
+                     "Ctrl+Z undoes",
                      text_color=MUTED, font=(UI, 11),
                      wraplength=self._PREVIEW_BOX[0], justify="center").grid(
             row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
@@ -1676,6 +1743,8 @@ class ExportDialog(ctk.CTkToplevel):
                                         command=self._export)
         self.export_btn.pack(side="left")
 
+        self._shield_entries()
+        self._update_history()
         self._draw_preview()
         threading.Thread(target=self._load_thumbs, daemon=True).start()
 
@@ -1966,6 +2035,90 @@ class ExportDialog(ctk.CTkToplevel):
 
     def _set_status(self, text):
         self.after(0, lambda: self.status.configure(text=text))
+
+    # ------------------------------------------------------------ undo/redo
+    # Everything the user can do to the working set lives in four containers,
+    # so a snapshot is a shallow copy of those and nothing has to know how to
+    # invert itself. _Card instances are immutable in practice (path and uid
+    # never change), which is what makes the shallow copy safe.
+    _UNDO_DEPTH = 50
+
+    def _snapshot(self):
+        return (list(self._order), set(self._excluded),
+                dict(self._back_of), dict(self._border_modes))
+
+    def _restore(self, snap):
+        order, excluded, back_of, modes = snap
+        self._order = list(order)
+        self._excluded = set(excluded)
+        self._back_of = dict(back_of)
+        self._border_modes = dict(modes)
+
+    def _push_undo(self, label):
+        """Record the state as it is *now*, before `label` changes it."""
+        self._undo_stack.append((label, self._snapshot()))
+        del self._undo_stack[:-self._UNDO_DEPTH]
+        self._redo_stack.clear()
+        self._update_history()
+
+    def _drop_history(self):
+        """Forget both stacks. For actions that cannot be taken back — undoing
+        past a deleted file would restore cards pointing at nothing."""
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._update_history()
+
+    def _undo(self, _event=None):
+        if not self._undo_stack:
+            return "break"
+        label, snap = self._undo_stack.pop()
+        self._redo_stack.append((label, self._snapshot()))
+        self._restore(snap)
+        self._history_changed(f"Undid: {label}")
+        return "break"
+
+    def _redo(self, _event=None):
+        if not self._redo_stack:
+            return "break"
+        label, snap = self._redo_stack.pop()
+        self._undo_stack.append((label, self._snapshot()))
+        self._restore(snap)
+        self._history_changed(f"Redid: {label}")
+        return "break"
+
+    def _history_changed(self, note):
+        # redoing an undone "Add cards…" brings back cards whose thumbnails
+        # were never loaded, so the loader runs again; it only ever adds
+        threading.Thread(target=self._load_thumbs, daemon=True).start()
+        self._draw_preview()
+        self._update_history()
+        self._set_status(note)
+
+    def _update_history(self):
+        """Buttons say what they would take back, not just that they exist."""
+        for btn, stack, verb in ((self.undo_btn, self._undo_stack, "Undo"),
+                                 (self.redo_btn, self._redo_stack, "Redo")):
+            if stack:
+                btn.configure(state="normal")
+                _tooltip(btn, f"{verb} {stack[-1][0]}")
+            else:
+                btn.configure(state="disabled")
+                _tooltip(btn, f"Nothing to {verb.lower()}")
+
+    def _shield_entries(self, parent=None):
+        """Ctrl+Z inside a text field belongs to the text field.
+
+        Bound on the entry itself, which consumes the event before it reaches
+        the dialog: Tk runs the widget's own bindings ahead of the toplevel's,
+        so returning "break" there stops it. Asking who has focus instead was
+        unreliable — CustomTkinter entries are composites, and focus_get()
+        answers about the wrapper, not the Tk entry inside it."""
+        for child in (parent or self).winfo_children():
+            if isinstance(child, (tk.Entry, tk.Text)):
+                for seq in ("<Control-z>", "<Control-Z>", "<Control-y>",
+                            "<Control-Y>", "<Control-Shift-Z>"):
+                    child.bind(seq, lambda _e: "break")
+            self._shield_entries(child)
 
     # ------------------------------------------------------------- preview
     _PREVIEW_BOX = (470, 560)   # max preview pixels (w, h)
@@ -2635,6 +2788,8 @@ class ExportDialog(ctk.CTkToplevel):
             # gets exported.
             path = self._path_for(d["key"])
             nxt = {"auto": "off", "off": "on", "on": "auto"}
+            # a stray click on a card silently retreats the border otherwise
+            self._push_undo("border change")
             self._border_modes[path] = nxt[self._border_modes.get(path, "auto")]
             self._draw_preview()
             return
@@ -2649,6 +2804,7 @@ class ExportDialog(ctk.CTkToplevel):
         tgt = next((c for c in self._order if c.uid == tgt_key), None)
         if src is None or tgt is None:
             return
+        self._push_undo("move card")
         order = list(self._order)
         order.remove(src)
         order.insert(order.index(tgt), src)
@@ -2679,15 +2835,21 @@ class ExportDialog(ctk.CTkToplevel):
         idx = next((i for i, c in enumerate(self._order) if c.uid == key), None)
         if idx is None:
             return
+        self._push_undo("duplicate card")
         src = self._order[idx]
         dup = _Card(src.path)
         self._order.insert(idx + 1, dup)
         self._back_of[dup.uid] = self._back_of.get(src.uid)
         self._draw_preview()
 
-    def _remove_card(self, key):
+    def _remove_card(self, key, record=True):
         """Take the card out of the working set entirely (the sheets recompact);
-        the file on disk is untouched. Add it back later with 'Add cards…'."""
+        the file on disk is untouched. Add it back later with 'Add cards…'.
+
+        record=False is for callers that have already dealt with the history —
+        deleting a file removes several cards at once and cannot be undone."""
+        if record:
+            self._push_undo("remove card")
         self._order = [c for c in self._order if c.uid != key]
         self._excluded.discard(key)
         self._back_of.pop(key, None)
@@ -2719,8 +2881,11 @@ class ExportDialog(ctk.CTkToplevel):
                 f.unlink()
             except OSError:
                 pass
+        # The file is gone, so no earlier state is reachable any more: undoing
+        # into one would put cards on the sheet pointing at nothing.
+        self._drop_history()
         for c in copies:
-            self._remove_card(c.uid)
+            self._remove_card(c.uid, record=False)
 
     def _add_cards(self):
         """Append more already-upscaled cards to the current PDF set. Picking a
@@ -2730,6 +2895,9 @@ class ExportDialog(ctk.CTkToplevel):
             parent=self, title="Add cards to the PDF",
             initialdir=OUTPUT_FOLDER,
             filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
+        if not files:
+            return
+        self._push_undo("add cards")
         present = {str(c.path): c for c in self._order}
         added = False
         for f in files:
