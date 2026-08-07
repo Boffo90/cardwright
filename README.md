@@ -1,3 +1,5 @@
+![Cardwright — print-ready TCG proxies at true 1200 DPI](assets/banner.png)
+
 # Cardwright
 
 Desktop app that turns Magic: The Gathering card images into **true 1200 DPI
