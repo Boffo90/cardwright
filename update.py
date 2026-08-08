@@ -16,7 +16,7 @@ from pathlib import Path
 
 import requests
 
-from config import ROOT
+from config import ROOT, IS_WINDOWS
 from version import APP_VERSION, GITHUB_REPO
 
 _UA = {"User-Agent": f"Cardwright/{APP_VERSION}",
@@ -34,6 +34,11 @@ def _parse(v: str) -> tuple:
 
 def check_for_update() -> dict | None:
     """Returns {"version", "url", "notes"} when a newer release exists."""
+    # Releases only carry Windows assets, so there is nothing to offer anyone
+    # else — and returning None here keeps the whole swap path below Windows-
+    # only rather than guarding each step of it.
+    if not IS_WINDOWS:
+        return None
     try:
         r = requests.get(
             f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",

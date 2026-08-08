@@ -17,8 +17,10 @@ from PIL import Image
 
 from config import (
     REALESRGAN_EXE,
+    NO_WINDOW_KWARGS,
     OUTPUT_FOLDER,
     TEMP_FOLDER,
+    MODELS_FOLDER,
     MODELS,
     DEFAULT_MODEL,
     AUTO_MODEL,
@@ -39,9 +41,6 @@ from config import (
     MPC_CARD_W_FRAC,
     MPC_CARD_H_FRAC,
 )
-
-# Prevents the Windows console window from flashing.
-CREATE_NO_WINDOW = 0x08000000
 
 _percent_re = re.compile(r"(\d+[.,]\d+)%")
 
@@ -263,6 +262,10 @@ def upscale(
         "-o", str(output),
         "-n", model_name,
         "-s", str(scale),
+        # The engine looks for a *relative* "models" folder, so without this
+        # it only finds the models when the working directory happens to be
+        # the app's own — which nothing guarantees when run from source.
+        "-m", str(MODELS_FOLDER),
     ]
 
     if status_callback:
@@ -273,7 +276,7 @@ def upscale(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         universal_newlines=True,
-        creationflags=CREATE_NO_WINDOW,
+        **NO_WINDOW_KWARGS,
     )
 
     while True:
