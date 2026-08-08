@@ -1,4 +1,9 @@
 customtkinter==6.0.0
+# Imported directly by gui.py and print_sheet.py. Left as a floor rather than
+# an exact pin: numpy drops old Pythons quickly (2.4 needs 3.11+), and pinning
+# one release would raise this project's minimum and change the version the
+# Windows build already uses. Every numpy API used here predates 1.26.
+numpy>=1.26
 pillow==12.2.0
 pyinstaller==6.21.0
 reportlab==5.0.0

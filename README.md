@@ -126,10 +126,33 @@ the full details of any failure — attach it to a bug report.
 
 ## Run from source
 
+Runs on **Windows and macOS**, Python 3.10+. There is no packaged macOS build
+yet, so on a Mac this is the way to run it.
+
+**Windows**
+
 ```
 pip install -r requirements.txt
 python main.py
 ```
+
+**macOS** — Homebrew ships the Tk bindings as a separate formula per Python
+version (`python-tk@3.13` pairs with `python@3.13`), and a mismatched pair
+fails with `No module named '_tkinter'`. Install a matching pair and use that
+interpreter the whole way through:
+
+```
+brew install python@3.13 python-tk@3.13
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+First launch downloads the macOS build of the AI engine and detects the GPU
+exactly as it does on Windows — Apple Silicon is native, reaching the GPU
+through Metal rather than Vulkan. The in-app updater stays Windows-only,
+since releases only carry Windows builds.
 
 ## Licence
 

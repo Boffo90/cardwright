@@ -7,9 +7,13 @@ dist/
 
 # downloaded on first run (never committed: licensing + size)
 realesrgan-ncnn-vulkan.exe
+realesrgan-ncnn-vulkan
 vcomp140.dll
 vcomp140d.dll
 models/
+
+# macOS
+.DS_Store
 
 # user data
 cardwright.log

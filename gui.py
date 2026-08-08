@@ -1,6 +1,7 @@
 import io
 import os
 import re
+import subprocess
 import threading
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -67,6 +68,7 @@ from config import (
     card_size_mm,
     find_back_image,
     ICON_FILE,
+    IS_WINDOWS,
     load_settings,
     save_settings,
 )
@@ -94,6 +96,21 @@ def _has_font(name: str) -> bool:
         return name in tkfont.families()
     except Exception:
         return False
+
+
+def _open_folder(path):
+    """
+    Show a folder in the system file manager (Explorer / Finder).
+
+    os.startfile is Windows-only. `open` reports failure through its exit
+    status rather than an exception, so that is translated into the OSError
+    callers already expect from startfile.
+    """
+    if IS_WINDOWS:
+        os.startfile(path)
+        return
+    if subprocess.run(["open", str(path)]).returncode != 0:
+        raise OSError(f"could not open {path}")
 
 # ---- palette ------------------------------------------------------------
 # Everything comes from theme.py so the whole app shares one set of tokens.
@@ -407,7 +424,7 @@ class App(_Root):
             side="right", padx=(4, 0), pady=(10, 0))
 
     def _open_log(self):
-        """Show the log file in Explorer, selected, ready to drag onto a report."""
+        """Show the log file in the file manager, ready to drag onto a report."""
         path = applog.LOG_PATH
         if not path.exists():
             messagebox.showinfo(
@@ -415,7 +432,7 @@ class App(_Root):
                 f"Nothing has been logged yet.\n\nThe file will appear at:\n{path}")
             return
         try:
-            os.startfile(path.parent)
+            _open_folder(path.parent)
         except OSError:
             applog.log.error("Could not open the log folder", exc_info=True)
             messagebox.showinfo("Log file", str(path))
@@ -791,7 +808,7 @@ class App(_Root):
         self._refresh_empty()
 
     def _open_output(self):
-        os.startfile(OUTPUT_FOLDER)
+        _open_folder(OUTPUT_FOLDER)
 
     # ============================================================ pdf export
     def _export_images(self):
