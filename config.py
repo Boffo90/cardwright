@@ -11,6 +11,20 @@ from PIL import Image as _PILImage
 _PILImage.MAX_IMAGE_PIXELS = None
 
 # ==========================================
+# PLATFORM
+# ==========================================
+# Windows is the distributed build; macOS is supported from source. Only the
+# few genuinely OS-specific values live here, so everything else can stay
+# platform-agnostic.
+
+IS_WINDOWS = sys.platform == "win32"
+
+# Passed to every subprocess that runs the upscaler. On Windows it stops a
+# console window flashing up for each card; the flag does not exist elsewhere
+# and passing it on POSIX raises ValueError, so the kwargs are empty there.
+NO_WINDOW_KWARGS = {"creationflags": 0x08000000} if IS_WINDOWS else {}
+
+# ==========================================
 # PATHS
 # ==========================================
 # When running as a PyInstaller .exe, external resources (the real-esrgan
@@ -26,7 +40,9 @@ _BUNDLE = Path(getattr(sys, "_MEIPASS", ROOT))
 
 ICON_FILE = _BUNDLE / "icon.ico"
 
-REALESRGAN_EXE = ROOT / "realesrgan-ncnn-vulkan.exe"
+# Upstream ships the same engine for both platforms; only the filename differs.
+REALESRGAN_EXE = ROOT / ("realesrgan-ncnn-vulkan.exe" if IS_WINDOWS
+                         else "realesrgan-ncnn-vulkan")
 
 MODELS_FOLDER = ROOT / "models"
 

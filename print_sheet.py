@@ -904,7 +904,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         if any(b is None for b in backs) and default_back is None:
             raise ValueError(
                 "back.png not found.\nPut a card-back image named back.png "
-                "(or back.jpg) next to Cardwright.exe — it is used for "
+                "(or back.jpg) in the Cardwright folder — it is used for "
                 "every card that has no double-faced back of its own.")
         backs = [Path(b) if b else default_back for b in backs]
 

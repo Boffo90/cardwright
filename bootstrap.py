@@ -24,19 +24,26 @@ import requests
 from PIL import Image
 
 from config import ROOT, MODELS_FOLDER, REALESRGAN_EXE, TEMP_FOLDER, \
-    load_settings, save_settings
-
-CREATE_NO_WINDOW = 0x08000000
+    IS_WINDOWS, NO_WINDOW_KWARGS, load_settings, save_settings
 
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Cardwright"}
 
+# The same upstream release publishes a build per platform. The macOS one is a
+# universal binary (x86_64 + arm64) that reaches the GPU through Metal, so
+# Apple Silicon is native and no Vulkan runtime has to be installed.
+_ENGINE_ZIP = ("realesrgan-ncnn-vulkan-20220424-windows.zip" if IS_WINDOWS
+               else "realesrgan-ncnn-vulkan-20220424-macos.zip")
+
 ENGINE_ZIP_URL = ("https://github.com/xinntao/Real-ESRGAN/releases/download/"
-                  "v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip")
+                  "v0.2.5.0/" + _ENGINE_ZIP)
 
 UPSCAYL_RAW = "https://raw.githubusercontent.com/upscayl/upscayl/main/resources/models/"
 
 # files that must exist next to the exe / in models/
-ENGINE_FILES = ["realesrgan-ncnn-vulkan.exe", "vcomp140.dll"]
+# The macOS build links only against system frameworks, so it needs no
+# redistributable next to it the way the Windows one needs vcomp140.dll.
+ENGINE_FILES = (["realesrgan-ncnn-vulkan.exe", "vcomp140.dll"] if IS_WINDOWS
+                else ["realesrgan-ncnn-vulkan"])
 MODEL_FILES = [
     "realesrgan-x4plus.bin", "realesrgan-x4plus.param",
     "realesr-animevideov3-x4.bin", "realesr-animevideov3-x4.param",
@@ -98,7 +105,12 @@ def download_all(progress_callback=None):
                 if not name:
                     continue
                 if name in ENGINE_FILES:
-                    (ROOT / name).write_bytes(z.read(info))
+                    dest = ROOT / name
+                    dest.write_bytes(z.read(info))
+                    if not IS_WINDOWS:
+                        # Writing the bytes out drops the archive's exec bit,
+                        # and the engine is unrunnable without it.
+                        dest.chmod(0o755)
                 elif name in MODEL_FILES:
                     (MODELS_FOLDER / name).write_bytes(z.read(info))
         steps += 1
@@ -134,10 +146,13 @@ def probe_gpu() -> tuple[bool, str]:
         Image.new("RGB", (32, 32), (128, 60, 60)).save(src)
         try:
             p = subprocess.run(
+                # -m for the same reason as in upscale.py: the engine's model
+                # folder defaults to a path relative to the working directory.
                 [str(REALESRGAN_EXE), "-i", str(src), "-o", str(dst),
-                 "-n", "realesr-animevideov3", "-s", "4", "-v"],
+                 "-n", "realesr-animevideov3", "-s", "4",
+                 "-m", str(MODELS_FOLDER), "-v"],
                 capture_output=True, text=True, timeout=120,
-                creationflags=CREATE_NO_WINDOW)
+                **NO_WINDOW_KWARGS)
             out = (p.stderr or "") + (p.stdout or "")
             name = ""
             for line in out.splitlines():
