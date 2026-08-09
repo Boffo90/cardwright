@@ -738,8 +738,14 @@ class App(_Root):
         # through to back.png. Off the UI thread: it costs a Scryfall lookup
         # and a catalogue search, and nothing is downloaded until Upscale all.
         if src.ID == "mpc":
-            threading.Thread(target=self._attach_gallery_back,
-                             args=(item, card, safe), daemon=True).start()
+            # Kept on the item because processing has to wait for it: the two
+            # network calls take several seconds, and pressing Upscale all
+            # inside that window would read item.downloads before the back was
+            # added and lose it without a word.
+            item.back_job = threading.Thread(
+                target=self._attach_gallery_back, args=(item, card, safe),
+                daemon=True)
+            item.back_job.start()
 
         # A source printed at another size (Yu-Gi-Oh) has to move the card
         # size with it, or fit-to-card stretches it into Magic proportions.
@@ -981,6 +987,10 @@ class App(_Root):
 
         self.after(0, lambda: self._finish(total, state["errors"]))
 
+    # Long enough for two slow catalogue calls, short enough that a hung
+    # lookup never strands the queue: the card still upscales, front only.
+    _BACK_LOOKUP_TIMEOUT = 30
+
     def _process_item(self, item, model, fit, trim, card_size=None, lang=None,
                       best_scan=False):
         self._ui(item.set_status, "processing", "Preparing…", 0)
@@ -988,6 +998,19 @@ class App(_Root):
 
         # build the list of local files to upscale (2 for DFCs)
         if item.kind == "card":
+            # A gallery pick may still be finding its back face. Reading
+            # downloads before that lands is how a double-faced card silently
+            # arrives with only its front, so wait for it here rather than
+            # hoping the user was slow to press the button.
+            job = getattr(item, "back_job", None)
+            if job is not None and job.is_alive():
+                self._ui(item.set_status, "processing", "Finding the back face…")
+                job.join(timeout=self._BACK_LOOKUP_TIMEOUT)
+                if job.is_alive():
+                    applog.log.warning(
+                        "Back-face lookup for %r did not finish in %ss; "
+                        "queueing the front alone",
+                        item.ref, self._BACK_LOOKUP_TIMEOUT)
             # already resolved by the importer -> just download
             targets = []
             for base, url in item.downloads:

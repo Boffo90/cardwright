@@ -2,6 +2,20 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.8 (unreleased) - the back lookup no longer loses a race
+- **Fixes v2.17.7, which only worked if you waited.** Finding a gallery pick's
+  back face takes two network calls, measured at **6.5 s** for Cosima, God of
+  the Voyage. That work ran in the background, so pressing *Upscale all* inside
+  that window read the card's download list before the back had been added and
+  processed the front alone, silently. Reported with a Cosima that arrived in
+  the output folder with no second face.
+- Processing now waits for a lookup still in flight, showing "Finding the back
+  face…" while it does, and gives up after 30 s rather than stranding the
+  queue. A card whose lookup times out still upscales, front only, and the log
+  records why.
+- The regression test drives the real `_process_item` against a lookup that has
+  not finished, and was checked to fail without the wait.
+
 ## v2.17.7 - gallery picks keep their double-faced backs
 - **Picking a double-faced card from the MPC gallery now brings its back
   face.** v2.17.6 fixed this for imported order files, but a card chosen by

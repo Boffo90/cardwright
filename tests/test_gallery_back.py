@@ -7,6 +7,9 @@ catalogue under its own card name, and contributors upload both faces
 together, so the right back is findable rather than a guess.
 """
 
+import threading
+import time
+
 import gui
 import scryfall
 
@@ -106,3 +109,54 @@ def test_a_lookup_failure_is_not_fatal(monkeypatch):
         raise scryfall.requests.RequestException("no network")
     monkeypatch.setattr(scryfall, "_get", boom)
     assert scryfall.back_face_name("Rona") is None
+
+
+# ------------------------------------------------------- the timing of it
+# The lookup costs two network calls and was measured at ~6.5 s for Cosima,
+# God of the Voyage. Pressing "Upscale all" inside that window used to read
+# item.downloads before the back landed and lose it silently, which is exactly
+# how the fix shipped broken in v2.17.7.
+
+class _Row:
+    kind = "card"
+    ref = "card"
+    status = "pending"
+    model_override = None
+    released_at = None
+    set_code = None
+    qty = 1
+    src = "mpc"
+
+    def __init__(self, downloads):
+        self.downloads = downloads
+        self.outputs = []
+
+    def set_status(self, *a, **kw):
+        pass
+
+
+def test_processing_waits_for_a_back_lookup_still_in_flight(monkeypatch):
+    row = _Row([("front-base", "front-url")])
+
+    def slow_lookup():
+        time.sleep(0.4)
+        row.downloads = [("front-base-front", "front-url"),
+                         ("front-base-back", "back-url")]
+
+    row.back_job = threading.Thread(target=slow_lookup, daemon=True)
+    row.back_job.start()
+
+    app = gui.App.__new__(gui.App)
+    app._ui = lambda fn, *a: None
+    app.ai_ok = False
+
+    seen = []
+    monkeypatch.setattr(gui.scryfall, "download_to_temp",
+                        lambda base, url: seen.append(base) or f"{base}.png")
+    monkeypatch.setattr(gui, "upscale", lambda path, **kw: path)
+    monkeypatch.setattr(gui, "_may_have_bleed", lambda item: False)
+
+    gui.App._process_item(app, row, "Auto", False, "never")
+
+    assert seen == ["front-base-front", "front-base-back"], (
+        "the back was still being looked up and got dropped")
