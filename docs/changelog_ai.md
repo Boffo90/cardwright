@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.7 (unreleased) - gallery picks keep their double-faced backs
+## v2.17.7 - gallery picks keep their double-faced backs
 - **Picking a double-faced card from the MPC gallery now brings its back
   face.** v2.17.6 fixed this for imported order files, but a card chosen by
   art in the gallery went down a different path and still fell through to the
