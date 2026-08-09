@@ -5,7 +5,7 @@
 ; Build:  ISCC installer.iss   (after building Cardwright.exe)
 
 #define AppName "Cardwright"
-#define AppVersion "2.17.5"
+#define AppVersion "2.17.6"
 #define AppExe "Cardwright.exe"
 
 [Setup]

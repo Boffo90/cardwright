@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.6 (unreleased) - MPC orders keep their double-faced backs
+## v2.17.6 - MPC orders keep their double-faced backs
 - **An MPC Autofill order no longer loses the back of a double-faced card.**
   The order file's `<backs>` section was documented in `mpcfill.py` but never
   parsed, so an imported MDFC arrived with only its front and quietly took the
