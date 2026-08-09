@@ -2,6 +2,24 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.6 (unreleased) - MPC orders keep their double-faced backs
+- **An MPC Autofill order no longer loses the back of a double-faced card.**
+  The order file's `<backs>` section was documented in `mpcfill.py` but never
+  parsed, so an imported MDFC arrived with only its front and quietly took the
+  shared back.png instead of its real second face. Reported by the author.
+- Backs are keyed by the same slot numbers the fronts use, checked against MPC
+  Autofill's own export tests rather than assumed. Both faces now download with
+  `-front` / `-back` names, which is the pairing convention Scryfall
+  double-faced cards already arrive with, so the preview and the duplex export
+  needed no changes at all.
+- A front entry covering several slots is **split** when those slots do not
+  share a back, instead of letting the first slot speak for all of them.
+- `<cardback>`, the order's shared back for ordinary cards, is still not
+  imported on purpose: the app has its own card-back setting and importing it
+  would override a deliberate choice.
+- Seven tests cover the parsing, including the split case and a malformed
+  `<backs>` entry.
+
 ## v2.17.5 - undo, and macOS from source
 
 ### macOS

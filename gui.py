@@ -1106,10 +1106,19 @@ class ImportDialog(ctk.CTkToplevel):
             safe = re.sub(r'[<>:"/\\|?*]', "", base)
             if c.get("slot"):
                 safe = f"{safe} {c['slot']}"
+            # A double-faced card downloads both faces, named so that the
+            # export dialog's -front/-back pairing picks them up: that is the
+            # same convention Scryfall DFCs already arrive with, so nothing
+            # downstream needs to know where the card came from.
+            if c.get("back_download"):
+                downloads = [(f"{safe}-front", c["download"]),
+                             (f"{safe}-back", c["back_download"])]
+            else:
+                downloads = [(safe, c["download"])]
             resolved.append({
                 "display": f"{c['qty']}x {c['name']}" if c["qty"] > 1 else c["name"],
                 "qty": c["qty"],
-                "downloads": [(safe, c["download"])],
+                "downloads": downloads,
                 "released_at": None,
                 "set": None,
                 "src": "mpc",

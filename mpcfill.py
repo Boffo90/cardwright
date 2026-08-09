@@ -152,12 +152,22 @@ def fetch_thumb(url: str) -> bytes | None:
 # the exact art the user already chose, which a name search cannot reproduce.
 
 
+def _slots_of(el) -> list[str]:
+    """The slot numbers one <card> entry occupies. <slot> singular is accepted
+    because some generators write it that way."""
+    return [x.strip() for x in
+            (el.findtext("slots") or el.findtext("slot") or "").split(",")
+            if x.strip()]
+
+
 def parse_order_xml(text: str) -> tuple[list[dict], list[str]]:
     """
     Parse an MPC Autofill order into (cards, problems).
 
-    Each card: {name, qty, download, identifier, ext, source, dpi, size}
+    Each card: {name, qty, slot, download, identifier, ext, source, dpi, size}
     - the same shape search() returns, so the queue treats them identically.
+    A double-faced card also carries {back_download, back_identifier,
+    back_name}.
     """
     import xml.etree.ElementTree as ET
 
@@ -174,6 +184,24 @@ def parse_order_xml(text: str) -> tuple[list[dict], list[str]]:
     if fronts is None:
         raise MPCError("No <fronts> section in that order file")
 
+    # A <backs> entry is a card's OWN back face - a double-faced card - and it
+    # is keyed by the same slot numbers the fronts use, so slot 1 in <backs>
+    # belongs to whichever front occupies slot 1. Missing this section was why
+    # imported MDFCs arrived with no back at all.
+    #
+    # <cardback> is a different thing: the shared back for every other slot.
+    # Cardwright already has its own card-back setting, so it is not imported.
+    backs_by_slot = {}
+    backs = root.find("backs")
+    if backs is not None:
+        for el in backs.findall("card"):
+            back_id = (el.findtext("id") or "").strip()
+            if not back_id:
+                continue
+            back_name = (el.findtext("name") or el.findtext("query") or "").strip()
+            for s in _slots_of(el):
+                backs_by_slot[s] = (back_id, back_name)
+
     cards, problems = [], []
     for el in fronts.findall("card"):
         drive_id = (el.findtext("id") or "").strip()
@@ -182,30 +210,44 @@ def parse_order_xml(text: str) -> tuple[list[dict], list[str]]:
             problems.append(f"{name} - no image id in the file")
             continue
 
-        slots = [x.strip() for x in
-                 (el.findtext("slots") or el.findtext("slot") or "").split(",")
-                 if x.strip()]
-        qty = len(slots) or 1
-
+        slots = _slots_of(el)
         # the <name> is a filename; the queue label reads better without it
         label = name.rsplit(".", 1)[0] if "." in name else name
 
-        cards.append({
-            "name": label,
-            # The slot is the only thing in the file that is unique per entry:
-            # <name> is just the card name, so an order with three different
-            # Islands repeats "Island.png" three times. Callers must fold this
-            # into the download filename or those three overwrite each other.
-            "slot": slots[0] if slots else "",
-            "qty": qty,
-            "source": "MPC order",
-            "dpi": 0,
-            "size": 0,
-            "thumb": "",
-            "download": f"https://drive.google.com/uc?id={drive_id}&export=download",
-            "ext": (name.rsplit(".", 1)[-1].lower() if "." in name else "png"),
-            "identifier": drive_id,
-        })
+        # One front entry covers every slot holding that art, and those slots
+        # need not share a back. Grouping by the back each slot actually has
+        # keeps a half-backed entry honest instead of letting the first slot
+        # speak for all of them.
+        groups: dict = {}
+        for s in (slots or [""]):
+            groups.setdefault(backs_by_slot.get(s), []).append(s)
+
+        for back, group in groups.items():
+            entry = {
+                "name": label,
+                # The slot is the only thing in the file that is unique per
+                # entry: <name> is just the card name, so an order with three
+                # different Islands repeats "Island.png" three times. Callers
+                # must fold this into the download filename or those three
+                # overwrite each other.
+                "slot": group[0] if group and group[0] else "",
+                "qty": len(group),
+                "source": "MPC order",
+                "dpi": 0,
+                "size": 0,
+                "thumb": "",
+                "download": f"https://drive.google.com/uc?id={drive_id}&export=download",
+                "ext": (name.rsplit(".", 1)[-1].lower() if "." in name else "png"),
+                "identifier": drive_id,
+            }
+            if back:
+                back_id, back_name = back
+                entry["back_identifier"] = back_id
+                entry["back_download"] = (
+                    f"https://drive.google.com/uc?id={back_id}&export=download")
+                entry["back_name"] = (back_name.rsplit(".", 1)[0]
+                                      if "." in back_name else back_name)
+            cards.append(entry)
 
     if not cards and not problems:
         problems.append("The <fronts> section is empty")
