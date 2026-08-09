@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.5 (unreleased) — undo, and macOS from source
+## v2.17.5 — undo, and macOS from source
 
 ### macOS
 - **Runs from source on macOS**, contributed by `cc3xz` in PR #1 — the
