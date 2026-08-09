@@ -666,6 +666,7 @@ class App(_Root):
         self.items.append(item)
         self._apply_filter(item)
         self._refresh_empty()
+        return item
 
     def _remove_item(self, item):
         if self.running:
@@ -727,9 +728,18 @@ class App(_Root):
         ident = str(card.get("identifier") or "")[:10]
         if ident:
             safe = f"{safe} {re.sub(r'[^A-Za-z0-9_-]', '', ident)}"
-        self._add_item(base, "card",
-                       downloads=[(safe, card["download"])], label=base,
-                       src=src.ID)
+        item = self._add_item(base, "card",
+                              downloads=[(safe, card["download"])], label=base,
+                              src=src.ID)
+
+        # A gallery pick is one image, but a double-faced card is two. MPC
+        # keeps the back under its own card name, so it can be found and
+        # queued alongside the front instead of the card silently falling
+        # through to back.png. Off the UI thread: it costs a Scryfall lookup
+        # and a catalogue search, and nothing is downloaded until Upscale all.
+        if src.ID == "mpc":
+            threading.Thread(target=self._attach_gallery_back,
+                             args=(item, card, safe), daemon=True).start()
 
         # A source printed at another size (Yu-Gi-Oh) has to move the card
         # size with it, or fit-to-card stretches it into Magic proportions.
@@ -740,6 +750,78 @@ class App(_Root):
                     self.card_size_menu.set(name)
                     self._persist_card_size(name)
                     break
+
+    # A catalogue entry is "Card Name (MOM 75)" or "Card Name (Borderless
+    # Victor Adame)": the card, then which art. Both faces of one artist's
+    # double-faced card carry the same suffix, which is what makes the right
+    # back findable rather than guessed at.
+    _VARIANT_RE = re.compile(r"\s*\(([^()]*)\)\s*$")
+
+    @classmethod
+    def _plain_name(cls, name):
+        return cls._VARIANT_RE.sub("", name).strip()
+
+    @classmethod
+    def _variant_of(cls, name):
+        m = cls._VARIANT_RE.search(name or "")
+        return (m.group(1).strip().lower() if m else "")
+
+    @classmethod
+    def _pick_back(cls, results, front):
+        """Choose which back belongs with `front`. Returns (pick, same_source).
+
+        Contributors upload both faces of a card together, so the back by the
+        front's own contributor is the one that matches, and among those the
+        one whose art variant reads the same. Anything else is a guess, and
+        the caller says so when it has to fall back to one.
+        """
+        want_src = (front.get("source") or "").strip()
+        want_var = cls._variant_of(front.get("name", ""))
+        same_src = [r for r in results
+                    if (r.get("source") or "").strip() == want_src]
+        pick = (next((r for r in same_src
+                      if cls._variant_of(r["name"]) == want_var), None)
+                or (same_src[0] if same_src else results[0]))
+        return pick, bool(same_src)
+
+    def _attach_gallery_back(self, item, card, safe):
+        """Find the back face of a double-faced gallery pick and queue it too.
+
+        Scryfall is asked what the second face is called; the catalogue is
+        then searched for that name. Contributors upload both faces together,
+        so the back by the same contributor - and, better, the one whose art
+        variant matches - is the one that belongs with the front the user
+        actually chose.
+        """
+        try:
+            back_name = scryfall.back_face_name(self._plain_name(card["name"]))
+            if not back_name:
+                return                      # single-faced, nothing to do
+            results = mpcfill.search(back_name, limit=30)
+        except Exception as e:
+            applog.log.warning("Back face lookup failed for %r", card.get("name"),
+                               exc_info=e)
+            return
+        if not results:
+            return
+
+        pick, same_src = self._pick_back(results, card)
+
+        # Renaming the front is what makes the pair visible to the export
+        # dialog, which matches faces by the -front / -back suffix.
+        item.downloads = [(f"{safe}-front", card["download"]),
+                          (f"{safe}-back", pick["download"])]
+        note = f"+ back: {pick['name']}"
+        if not same_src:
+            # honest about it: this back is not by the front's contributor
+            note += f"  (from {pick.get('source') or 'another source'})"
+        applog.log.info("Queued back face for %s: %s", card["name"], pick["name"])
+        self._ui(self._note_if_pending, item, note)
+
+    def _note_if_pending(self, item, note):
+        """Only touch the row if processing has not overtaken us."""
+        if item.winfo_exists() and item.status == "pending":
+            item.set_status("pending", note)
 
     def _open_import(self):
         if self.running:

@@ -145,6 +145,37 @@ def _png_urls(card: dict) -> list[tuple[str, str]]:
     return results
 
 
+def back_face_name(name: str) -> str | None:
+    """
+    The name of a card's second PHYSICAL face, or None if it has only one.
+
+    Split, flip and adventure cards also carry two `card_faces`, but they are
+    one piece of cardboard. Scryfall gives those a top-level image and leaves
+    the faces without images of their own, which is the same test `_png_urls`
+    uses to decide how many files a card is worth downloading. Reusing it here
+    keeps the two answers from disagreeing.
+
+    Returns None rather than raising: a catalogue pick should still queue if
+    Scryfall is unreachable or does not know the name.
+    """
+    try:
+        r = _get(f"{SCRYFALL_API}/cards/named", params={"fuzzy": name})
+        if r.status_code != 200:
+            return None
+        card = r.json()
+    except requests.RequestException:
+        return None
+
+    if card.get("image_uris"):
+        return None
+    faces = card.get("card_faces") or []
+    if len(faces) != 2:
+        return None
+    if not all((f.get("image_uris") or {}).get("png") for f in faces):
+        return None
+    return (faces[1].get("name") or "").strip() or None
+
+
 # --------------------------------------------------------------------------
 # language
 # --------------------------------------------------------------------------

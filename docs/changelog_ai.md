@@ -2,6 +2,26 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.7 (unreleased) - gallery picks keep their double-faced backs
+- **Picking a double-faced card from the MPC gallery now brings its back
+  face.** v2.17.6 fixed this for imported order files, but a card chosen by
+  art in the gallery went down a different path and still fell through to the
+  shared back.png. Reported with Rona, Herald of Invasion.
+- The back is not in the search result, but it is in the catalogue under its
+  own name. Scryfall says what the second face is called, the catalogue is
+  searched for it, and the entry by **the front's own contributor** wins,
+  preferring the one whose art variant matches. Contributors upload both faces
+  together, so this finds the right art rather than guessing: checked against
+  every Rona printing in the catalogue, where Chilli_Axe, WillieTanner's (a)
+  and (b), and PsilosX each pair correctly.
+- If only another contributor has the back, it is used and the queue row says
+  where it came from.
+- Split, flip and adventure cards are not affected: they have two card faces
+  but one piece of cardboard, and the check reuses the same test the
+  downloader already uses to decide how many images a card is worth.
+- The lookup runs in the background and fails quietly, so an unreachable
+  Scryfall never stops a card from queueing.
+
 ## v2.17.6 - MPC orders keep their double-faced backs
 - **An MPC Autofill order no longer loses the back of a double-faced card.**
   The order file's `<backs>` section was documented in `mpcfill.py` but never
