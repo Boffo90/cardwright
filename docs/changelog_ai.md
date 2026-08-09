@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.8 (unreleased) - the back lookup no longer loses a race
+## v2.17.8 - the back lookup no longer loses a race
 - **Fixes v2.17.7, which only worked if you waited.** Finding a gallery pick's
   back face takes two network calls, measured at **6.5 s** for Cosima, God of
   the Voyage. That work ran in the background, so pressing *Upscale all* inside
