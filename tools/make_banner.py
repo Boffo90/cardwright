@@ -77,7 +77,7 @@ for r in range(ROWS):
         rrect(d, x + 7, y + 7, x + CARD_W - 7, y + int(CARD_H * 0.55), 3,
               fill=theme.SURFACE_HOVER)
 
-# Cut guides at every card boundary, in the app's gold — the detail that says
+# Cut guides at every card boundary, in the app's gold - the detail that says
 # what the tool is actually for. One pixel wide, so it stays a whisper.
 TICK = 8
 xs = [gx - GAP // 2] + [gx + c * (CARD_W + GAP) + CARD_W + GAP // 2

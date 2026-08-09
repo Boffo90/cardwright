@@ -135,7 +135,7 @@ CONTROL_ALT = theme.SURFACE_HOVER
 SURFACE_INPUT = theme.BG           # inputs sit darker than their panel
 TEXT_MUTED_ = theme.TEXT_MUTED     # section eyebrows
 
-# resolved once the Tk root exists (font families need one) — see App.__init__
+# resolved once the Tk root exists (font families need one) - see App.__init__
 UI = theme.FONT_FALLBACK
 
 
@@ -159,7 +159,7 @@ ROW_MODELS = {
 
 # status -> (dot color, text color)
 STATUS_COLORS = {
-    # (dot, caption) — muted while idle, accent while working, semantic at rest
+    # (dot, caption) - muted while idle, accent while working, semantic at rest
     "pending":    (theme.TEXT_MUTED, theme.TEXT_MUTED),
     "processing": (theme.ACCENT, theme.TEXT_DIM),
     "done":       (theme.SUCCESS, theme.TEXT_MUTED),
@@ -184,7 +184,7 @@ else:
 # --------------------------------------------------------------------------
 # Only images that could actually carry an MPC bleed edge are eligible for the
 # trim. The trim is decided by aspect ratio, and a 600x825 TCGdex Pokemon
-# image lands at 0.7273 — inside the 0.725-0.745 MPC window — so it was being
+# image lands at 0.7273 - inside the 0.725-0.745 MPC window - so it was being
 # cropped by 4.4% a side, eating the card's border. Scryfall (0.7163) and
 # Gatherer (0.7162) sit outside the window, which is why this only ever showed
 # up on Pokemon.
@@ -506,7 +506,7 @@ class App(_Root):
 
     # ---------------------------------------------------------------- footer
     def _build_footer(self):
-        # Row 1 — how cards get processed (settings only, no actions)
+        # Row 1 - how cards get processed (settings only, no actions)
         opts = ctk.CTkFrame(self, fg_color=PANEL, corner_radius=theme.RADIUS_LG)
         opts.grid(row=3, column=0, sticky="ew", padx=24, pady=(4, 0))
         pad = theme.SPACE
@@ -547,14 +547,14 @@ class App(_Root):
         self.model_menu.set(DEFAULT_MODEL)
 
         # Card size drives what fit-to-card resizes to, so it lives here and
-        # not only in Export — a Yu-Gi-Oh card forced into Magic proportions
+        # not only in Export - a Yu-Gi-Oh card forced into Magic proportions
         # comes out stretched.
         self.card_size_menu = field("Card size", 0, 1, card_size_options(),
                                     command=self._persist_card_size)
         self.card_size_menu.set(
             load_settings().get("card_size", CARD_SIZE_DEFAULT))
 
-        # "Language" alone reads as the app's own language — a user hunting
+        # "Language" alone reads as the app's own language - a user hunting
         # for French cards did not recognise it. It qualifies the card, like
         # "Card size" beside it.
         self.card_lang_menu = field("Card language", 1, 0, list(CARD_LANGS.keys()),
@@ -594,7 +594,7 @@ class App(_Root):
         self.best_scan_switch.grid(row=2, column=0, sticky="w",
                                    pady=(pad["sm"], 0))
 
-        # Row 2 — actions
+        # Row 2 - actions
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.grid(row=4, column=0, sticky="ew", padx=24, pady=(pad["md"], 18))
         footer.grid_columnconfigure(0, weight=1)
@@ -689,7 +689,7 @@ class App(_Root):
             return
         # A bare name doesn't choose a printing, so show the gallery: the user
         # sees what they are about to upscale and can switch art or source.
-        # A link or a decklist line already named one — straight to the queue.
+        # A link or a decklist line already named one - straight to the queue.
         if not scryfall.ref_names_a_printing(ref):
             self.ref_entry.delete(0, "end")
             self._open_sources(ref)
@@ -838,7 +838,7 @@ class App(_Root):
 
     def _export_pdf_files(self):
         """Pick specific already-upscaled cards (from the output folder or
-        anywhere) and lay just those into a PDF — no queue needed."""
+        anywhere) and lay just those into a PDF - no queue needed."""
         if self.running:
             return
         files = filedialog.askopenfilenames(
@@ -961,7 +961,7 @@ class App(_Root):
         if errors:
             failed = [it for it in self.items if it.status == "error"]
             names = "\n".join(
-                f"  • {it.name.cget('text')} — {it.info.cget('text')}"
+                f"  • {it.name.cget('text')} - {it.info.cget('text')}"
                 for it in failed[:12])
             if len(failed) > 12:
                 names += f"\n  … (+{len(failed) - 12} more)"
@@ -970,7 +970,7 @@ class App(_Root):
                 f"{ok} succeeded, {errors} failed:\n\n{names}\n\n"
                 f"Use the 'Error' filter above the queue to see them, "
                 f"then 'Upscale all' retries only the failed ones.\n\n"
-                f"Full details were written to the log — the 'Log' button in "
+                f"Full details were written to the log - the 'Log' button in "
                 f"the header opens it. Attach it if you report this.")
         else:
             messagebox.showinfo(
@@ -1045,7 +1045,7 @@ class ImportDialog(ctk.CTkToplevel):
         self.src_menu.pack(side="left", padx=(0, 16))
 
         # Scryfall lists a card's tokens in `all_parts`, so this is exact
-        # rather than guesswork — and someone printing a Krenko deck wants
+        # rather than guesswork - and someone printing a Krenko deck wants
         # the goblins.
         self.tokens_var = ctk.BooleanVar(
             value=bool(load_settings().get("import_tokens", False)))
@@ -1101,7 +1101,7 @@ class ImportDialog(ctk.CTkToplevel):
             base = f"{c['name']}  [{c['source']}]"
             # The download name has to carry the slot. An MPC order names every
             # entry by card alone, so an order with three different Islands
-            # repeats "Island.png" three times — without this they all write
+            # repeats "Island.png" three times - without this they all write
             # the same file and two of the three arts are silently lost.
             safe = re.sub(r'[<>:"/\\|?*]', "", base)
             if c.get("slot"):
@@ -1175,22 +1175,22 @@ class ImportDialog(ctk.CTkToplevel):
         if bad:
             problems.append("Could not parse these lines:\n  - " + "\n  - ".join(bad))
         if english_only:
-            # Not a failure — these cards were simply never printed in the
+            # Not a failure - these cards were simply never printed in the
             # chosen language, so they were added in English.
             problems.append(
                 "No printing in the selected language (added in English):\n  - "
                 + "\n  - ".join(english_only))
         if from_scryfall:
             # Also not a failure. Gatherer has no entry for Secret Lairs,
-            # promos, or any foil printing — Scryfall numbers those with a star
-            # (198★) and gives them no multiverse id — so they come from
+            # promos, or any foil printing - Scryfall numbers those with a star
+            # (198★) and gives them no multiverse id - so they come from
             # Scryfall instead of being dropped.
             problems.append(
                 "Not on Gatherer, so these came from Scryfall instead:\n  - "
                 + "\n  - ".join(from_scryfall))
 
         # A language fallback is not a failure, so it must not turn the whole
-        # import red — it only gets the neutral wording when nothing else
+        # import red - it only gets the neutral wording when nothing else
         # actually went wrong.
         failures = len(not_found) + len(bad)
         if problems:
@@ -1207,7 +1207,7 @@ class ImportDialog(ctk.CTkToplevel):
                 title = "Imported"
                 popup = messagebox.showinfo
             self.status.configure(
-                text=f"Added {len(cards)}. {note} — see popup.",
+                text=f"Added {len(cards)}. {note} - see popup.",
                 text_color=colour)
             popup(
                 title,
@@ -1296,13 +1296,13 @@ class _Card:
     """One card as it sits on a sheet.
 
     Two copies of the same art are two instances sharing one path. Copies used
-    to be physical files — `name (2).png` written next to the original — purely
+    to be physical files - `name (2).png` written next to the original - purely
     so each copy had an identity the preview could address. The PDF never
     needed them: `build_pdf` takes a path list and caches its flattened images
     by path, so the same file listed twice costs one flatten and prints twice.
 
     So `path` is what gets drawn and exported, and keys everything about the
-    *image* — thumbnails, border treatment. `uid` addresses this one copy: the
+    *image* - thumbnails, border treatment. `uid` addresses this one copy: the
     drag, the exclusion set, the hit-boxes, its assigned back.
     """
 
@@ -1838,7 +1838,7 @@ class ExportDialog(ctk.CTkToplevel):
         rule, then 'auto' (follow the global switch).
 
         Keyed by path, not by copy, because build_pdf's border_modes is keyed
-        by path — two copies of one card cannot be treated differently, and
+        by path - two copies of one card cannot be treated differently, and
         pretending otherwise in the preview would lie about the export."""
         override = self._border_modes.get(path)
         if override:
@@ -1917,7 +1917,7 @@ class ExportDialog(ctk.CTkToplevel):
         return out or None
 
     def _collect_settings(self) -> dict:
-        """Every export control as a flat dict — used both to persist the
+        """Every export control as a flat dict - used both to persist the
         last-used values and to save/load named presets."""
         dx, dy = self._offsets()
         return {
@@ -2012,7 +2012,7 @@ class ExportDialog(ctk.CTkToplevel):
                 pass
 
     # ---------------------------------------------------------- presets
-    _PRESET_NONE = "— presets —"
+    _PRESET_NONE = "(presets)"
 
     def _preset_names(self):
         presets = load_settings().get("export_presets", {})
@@ -2079,7 +2079,7 @@ class ExportDialog(ctk.CTkToplevel):
         self._update_history()
 
     def _drop_history(self):
-        """Forget both stacks. For actions that cannot be taken back — undoing
+        """Forget both stacks. For actions that cannot be taken back - undoing
         past a deleted file would restore cards pointing at nothing."""
         self._undo_stack.clear()
         self._redo_stack.clear()
@@ -2128,7 +2128,7 @@ class ExportDialog(ctk.CTkToplevel):
         Bound on the entry itself, which consumes the event before it reaches
         the dialog: Tk runs the widget's own bindings ahead of the toplevel's,
         so returning "break" there stops it. Asking who has focus instead was
-        unreliable — CustomTkinter entries are composites, and focus_get()
+        unreliable - CustomTkinter entries are composites, and focus_get()
         answers about the wrapper, not the Tk entry inside it."""
         for child in (parent or self).winfo_children():
             if isinstance(child, (tk.Entry, tk.Text)):
@@ -2143,7 +2143,7 @@ class ExportDialog(ctk.CTkToplevel):
     def _sheet_images(self, drop_excluded=True):
         """
         What goes on the sheets: (fronts, backs). Fronts are _Card instances,
-        backs are image paths (or None when duplex is off) — a back is not
+        backs are image paths (or None when duplex is off) - a back is not
         something the user reorders, so it needs no identity of its own. In
         duplex a card's own back face stops being a front. A chosen card back
         overrides back.png. When drop_excluded is True the cards the user
@@ -2195,7 +2195,7 @@ class ExportDialog(ctk.CTkToplevel):
 
     def _treated_thumb(self, key):
         """Working-size treated copy (cached for the loupe) plus its thumb.
-        Built on demand — only for cards actually painted on a visible sheet."""
+        Built on demand - only for cards actually painted on a visible sheet."""
         if key in self._thumbs_b:
             return self._thumbs_b[key]
         pair = self._thumbs_raw.get(key)
@@ -2269,7 +2269,7 @@ class ExportDialog(ctk.CTkToplevel):
         bh = rows * CH + (rows - 1) * g
         left = (pw - bw) / 2
         # with registration marks the cutter aligns to the marks, so shift-down
-        # is ignored (see build_pdf) — keep the preview in step
+        # is ignored (see build_pdf) - keep the preview in step
         reg_on = bool(self.reg_marks.get())
         top = (ph - bh) / 2 + (0.0 if reg_on else self._shift())
         if ph - top - bh < 3:
@@ -2316,10 +2316,10 @@ class ExportDialog(ctk.CTkToplevel):
 
         if not reg_on:
             self.reg_hint.configure(
-                text="Off — cards use every slot.", text_color=MUTED)
+                text="Off - cards use every slot.", text_color=MUTED)
         elif blocked:
             # What blocks a slot is a CORNER mark landing on a CORNER card, so
-            # the fix is usually to move the marks outward — often by half a
+            # the fix is usually to move the marks outward - often by half a
             # millimetre. Name the exact inset that works instead of leaving
             # the user to hunt for it; fall back to naming a layout that fits.
             fix_inset = print_sheet.best_inset(
@@ -2335,7 +2335,7 @@ class ExportDialog(ctk.CTkToplevel):
             elif clean:
                 fix = f" {' or '.join(clean)} keeps every slot on this page."
             else:
-                fix = (" No inset or layout keeps them all on this page — "
+                fix = (" No inset or layout keeps them all on this page - "
                        "A3, Legal or Tabloid has the margin for it.")
             n = len(blocked)
             lost = (f"{n} sits under a corner mark and stays empty "
@@ -2343,7 +2343,7 @@ class ExportDialog(ctk.CTkToplevel):
                     f"{n} sit under a corner mark and stay empty "
                     "(those cards move to the next sheet)")
             self.reg_hint.configure(
-                text=f"⚠ {len(usable)} of {len(all_pos)} slots usable — "
+                text=f"⚠ {len(usable)} of {len(all_pos)} slots usable - "
                      f"{lost}.{fix}",
                 text_color="#e0b050")
         else:
@@ -2505,7 +2505,7 @@ class ExportDialog(ctk.CTkToplevel):
         self._loupe_item = self._drag_item = None
         for p in range(sheets):
             skipped = sel is not None and p not in sel
-            cap = f"Sheet {p + 1} of {sheets} — {side}"
+            cap = f"Sheet {p + 1} of {sheets} - {side}"
             if skipped:
                 cap += "   (not printed)"
             self.canvas.create_text(
@@ -2801,7 +2801,7 @@ class ExportDialog(ctk.CTkToplevel):
             return
         if not d["moved"]:
             # a plain click cycles the black border: auto -> off -> on.
-            # Per image, so every copy of the card follows — that is what
+            # Per image, so every copy of the card follows - that is what
             # gets exported.
             path = self._path_for(d["key"])
             nxt = {"auto": "off", "off": "on", "on": "auto"}
@@ -2863,7 +2863,7 @@ class ExportDialog(ctk.CTkToplevel):
         """Take the card out of the working set entirely (the sheets recompact);
         the file on disk is untouched. Add it back later with 'Add cards…'.
 
-        record=False is for callers that have already dealt with the history —
+        record=False is for callers that have already dealt with the history:
         deleting a file removes several cards at once and cannot be undone."""
         if record:
             self._push_undo("remove card")
@@ -2885,7 +2885,7 @@ class ExportDialog(ctk.CTkToplevel):
             files.append(Path(back))
         names = "\n".join(f.name for f in files)
         # Every copy of the card points at the file being deleted, so they all
-        # go — leaving one behind would put a missing image on the sheet.
+        # go - leaving one behind would put a missing image on the sheet.
         copies = [c for c in self._order if c.path == front.path]
         extra = (f"\n\n{len(copies)} copies of this card are on the sheet; "
                  "all of them will be removed." if len(copies) > 1 else "")
@@ -3337,7 +3337,7 @@ class CardSearchDialog(ctk.CTkToplevel):
             self.after(120, self._search)
 
     def _switch_source(self, label):
-        """Same query, different catalogue — the point of the switcher."""
+        """Same query, different catalogue - the point of the switcher."""
         for s in self.switchable:
             if s.LABEL == label:
                 self.backend = s
@@ -3431,7 +3431,7 @@ class CardSearchDialog(ctk.CTkToplevel):
         threading.Thread(target=load, daemon=True).start()
 
     def _pick(self, card):
-        # Tell the handler which catalogue this came from — with the source
+        # Tell the handler which catalogue this came from - with the source
         # switcher the dialog is no longer tied to one backend.
         card = {**card, "_source": getattr(self.backend, "ID", "mpc")}
         self.on_pick(card)

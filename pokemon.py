@@ -8,7 +8,7 @@ are 63x88 mm, the same as Magic, so no card-size switch is needed.
 TCGdex was chosen over pokemontcg.io after measuring both:
   - identical image ceiling (600x825 "high"), so resolution did not decide it
   - no API key at all, where pokemontcg.io meters unauthenticated use and its
-    terms allow one key per person — unworkable in a distributed desktop app
+    terms allow one key per person - unworkable in a distributed desktop app
   - open source, and pokemontcg.io has been absorbed into a commercial product
   - 14 languages with real images, which the card-language picker can drive
   - low.webp thumbnails are ~16 KB against a 161 KB small PNG
@@ -92,7 +92,7 @@ def search(query: str, limit: int = 60, lang: str | None = None) -> list[dict]:
     """
     Cards whose name matches `query`.
 
-    Each item: {name, source, dpi, size, thumb, download, ext, identifier} —
+    Each item: {name, source, dpi, size, thumb, download, ext, identifier},
     the keys the search gallery expects from every catalogue.
     """
     query = query.strip()

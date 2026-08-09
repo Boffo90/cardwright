@@ -6,7 +6,7 @@ from contributors' Google Drives at print resolution (usually 1200 DPI)
 and carry an MPC full-bleed edge, which the upscale pipeline trims.
 
 Only the public read endpoints are used, one card at a time on the user's
-own machine — the same requests the website makes.
+own machine - the same requests the website makes.
 """
 
 import time
@@ -145,7 +145,7 @@ def fetch_thumb(url: str) -> bytes | None:
 #
 # `id` is a Google Drive file id, the same identifier the search returns, so
 # the existing download path works unchanged. `slots` is a comma-separated
-# list of positions in the order — its LENGTH is the quantity. Some generators
+# list of positions in the order - its LENGTH is the quantity. Some generators
 # write <slot> singular, so both are accepted.
 #
 # The point of importing this rather than re-searching: an order file names
@@ -157,7 +157,7 @@ def parse_order_xml(text: str) -> tuple[list[dict], list[str]]:
     Parse an MPC Autofill order into (cards, problems).
 
     Each card: {name, qty, download, identifier, ext, source, dpi, size}
-    — the same shape search() returns, so the queue treats them identically.
+    - the same shape search() returns, so the queue treats them identically.
     """
     import xml.etree.ElementTree as ET
 
@@ -179,7 +179,7 @@ def parse_order_xml(text: str) -> tuple[list[dict], list[str]]:
         drive_id = (el.findtext("id") or "").strip()
         name = (el.findtext("name") or el.findtext("query") or "?").strip()
         if not drive_id:
-            problems.append(f"{name} — no image id in the file")
+            problems.append(f"{name} - no image id in the file")
             continue
 
         slots = [x.strip() for x in

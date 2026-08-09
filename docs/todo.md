@@ -1,4 +1,4 @@
-# Cardwright — TODO
+# Cardwright - TODO
 
 ## ▶ START HERE (handoff, 2026-08-02)
 **v2.17.3 is built, released and pushed. Nothing is half-finished; the tree is
@@ -31,10 +31,10 @@ the top of `gui.py`.
 The export dialog matches or beats the competition on features but not on how it
 feels to use. `ux_audit.md` compares it against Proxxied and proxy-print,
 prioritises the twelve real gaps and concludes that Tier 1 and Tier 2 are all
-reachable in CustomTkinter — a Qt rewrite is not justified yet.
+reachable in CustomTkinter - a Qt rewrite is not justified yet.
 
-Done so far: the file-per-copy model (v2.17.4) — copies are instances sharing an
-image, so a quantity control is now just a number — and **undo/redo** (v2.17.5).
+Done so far: the file-per-copy model (v2.17.4) - copies are instances sharing an
+image, so a quantity control is now just a number - and **undo/redo** (v2.17.5).
 Next from Tier 1: a drop indicator with droppable empty slots, dragging between
 sheets, quantity per card, and changing a card's art without leaving the dialog.
 
@@ -43,14 +43,14 @@ From the July 2026 comparison against Proxy-PDF-Maker, fabricard.net and
 silhouette-card-maker. Tier 1 was done in v2.17.0; these are what was ranked
 below it and still look worth having:
 
-- **SVG cut-file export** — Proxy-PDF-Maker's "Export Exact Guides". Directly
+- **SVG cut-file export** - Proxy-PDF-Maker's "Export Exact Guides". Directly
   answers the `.studio3` requests and is far cheaper than a proprietary format.
-  **Check first** whether the *free* edition of Silhouette Studio imports SVG —
+  **Check first** whether the *free* edition of Silhouette Studio imports SVG:
   it may be a Designer Edition feature, which would sink the idea.
-- **Two-colour dashed cut guides** — alternating colours so a guide is visible
+- **Two-colour dashed cut guides** - alternating colours so a guide is visible
   against both light and dark card edges. Cheap, and better than our single
   colour.
-- **Save / load project** — export presets save *settings*; this would save the
+- **Save / load project** - export presets save *settings*; this would save the
   working session (card list, quantities, assigned backs). Losing a hand-built
   100-card queue on close is the pain it solves.
 - **Live image sliders** (brightness, contrast, saturation…) per card, the way
@@ -59,22 +59,22 @@ below it and still look worth having:
 
 ## Deliberately not doing
 Recorded so they are not re-researched from scratch:
-- **Colour cube (.CUBE LUT) support** — powerful, but the profile system covers
+- **Colour cube (.CUBE LUT) support** - powerful, but the profile system covers
   the common case and this is for people who already know what a LUT is.
-- **Mixed card orientation, margin modes, base-PDF registration** — we have
+- **Mixed card orientation, margin modes, base-PDF registration** - we have
   native registration marks, which beats overlaying a base PDF.
-- **Prebuilt deck browser / EDHREC suggestions** (fabricard has 815 decks) —
+- **Prebuilt deck browser / EDHREC suggestions** (fabricard has 815 decks):
   perpetual content maintenance, and it pushes the project toward being a deck
   index rather than a tool. Same line already drawn over curated Drive folders.
-- **CLI, themes, unit switching** — low value for this audience.
-- **Running the AI twice and downsampling** — 6× sharper on small sources but
+- **CLI, themes, unit switching** - low value for this audience.
+- **Running the AI twice and downsampling** - 6× sharper on small sources but
   15.3 s and a 125 MB intermediate per card against 2.0 s. Staying light is why
   people move here from Proxxied. See `decisions.md`.
 
 ## Open questions for the author
 - **Licence.** The author said in July 2026 that they do not care about the code
   being open source and only want donations. Nothing was changed. If it is ever
-  revisited: **decide before merging the first PR** — the current LICENSE takes
+  revisited: **decide before merging the first PR** - the current LICENSE takes
   contributions under *its* terms, so relicensing afterwards needs every
   contributor's permission. GPL-3.0 was the suggested fit (forks must stay
   open, nobody can close and sell it) with the name protected separately as a
@@ -82,7 +82,7 @@ Recorded so they are not re-researched from scratch:
 - **Code signing** still pending (Azure Trusted Signing ~US$10/mo). Until then
   SmartScreen warns "unknown publisher" on every download. There is an FAQ
   entry explaining it.
-- **Linux .deb** — requested at launch. Still undecided, but **cheaper than it
+- **Linux .deb** - requested at launch. Still undecided, but **cheaper than it
   was**: the macOS port (PR #1, v2.17.5) put every platform branch behind
   `IS_WINDOWS` in `config.py` and left a test suite that asserts both sides, so
   Linux is now mostly a third engine zip and a packaging story rather than a
@@ -94,20 +94,20 @@ Recorded so they are not re-researched from scratch:
 
 ## Known limits (not bugs)
 - MPC search depends on mpcfill.com + Google Drive; fragile if they change.
-- Removing or duplicating a card recompacts the sheets — inherent to not
+- Removing or duplicating a card recompacts the sheets - inherent to not
   wasting paper.
 - Pokémon art tops out at 600×825 across every catalogue, against Scryfall's
   745×1040. A source limit, not ours. Mitigated by pre-scaling before the AI.
 - **One Piece / Digimon / Dragon Ball**: `apitcg.com` covers all three but
   demands an API key on every call, which a binary handed to strangers cannot
   honour. Blocked on that, not on the data existing.
-- **mpcfill OCR fork (GPL)** — consuming their HTTP API would be fine (GPL
+- **mpcfill OCR fork (GPL)** - consuming their HTTP API would be fine (GPL
   covers distributing code, not using a service); we must NOT vendor their code.
   Waiting on their API/spec.
 
 ## Backlog (interactive preview)
 - Drag whole sheets to reorder them (only cards reorder today).
-- Add cards from the preview — needs the upscaling pipeline inside
+- Add cards from the preview - needs the upscaling pipeline inside
   ExportDialog (cross-module; deferred).
 - The preview still loads every card's working image up front. Fully lazy thumb
   loading would help 300+ card decks.

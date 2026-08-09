@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 # Card sources (Scryfall / Gatherer / MPC Autofill on Google Drive) are chosen
-# by the user and can be very large — MPC art tops 190M pixels, above Pillow's
+# by the user and can be very large - MPC art tops 190M pixels, above Pillow's
 # ~178M "decompression bomb" guard. The sources are trusted, so lift the cap
 # once here; this is a process-wide attribute, so importing config disables it
 # everywhere before any image is decoded.
@@ -87,7 +87,7 @@ MODELS = {
 #   - realistic  -> Real-ESRGAN x4+ for sets with photorealistic art
 #                   (UltraSharp posterizes faces/hands there). Art style
 #                   cannot be reliably detected from pixels, so these are
-#                   listed by set code below — add new codes as they appear.
+#                   listed by set code below - add new codes as they appear.
 AUTO_MODEL = "Auto (detect digital vs scan)"
 
 RENDER_ERA_START = "2023-06-01"      # released_at >= this -> digital render
@@ -130,7 +130,7 @@ CARD_SIZE_DEFAULT = "MTG / Pokémon (63×88 mm)"
 
 # One user-defined size, stored in settings as [w_mm, h_mm]. Everything
 # downstream reads card_size_mm/card_size_px, so teaching those two about it is
-# enough — the upscaler, the sheet builder and the preview all follow.
+# enough - the upscaler, the sheet builder and the preview all follow.
 CUSTOM_SIZE_EDIT = "Custom size…"       # picker entry that opens the editor
 CUSTOM_SIZE_PREFIX = "Custom ("         # how a saved one is labelled
 
@@ -200,12 +200,12 @@ FIT_TO_CARD_DEFAULT = True
 # MPC / MPC-Autofill card images carry a full-bleed edge: a poker card is
 # 822x1122 px at 300 DPI, of which 36 px per side is bleed, leaving a
 # 750x1050 card. That is an aspect ratio of ~0.733 vs a plain MTG card's
-# ~0.716, so bleed images are recognisable by proportion — Scryfall/Gatherer
+# ~0.716, so bleed images are recognisable by proportion - Scryfall/Gatherer
 # scans (0.716) are never touched. The card area is the centred 91.24% x
 # 93.58% of the image.
 MPC_TRIM_DEFAULT = True
 
-# Detection is by aspect ratio, which is a guess — a good one for MPC art, but
+# Detection is by aspect ratio, which is a guess - a good one for MPC art, but
 # a guess. These let the user overrule it per run:
 #   Auto-detect  measure the proportions (what we always did)
 #   Assume bleed trim regardless, for a bleed image the ratio test misses
@@ -280,7 +280,7 @@ def card_lang_code(name=None):
 # When a lookup is just a card name, compare that card's printings and take
 # the one with the best scan instead of whichever Scryfall returns first.
 # Worth defaulting on here: a weak scan is exactly what upscaling to 1200 DPI
-# magnifies. Only applies to bare names — a link or a decklist line already
+# magnifies. Only applies to bare names - a link or a decklist line already
 # names the printing the user wants.
 BEST_SCAN_DEFAULT = True
 
@@ -384,15 +384,15 @@ SHADOW_TEST_LEVELS = [0, 4, 8, 12, 16, 20, 24, 28, 32]
 # "Contrast edges" pushes the dark pixels inside a fixed band at the card's
 # edge; "Auto-detect" measures how deep the frame actually runs. Contrast
 # edges is the default because it detects nothing, so there is no judgement
-# to get wrong on artwork that reaches the cut edge — and its four sliders
+# to get wrong on artwork that reaches the cut edge - and its four sliders
 # let the user dial it, where auto-detect either fires or it doesn't.
 BORDER_MODES = ["Off", "Contrast edges", "Auto-detect"]
 
 BORDER_DEFAULT = "Contrast edges"
 
 # v2.13.0 renamed the auto mode and added a second algorithm. A settings file
-# written before that carries the old label, which is no longer in the list —
-# without this the picker silently falls back to "Off" and quietly stops
+# written before that carries the old label, which is no longer in the list.
+# Without this the picker silently falls back to "Off" and quietly stops
 # treating borders for everyone who already had it on.
 _BORDER_RENAMES = {
     "On (auto-detect)": "Auto-detect",

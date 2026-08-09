@@ -2,7 +2,7 @@
 Cardwright design tokens.
 
 One place for colour, spacing, radius and type so every window looks like the
-same product. The palette is a low-chroma graphite ramp (calm, tool-like —
+same product. The palette is a low-chroma graphite ramp (calm and tool-like,
 think Linear/Figma) with a single warm accent that keeps the app's identity.
 
 Every foreground/background pair below was checked against WCAG:
@@ -41,7 +41,7 @@ CONTROL       = "#232A34"   # secondary buttons
 CONTROL_HOVER = "#2E3743"
 
 # ----------------------------------------------------------------- spacing
-# 4pt rhythm, dense end of the scale — this is a tool, not a landing page.
+# 4pt rhythm, dense end of the scale - this is a tool, not a landing page.
 SPACE = {"xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "2xl": 32}
 
 # ------------------------------------------------------------------ radius

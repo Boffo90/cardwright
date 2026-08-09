@@ -49,7 +49,7 @@ LAYOUTS = {
     "4×2 landscape": (4, 2, True),
     "7-card Silhouette": (4, 2, True),
     # For the bigger papers. Without these, choosing A3 buys a larger sheet
-    # and still prints 9 cards on it — A3 and Tabloid hold 16.
+    # and still prints 9 cards on it - A3 and Tabloid hold 16.
     # Not Legal: 4 rows come to 352 mm and Legal is 356, which the 3 mm
     # unprintable margin at each edge eats. They fall through the generic
     # grid path, so no special casing is needed.
@@ -65,7 +65,7 @@ DEFAULT_LAYOUT = "3×3 portrait"
 #     [    ] [ 5 ] [ 6 ] [ 7 ]
 #
 # That frees both left corners, where the registration marks a Cameo relies on
-# most (lower-left and upper-right) sit — the same trick ProxySheet's
+# most (lower-left and upper-right) sit - the same trick ProxySheet's
 # "SevenCard" template uses to cut down detection failures.
 SEVEN_CARD = "7-card Silhouette"
 
@@ -113,7 +113,7 @@ SHADOW_KNEE = 75
 # Three independent guards keep it artifact-free:
 #   1. per card: only run when the perimeter is UNIFORMLY dark. Borderless,
 #      full-art and white-bordered cards have art (high variance) or light
-#      pixels there, so they are skipped entirely — no vignette effect.
+#      pixels there, so they are skipped entirely - no vignette effect.
 #   2. per pixel, spatially: the treated band is measured from the image
 #      (how deep the uniform dark border actually goes), then faded out, so
 #      the border is covered edge to edge with no gradient inside it.
@@ -163,7 +163,7 @@ def _smooth_profile(profile: np.ndarray, k: int = BORDER_SMOOTH) -> np.ndarray:
 BORDER_MAX_DEPTH = 0.13      # per-edge cap, fraction of that dimension
 # Short fade: the detected depth already lands on the border/content edge,
 # so a long ramp would darken the first millimetre of the card frame. At
-# 1200 DPI this is a quarter of a millimetre — enough to avoid a hard cut,
+# 1200 DPI this is a quarter of a millimetre - enough to avoid a hard cut,
 # too small to see.
 BORDER_FADE_FRAC = 0.005     # fade-out distance past the detected border
 # Inside the frame, pixels below this go black. Kept low on purpose: the
@@ -189,7 +189,7 @@ BORDER_TONE_MAX = 58
 #                      band, so there is never a seam to see
 #   tone weighting     only dark pixels are pushed; bright art in the band is
 #                      left alone, which is what makes it safe on full-art
-#   contrast curve     a push, not a binary snap — so a near-black frame goes
+#   contrast curve     a push, not a binary snap - so a near-black frame goes
 #                      black without flattening everything around it
 
 CONTRAST_TONE_KNEE = 140     # above this (0-255) a pixel is art, not frame
@@ -246,7 +246,7 @@ def _apply_profile(im: Image.Image, profile, shadow=0) -> Image.Image:
     """
     profile = (label, brightness, gamma, saturation); shadow = lift at pure
     black (0-255), fading linearly to zero at SHADOW_KNEE. Only the deepest
-    tones rise — the rest of the tonal range is untouched.
+    tones rise - the rest of the tonal range is untouched.
     """
     _, brightness, gamma, saturation = profile if profile else ("", 1.0, 1.0, 1.0)
     if gamma != 1.0 or shadow > 0:
@@ -274,7 +274,7 @@ def _deepen_black_border(im: Image.Image, opaque=None, amount: float = 1.0,
 
     amount        0..1, how far towards true black the frame is pushed.
     manual_width  >0 skips detection and treats this fraction of the card
-                  width on all four edges — for cards where the artwork
+                  width on all four edges - for cards where the artwork
                   reaches the cut edge and no measurement can tell frame
                   from art.
     """
@@ -572,7 +572,7 @@ REG_THICK_MIN_MM = 0.5
 REG_THICK_MAX_MM = 1.0
 # How close a mark may sit to the paper edge.
 #
-# Studio documents 0.394 in (10 mm) as its minimum, and that was our floor —
+# Studio documents 0.394 in (10 mm) as its minimum, and that was our floor,
 # but it is what costs card slots, because the corner marks land on the corner
 # cards. Measured on our own layouts: Letter 3x3 goes from 6 usable cards to 9,
 # Letter 4x2 from 6 to 8, A4 3x3 from 7 to 9, purely by moving the marks
@@ -582,7 +582,7 @@ REG_THICK_MAX_MM = 1.0
 #
 # 3.5 mm is the floor rather than something smaller because most inkjets
 # cannot print within ~3 mm of the paper edge (the same reason MIN_BOTTOM
-# exists) — a mark below that would simply be clipped off by the printer.
+# exists) - a mark below that would simply be clipped off by the printer.
 # The DEFAULT stays at Studio's 10 mm: lowering it is a lever the user can
 # reach for when they want the slots back, not a silent change to their output.
 REG_INSET_MIN_MM = 3.5
@@ -595,7 +595,7 @@ REG_INSET_MIN_MM = 3.5
 #
 # The inset minimum and thickness maximum already matched REG_INSET_MIN_MM and
 # REG_THICK_MAX_MM, which is what confirms these are the same spec this code
-# was built from. The length did NOT: it defaulted to 5 mm — our own minimum —
+# was built from. The length did NOT: it defaulted to 5 mm (our own minimum)
 # where Studio expects 8.89, so marks came out visibly shorter than a
 # Studio-made template's. That, not the inset, is the size mismatch.
 REG_INSET_DEFAULT_MM = 10.0     # Studio's minimum, and what Proxxied ships
@@ -637,7 +637,7 @@ def _reg_geometry(pw, ph, inset_mm, length_mm, thick_mm, four=False):
     else:
         # 5x5 mm filled, then grown by half the line thickness on every side.
         # silhouette-card-maker draws this as a Rectangle with edgecolor and
-        # linewidth=thickness, and a stroke is centred on the path — so their
+        # linewidth=thickness, and a stroke is centred on the path - so their
         # square reaches 5 + thickness across (6 mm at the 1 mm default) while
         # a plain filled 5 mm rect, which is what this used to be, comes out a
         # millimetre smaller. Reported from Reddit as "marks smaller than SCM's".
@@ -786,8 +786,8 @@ def _draw_marks(c, ox, oy, block_w, block_h, gutter=0.0, guide_rgb=(1, 1, 1),
 
     # Dark tick marks in the margins, aligned to every boundary.
     #
-    # These are guides too. Turning guides off used to leave them printed —
-    # the setting only gated the corner crosses above — so the page still came
+    # These are guides too. Turning guides off used to leave them printed
+    # (the setting only gated the corner crosses above), so the page still came
     # out with dark marks in the margins.
     if guide_rgb is None:
         return
@@ -872,7 +872,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     (flip on long edge).
     back_offset:    (dx_mm, dy_mm) shift applied to the back pages only, to
                     compensate the printer's duplex misalignment. The back's
-                    cut guides move with its cards — they mark where those
+                    cut guides move with its cards - they mark where those
                     cards will be, not where the fronts are.
     back_bleed_mm:  backs are drawn oversized by this much on every edge, so
                     duplex drift up to ~that amount never exposes a white
@@ -889,7 +889,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     can read them, which lowers the cards per sheet.
     edge_bleed_mm:  fronts get a colored bleed frame this wide around each
                     card; cards are separated by a 2x gutter so the cut runs
-                    through the frame — small cut drift shows frame color,
+                    through the frame - small cut drift shows frame color,
                     never white paper or the neighboring card.
     bleed_color:    key of BLEED_COLORS for that frame.
     guide_color:    key of GUIDE_COLORS for the corner cross guides.
@@ -904,7 +904,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         if any(b is None for b in backs) and default_back is None:
             raise ValueError(
                 "back.png not found.\nPut a card-back image named back.png "
-                "(or back.jpg) in the Cardwright folder — it is used for "
+                "(or back.jpg) in the Cardwright folder - it is used for "
                 "every card that has no double-faced back of its own.")
         backs = [Path(b) if b else default_back for b in backs]
 
@@ -949,14 +949,14 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     reg_four = reg_pattern == REG_PATTERNS[1]
 
     # Keep-clear boxes around the registration marks, so no guide or margin
-    # tick lands beside one. Empty when marks are off — nothing to avoid then.
+    # tick lands beside one. Empty when marks are off - nothing to avoid then.
     reg_clear = ()
     if reg_marks:
         _, reg_clear = _reg_geometry(pw, ph, reg_inset_mm, reg_length_mm,
                                      reg_thick_mm, reg_four)
 
     # The back page draws its guides inside the offset transform (below), so
-    # the keep-clear boxes — which are page coordinates — have to be restated
+    # the keep-clear boxes - which are page coordinates - have to be restated
     # in that frame or the shift would walk a guide into a mark.
     back_clear = tuple((x0 - dx, y0 - dy, x1 - dx, y1 - dy)
                        for x0, y0, x1, y1 in reg_clear)
@@ -966,7 +966,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         reg_thick_mm, reg_four) if reg_marks else set()
     usable = [p for i, p in enumerate(all_pos) if i not in blocked]
     if not usable:
-        raise ValueError("Registration marks cover every card slot — "
+        raise ValueError("Registration marks cover every card slot - "
                          "use a smaller grid, card size or mark length")
     slots_per_page = len(usable)
 
@@ -1055,7 +1055,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 if back_rotation_deg:
                     # rotate the whole back layout about the page centre to
                     # cancel angular duplex drift. Registration marks are the
-                    # one thing left square to the page — the cutter's sensor
+                    # one thing left square to the page - the cutter's sensor
                     # hunts for them at a fixed inset.
                     c.translate(pw / 2, ph / 2)
                     c.rotate(back_rotation_deg)
@@ -1132,7 +1132,7 @@ def build_calibration(image_path, out_path, page_name="A4",
     c.setFillColorRGB(0.3, 0.3, 0.3)
     c.setFont("Helvetica", 8)
     c.drawCentredString(pw / 2, oy - MARK_LEN - 4 * mm,
-                        "Cardwright calibration — print at 100% scale, no printer color correction. "
+                        "Cardwright calibration - print at 100% scale, no printer color correction. "
                         "Pick the number closest to a real card.")
     c.showPage()
     c.save()
@@ -1197,7 +1197,7 @@ def build_duplex_test(out_path, page_name="A4", layout=DEFAULT_LAYOUT,
     c.setFont("Helvetica", 8)
     c.setFillColorRGB(0.3, 0.3, 0.3)
     c.drawCentredString(pw / 2, oy - MARK_LEN - 4 * mm,
-                        "Duplex test FRONT — print double-sided at 100% scale, "
+                        "Duplex test FRONT - print double-sided at 100% scale, "
                         "no printer color correction, then hold to the light.")
     c.showPage()
 
@@ -1216,7 +1216,7 @@ def build_duplex_test(out_path, page_name="A4", layout=DEFAULT_LAYOUT,
     c.setFillColorRGB(0.3, 0.3, 0.3)
     c.drawCentredString(
         pw / 2, oy - MARK_LEN - 4 * mm,
-        f"Duplex test BACK — offset {back_offset[0]:+.1f}, {back_offset[1]:+.1f} mm, "
+        f"Duplex test BACK - offset {back_offset[0]:+.1f}, {back_offset[1]:+.1f} mm, "
         f"rotation {back_rotation_deg:+.2f}°. Adjust until it overlaps the front.")
     c.showPage()
     c.save()
@@ -1261,7 +1261,7 @@ def build_shadow_test(image_path, out_path, page_name="A4", profile_id=1,
     c.setFillColorRGB(0.3, 0.3, 0.3)
     c.setFont("Helvetica", 8)
     c.drawCentredString(pw / 2, oy - MARK_LEN - 4 * mm,
-                        "Shadow lift test — pick the lowest +N where dark details "
+                        "Shadow lift test - pick the lowest +N where dark details "
                         "(signature) are visible after laminating.")
     c.showPage()
     c.save()

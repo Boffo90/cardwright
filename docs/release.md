@@ -1,4 +1,4 @@
-# Cardwright — Release Flow
+# Cardwright - Release Flow
 
 Steps for each version:
 1. Bump version in `version.py` + `installer.iss`.

@@ -50,7 +50,7 @@ def search(query: str, limit: int = 60) -> list[dict]:
     Yu-Gi-Oh card is often reprinted with different art.
 
     Each item: {name, source, dpi, size, thumb, download, ext, identifier}
-    — the same keys the MPC search returns, so the GUI can share the dialog.
+    - the same keys the MPC search returns, so the GUI can share the dialog.
     """
     query = query.strip()
     if not query:
@@ -108,7 +108,7 @@ def download(card: dict, target) -> Path:
 
 
 def fetch_thumb(url: str) -> bytes | None:
-    """Search thumbnail, cached on disk — their terms ask us not to keep
+    """Search thumbnail, cached on disk - their terms ask us not to keep
     pulling the same images from their servers."""
     if not url:
         return None

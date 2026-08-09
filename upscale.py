@@ -169,7 +169,7 @@ def upscale(
         out_name = generate_output_name(file) if rename else file.stem + ".png"
         output = OUTPUT_FOLDER / out_name
         if status_callback:
-            status_callback("Resizing (no GPU — AI disabled)…")
+            status_callback("Resizing (no GPU - AI disabled)…")
         im = Image.open(source)
         if im.mode not in ("RGB", "RGBA"):
             im = im.convert("RGBA")
@@ -212,13 +212,13 @@ def upscale(
 
     # Skip the AI when the (trimmed) source already has at least card
     # resolution. MPC art, pre-rendered high-res and previously-processed
-    # cards gain nothing from x4 — it would only balloon them to ~16x the
+    # cards gain nothing from x4 - it would only balloon them to ~16x the
     # pixels (slow preview, heavy PDFs). Just fit to card (if asked) + DPI.
     with Image.open(source) as probe:
         w, h = probe.size
     if w >= card_w_px and h >= card_h_px:
         if status_callback:
-            status_callback("Already high-res — skipping AI upscale")
+            status_callback("Already high-res - skipping AI upscale")
         im = Image.open(source)
         if im.mode not in ("RGB", "RGBA"):
             im = im.convert("RGBA")
@@ -238,7 +238,7 @@ def upscale(
     # difference: measured on a 600x825 Pokemon scan, sharpness went from 54
     # to 84 (Laplacian variance) for +0.5 s and no extra memory.
     #
-    # For MTG this never fires — Scryfall's 745 px x4 already clears 2976.
+    # For MTG this never fires - Scryfall's 745 px x4 already clears 2976.
     # Gatherer (646) and the Pokemon catalogues (600) are what it is for.
     #
     # Running the AI twice and downsampling scores far higher (331) but costs
@@ -248,7 +248,7 @@ def upscale(
     need_h = -(-card_h_px // scale)
     if w < need_w or h < need_h:
         if status_callback:
-            status_callback("Small source — normalizing before AI…")
+            status_callback("Small source - normalizing before AI…")
         pre = TEMP_FOLDER / (source.stem + "_pre.png")
         with Image.open(source) as im:
             if im.mode not in ("RGB", "RGBA"):
@@ -264,7 +264,7 @@ def upscale(
         "-s", str(scale),
         # The engine looks for a *relative* "models" folder, so without this
         # it only finds the models when the working directory happens to be
-        # the app's own — which nothing guarantees when run from source.
+        # the app's own - which nothing guarantees when run from source.
         "-m", str(MODELS_FOLDER),
     ]
 

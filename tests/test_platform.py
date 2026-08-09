@@ -161,7 +161,7 @@ def test_open_folder_raises_oserror_when_open_fails(monkeypatch, tmp_path):
 
 
 # ==========================================================================
-# The constants above being right is only half of it — these drive the real
+# The constants above being right is only half of it - these drive the real
 # functions and assert the values actually reach the engine, so dropping the
 # kwargs or the chmod fails a test instead of passing quietly.
 # ==========================================================================

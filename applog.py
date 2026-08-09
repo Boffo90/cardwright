@@ -8,7 +8,7 @@ report of "it doesn't fetch cards" was unactionable because nothing recorded
 
 Kept deliberately small: one rotating file, no console handler (the app is
 built windowed, so there is no console to write to), and hooks that catch what
-would otherwise vanish — unhandled exceptions on the main thread and in worker
+would otherwise vanish - unhandled exceptions on the main thread and in worker
 threads both used to disappear silently.
 """
 

@@ -35,7 +35,7 @@ def _parse(v: str) -> tuple:
 def check_for_update() -> dict | None:
     """Returns {"version", "url", "notes"} when a newer release exists."""
     # Releases only carry Windows assets, so there is nothing to offer anyone
-    # else — and returning None here keeps the whole swap path below Windows-
+    # else - and returning None here keeps the whole swap path below Windows-
     # only rather than guarding each step of it.
     if not IS_WINDOWS:
         return None
@@ -121,7 +121,7 @@ def _write_swap_script(current: Path, new: Path) -> Path:
     A PyInstaller onefile app is TWO processes (bootloader + child), so we
     wait on the image name rather than a PID: waiting on os.getpid() only
     sees the child, and moving the exe while the bootloader still holds it
-    fails silently — which then relaunches the OLD exe alongside the dying
+    fails silently - which then relaunches the OLD exe alongside the dying
     one and corrupts its _MEI temp dir.
     """
     # Absolute System32 paths + ping-based sleeps: "timeout" needs a console

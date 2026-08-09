@@ -2,8 +2,8 @@
 Card image sources for the search gallery.
 
 Each source matches the interface CardSearchDialog already expects from
-mpcfill / ygoprodeck — search(query) -> [card dict], fetch_thumb(url) -> bytes
-— plus an `ADD_KIND` marker telling the queue how a pick should be fetched:
+mpcfill / ygoprodeck: search(query) -> [card dict], fetch_thumb(url) -> bytes,
+plus an `ADD_KIND` marker telling the queue how a pick should be fetched:
 
     "card"      the dict carries a direct image URL, download it as-is
     "scryfall"  the dict carries a reference to resolve through scryfall.fetch
@@ -81,7 +81,7 @@ def _label(card: dict) -> tuple[str, str]:
     if status == "lowres":
         bits.append("low-res scan")
     elif status in ("placeholder", "missing"):
-        # Not the card at all — a stand-in. Say so, or it looks like a normal
+        # Not the card at all - a stand-in. Say so, or it looks like a normal
         # option that simply came out blurry.
         bits.append("no real scan")
     if card.get("artist"):
@@ -145,9 +145,9 @@ class _Gatherer:
     PLACEHOLDER = "Card name (e.g. Lightning Bolt)"
     # Measured across several cards, consistently: Gatherer serves 646x902 at
     # heavy compression while Scryfall serves 745x1040 at ~1 MB. Worth saying
-    # out loud — it is roughly 15x less data to upscale from.
+    # out loud - it is roughly 15x less data to upscale from.
     NOTE = ("Gatherer images are 646×902 and heavily compressed (~60 KB vs "
-            "Scryfall's ~1 MB) — a weaker source to upscale from.")
+            "Scryfall's ~1 MB) - a weaker source to upscale from.")
 
     @staticmethod
     def search(query: str, limit: int = 60) -> list[dict]:
@@ -241,11 +241,11 @@ class _Pokemon:
     # No CARD_SIZE_HINT: a Pokemon card is 63x88 mm, the same as Magic, so the
     # default card size is already right.
     #
-    # Worth stating plainly — 600x825 is the ceiling across every Pokemon
+    # Worth stating plainly - 600x825 is the ceiling across every Pokemon
     # catalogue, not a TCGdex limitation, and it is below what a 63x88 mm card
     # needs at 1200 DPI. The pipeline normalizes before the AI pass to make
     # the most of it.
-    NOTE = ("Pokémon art tops out at 600×825 everywhere — below Scryfall's "
+    NOTE = ("Pokémon art tops out at 600×825 everywhere - below Scryfall's "
             "745×1040, so expect a little less detail than Magic cards.")
 
     @staticmethod

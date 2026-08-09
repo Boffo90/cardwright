@@ -151,7 +151,7 @@ def _png_urls(card: dict) -> list[tuple[str, str]]:
 
 def ref_names_a_printing(ref: str) -> bool:
     """
-    True when the reference picks a specific printing — a URL, or a decklist
+    True when the reference picks a specific printing - a URL, or a decklist
     line with a set and collector number. Those are deliberate choices and
     must never be second-guessed; only a bare card name is up for grabs.
     """
@@ -165,7 +165,7 @@ def ref_names_a_printing(ref: str) -> bool:
 
 def _ref_pins_language(ref: str) -> bool:
     """
-    True when the reference itself names a language — a /ja/ Scryfall card
+    True when the reference itself names a language - a /ja/ Scryfall card
     URL, or a raw api.scryfall.com URL the caller built. An explicit link
     always beats the global preference: someone who pastes the Japanese
     printing wants the Japanese printing.
@@ -182,7 +182,7 @@ def _localize(card: dict, lang: str | None) -> tuple[dict, bool]:
     Swap a resolved card for its printing in `lang`.
 
     Returns (card, fell_back). Scryfall has no bulk way to ask for a
-    language — /cards/collection identifiers don't take one — so this is a
+    language - /cards/collection identifiers don't take one - so this is a
     per-card round trip on top of whatever resolved the card in the first
     place. At SCRYFALL_DELAY that is ~0.1 s per unique printing.
 
@@ -201,7 +201,7 @@ def _localize(card: dict, lang: str | None) -> tuple[dict, bool]:
     if r.status_code == 200:
         localized = r.json()
         # Guard against a printing that exists but has no usable image in
-        # that language — better the English art than no card at all.
+        # that language - better the English art than no card at all.
         try:
             _png_urls(localized)
         except ScryfallError:
@@ -215,7 +215,7 @@ def _localize(card: dict, lang: str | None) -> tuple[dict, bool]:
 # best scan
 # --------------------------------------------------------------------------
 # Scryfall serves every PNG at the same 745x1040, so pixel dimensions say
-# nothing about quality — what varies is how good the underlying scan is.
+# nothing about quality - what varies is how good the underlying scan is.
 # Two signals, and both are needed:
 #
 #   image_status  drops the ones that aren't the card at all. A "placeholder"
@@ -277,7 +277,7 @@ def best_printing(card: dict, lang: str | None,
 
     Only ever called for a bare card name, where no particular printing was
     asked for. A decklist line or a link names an exact printing and is left
-    alone — the user already chose.
+    alone - the user already chose.
 
     Falls back to `card` unchanged whenever the search turns up nothing
     usable, so this can never make a lookup fail.
@@ -299,7 +299,7 @@ def best_printing(card: dict, lang: str | None,
     if not usable:
         return card
 
-    # Same artwork only. This is a scan-quality upgrade, not an art swap —
+    # Same artwork only. This is a scan-quality upgrade, not an art swap:
     # "Silence" in English otherwise lands on a Secret Lair with completely
     # different art, which is not what someone typing a card name asked for.
     illus = _illustration(card)
@@ -442,7 +442,7 @@ _GATHERER_LOCALES = {
 def _gatherer_parse(ref: str):
     """Returns {'mid': int} or {'set','number','lang','name'} for Gatherer
     URLs. The trailing name slug is kept because it is the only part of a
-    new-style link Scryfall is guaranteed to understand — see _fetch_gatherer."""
+    new-style link Scryfall is guaranteed to understand - see _fetch_gatherer."""
     if "gatherer.wizards.com" not in ref.lower():
         return None
 
@@ -469,7 +469,7 @@ def _printing_by_name(name: str, number=None, lang=None, status_callback=None):
     commas are already gone ("tyvars-stand" -> "Tyvar's Stand").
     """
     if status_callback:
-        status_callback("Set code not on Scryfall — looking up by name...")
+        status_callback("Set code not on Scryfall - looking up by name...")
     r = _get(f"{SCRYFALL_API}/cards/named", params={"fuzzy": name})
     if r.status_code != 200:
         return None
@@ -492,7 +492,7 @@ def _printing_by_name(name: str, number=None, lang=None, status_callback=None):
 
 def _fetch_gatherer(g: dict, status_callback=None):
     """
-    A Gatherer link yields the GATHERER image where one exists — that is the
+    A Gatherer link yields the GATHERER image where one exists - that is the
     whole point of pasting one. Scryfall is consulted for the multiverse id
     (needed to fetch the image) and for naming / Auto-mode metadata.
 
@@ -533,10 +533,10 @@ def _fetch_gatherer(g: dict, status_callback=None):
     if mid is None:
         if card:
             if status_callback:
-                status_callback("Not on Gatherer — using the Scryfall image...")
+                status_callback("Not on Gatherer - using the Scryfall image...")
             return _download_card(card, status_callback)
         raise ScryfallError(
-            "Could not find that card from the Gatherer link — neither "
+            "Could not find that card from the Gatherer link - neither "
             "Gatherer nor Scryfall recognises it.")
 
     if card:
@@ -556,7 +556,7 @@ def _fetch_gatherer(g: dict, status_callback=None):
         if card is None:
             raise
         if status_callback:
-            status_callback("Gatherer has no image — using Scryfall's...")
+            status_callback("Gatherer has no image - using Scryfall's...")
         return _download_card(card, status_callback)
 
 
@@ -662,7 +662,7 @@ def _related_tokens(card_objects, status_callback=None) -> list[dict]:
     """
     The tokens a set of cards makes, deduped, as resolved card objects.
 
-    Scryfall hangs these off `all_parts`, so no guessing is involved — a card
+    Scryfall hangs these off `all_parts`, so no guessing is involved - a card
     that makes no tokens simply has none. Fetched with one bulk /collection
     call rather than one request per token, since identifiers accept `id`.
     """
@@ -688,7 +688,7 @@ def _related_tokens(card_objects, status_callback=None) -> list[dict]:
         fetched.extend(data.get("data", []))
 
     # Three cards that each make a Goblin point at the Goblin printed in their
-    # own set — three different ids, one actual token. Collapse those, keeping
+    # own set - three different ids, one actual token. Collapse those, keeping
     # the newest printing (the best scan, same reasoning as the Best scan
     # switch).
     #
@@ -720,7 +720,7 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
         }
 
     `english_only` lists the cards that had no printing in `lang` and came
-    back in English instead — a normal outcome worth surfacing, since a deck
+    back in English instead - a normal outcome worth surfacing, since a deck
     that silently mixes languages looks like a bug to the user.
     """
     entries, bad = parse_decklist(text)
@@ -774,7 +774,7 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
         try:
             downloads = [(f"{base}{label}", url) for url, label in _png_urls(c)]
         except ScryfallError:
-            not_found.append(f'{c["name"]} ({c["set"].upper()}) {c["collector_number"]} — no image')
+            not_found.append(f'{c["name"]} ({c["set"].upper()}) {c["collector_number"]} - no image')
             continue
 
         display = f'{e["qty"]}x {c["name"]}' if e["qty"] > 1 else c["name"]
@@ -789,7 +789,7 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
         }
         if source == "gatherer":
             # Gatherer only knows cards with a multiverse id. Plenty do not:
-            # every Secret Lair and promo, and — less obviously — every foil
+            # every Secret Lair and promo, and - less obviously - every foil
             # printing, which Scryfall numbers with a star (198★) and gives no
             # multiverse id because Gatherer never catalogued foils separately.
             #
@@ -862,7 +862,7 @@ def deck_url_kind(text: str):
 # HISTORY, so nobody re-litigates this from scratch: Moxfield's support was
 # asked for API access and declined, citing WotC concerns, and this project
 # recorded "do not scrape" as a result. That was revisited in July 2026 and
-# the call was deliberately reversed by the author — see decisions.md. What
+# the call was deliberately reversed by the author - see decisions.md. What
 # follows uses the same unauthenticated endpoint their own web client calls.
 #
 # Because that access is theirs to withdraw, every failure path here has to
@@ -871,7 +871,7 @@ def deck_url_kind(text: str):
 MOXFIELD_API = "https://api2.moxfield.com/v3/decks/all/{deck_id}"
 
 _MOXFIELD_PASTE = ("In Moxfield use Export → copy the decklist text and "
-                   "paste it here instead — that format is supported "
+                   "paste it here instead - that format is supported "
                    "directly.")
 
 # Everything except the maybeboard, which is by definition cards the author

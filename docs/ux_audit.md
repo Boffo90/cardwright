@@ -1,4 +1,4 @@
-# Cardwright — Print-sheet UX audit (August 2026)
+# Cardwright - Print-sheet UX audit (August 2026)
 
 ## Why this exists
 The export dialog does everything the competition does and several things none of
@@ -9,11 +9,11 @@ references actually do, what we actually do, and which differences are worth
 closing.
 
 ## What was read, and when
-- **proxxied.com/app** — the live Proxy Builder, 2026-08-04. Full control
+- **proxxied.com/app** - the live Proxy Builder, 2026-08-04. Full control
   inventory read off the running app, not the marketing page.
-- **github.com/alex-taxiera/proxy-print** @ `trunk`, 2026-08-04 — `src/components/Preview/*`
+- **github.com/alex-taxiera/proxy-print** @ `trunk`, 2026-08-04 - `src/components/Preview/*`
   read directly. Stack: React + Chakra UI + `@dnd-kit`, image work in wasm.
-- **Cardwright** — `ExportDialog`, `gui.py:1234`–`gui.py:2910`.
+- **Cardwright** - `ExportDialog`, `gui.py:1234`–`gui.py:2910`.
 
 ## What Cardwright's preview does today
 Scrolls every sheet at once, drag-to-reorder with a ghost (`_start_drag_ghost`),
@@ -24,7 +24,7 @@ analysis that names the inset which fixes it.
 
 ## Gaps worth closing
 
-### A — Direct manipulation of the sheet
+### A - Direct manipulation of the sheet
 1. **No drop feedback.** We show a ghost following the cursor, but nothing on the
    sheet says where the card will land. `_reorder` inserts *before* the card you
    dropped on; you find that out afterwards. Both references highlight the target.
@@ -41,13 +41,13 @@ analysis that names the inset which fixes it.
 5. **No per-slot disable.** Proxxied lets you turn individual slots off and has
    *Center Cards Across Disabled Gaps* for layouts like 3×3 minus the middle.
 
-### B — Getting out of a mistake
+### B - Getting out of a mistake
 6. ~~**No undo.**~~ **Done in v2.17.5.** Ctrl+Z / Ctrl+Y plus buttons that name
    what they would take back. Deleting a file clears the history rather than
    pretending to be undoable. What is still missing against Proxxied is the
-   *visible* Action History list — the buttons show one step, not the trail.
+   *visible* Action History list - the buttons show one step, not the trail.
 
-### C — Changing a card without leaving the sheet
+### C - Changing a card without leaving the sheet
 7. **Art cannot be changed from the preview.** Seeing the wrong printing means
    cancelling out to the main window and re-running the card. Proxxied has a
    global *Preferred Art Source* (Scryfall / MPC Autofill) plus Advanced Search;
@@ -56,9 +56,9 @@ analysis that names the inset which fixes it.
 8. **Quantity is one duplicate at a time.** proxy-print offers *Add 1* /
    *Add 3* / *Add more…* per card. Ours is *Duplicate*, and each invocation writes
    a physical `name (2).png` to the output folder (`_copy_of`, `gui.py:2594`).
-   That file-per-copy model is what blocks a real quantity control — see below.
+   That file-per-copy model is what blocks a real quantity control - see below.
 
-### D — Discoverability
+### D - Discoverability
 9. **Left-click cycles a three-state border mode** (auto → off → on) with no
    indicator of which state a card is in and no visible affordance. It is
    documented only in the hint line under the canvas.
@@ -68,7 +68,7 @@ analysis that names the inset which fixes it.
 11. **One 3-line hint paragraph** carries every interaction the preview supports
     (`gui.py:1624`). Anything not in that sentence is undiscoverable.
 
-### E — Session
+### E - Session
 12. **No save/load of the working session.** Proxxied names the project
     ("Untitled Project"). Already recorded in `todo.md`.
 
@@ -86,7 +86,7 @@ that names the fixing inset rather than just warning, and a preview that scrolls
 **every sheet at once** where both references paginate one page at a time.
 
 ## Priority
-**Tier 1 — the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · drop indicator +
+**Tier 1 - the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · drop indicator +
 droppable empty slots · drag between sheets · quantity per card · change art
 from the preview.
 
@@ -100,23 +100,23 @@ Item by item, honestly:
 
 | Item | In Tkinter |
 | --- | --- |
-| Undo/redo | Yes — it is a model concern (`_order`, `_excluded`, `_back_of`, `_border_modes`); nothing to draw |
-| Drop indicator | Yes — one canvas rectangle drawn at the target slot |
-| Droppable empty slots | Yes — `usable` already holds every slot position; `_key_at` needs to return empty slots too |
-| Drag between sheets | Yes — the edge auto-scroll already exists |
+| Undo/redo | Yes - it is a model concern (`_order`, `_excluded`, `_back_of`, `_border_modes`); nothing to draw |
+| Drop indicator | Yes - one canvas rectangle drawn at the target slot |
+| Droppable empty slots | Yes - `usable` already holds every slot position; `_key_at` needs to return empty slots too |
+| Drag between sheets | Yes - the edge auto-scroll already exists |
 | Quantity per card | Yes, but needs the file-per-copy model replaced with a count |
 | Change art from the preview | Yes, but cross-module: needs the upscaling pipeline reachable from `ExportDialog` (already flagged in `todo.md`) |
-| Multi-select | Yes — a set of keys plus a selection outline |
+| Multi-select | Yes - a set of keys plus a selection outline |
 | Keybinds / indicators | Yes |
 | **Animated reflow, transitions, 60 fps drag** | **No** |
 
 The only structural loss is animation, and none of the Tier 1/Tier 2 complaints
 are about animation. **Recommendation: close Tier 1 and Tier 2 in CustomTkinter.**
-Revisit PySide6 only if something on that list actually proves impossible — that
+Revisit PySide6 only if something on that list actually proves impossible - that
 would be a decision made on evidence instead of on feel, and the backend
 (`print_sheet.py`, `upscale.py`, the source modules) is untouched either way.
 
-## One thing to fix first — done in v2.17.4
+## One thing to fix first - done in v2.17.4
 `_copy_of` wrote a real PNG per duplicate, and the queue's quantity wrote one
 per copy, so a 4-of cost four identical files. Copies are now `_Card` instances
 sharing one path: identity for the copy, path for the image. `_copy_of` is gone.
