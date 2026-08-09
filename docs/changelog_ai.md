@@ -2,7 +2,29 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.5 (unreleased) — undo
+## v2.17.5 (unreleased) — undo, and macOS from source
+
+### macOS
+- **Runs from source on macOS**, contributed by `cc3xz` in PR #1 — the
+  project's first outside contribution. No `.app`, DMG, signing or macOS
+  release: Windows is still the only platform with a build. Apple Silicon is
+  native, reaching the GPU through Metal, so there is no Vulkan runtime to
+  install.
+- The compatibility fixes were real crashes, not cosmetics: `creationflags`
+  raises `ValueError` on POSIX and broke every upscale, `os.startfile` does not
+  exist there, bootstrap fetched the Windows zip, and the engine came out of
+  the archive without its exec bit.
+- **`numpy` was never declared in `requirements.txt`** although `gui.py` and
+  `print_sheet.py` both import it, so a clean install following the README
+  could not start the app. A Windows bug, found from a Mac.
+- A test suite covering every platform branch, and CI on windows-latest and
+  macos-latest. The tests assert the **Windows** side too, so a branch written
+  the wrong way round fails on whichever machine runs it.
+- The engine is now told where its models are with an absolute `-m`. On macOS
+  it would otherwise find none unless launched from the app's own folder. The
+  PR reported this as affecting Windows as well; measured before merging, and
+  it does not — the Windows engine resolves the path relative to the
+  executable. Passing it is still right, just not a Windows fix.
 
 ### Undo/redo in the export preview
 - **Ctrl+Z / Ctrl+Y**, and a pair of buttons beside the page nav. Covers

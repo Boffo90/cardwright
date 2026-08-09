@@ -127,8 +127,19 @@ A source too small for one x4 pass to reach the card is resized up to exactly `t
 ## Footer options layout
 The options panel keeps each row in its **own frame**. Tk's grid shares column widths across rows, so a wide label in one row silently widens the row above it: adding the Card language row directly to the shared grid pushed the panel from 903 px to 1027 against a 900 px minimum window — reintroducing exactly the clipping v2.12.0 fixed. Measure `winfo_reqwidth()` of the options frame after touching this area; it should stay under 900. Long help text goes on its own row with `wraplength` rebound on `<Configure>`, never inline beside controls.
 
+## Platforms (v2.17.5)
+**Windows is the product; macOS is supported from source.** Contributed in PR #1 by `cc3xz`, August 2026, and merged with that boundary explicit: no `.app`, DMG, signing or macOS release. Rebase-merged, so the history stays linear.
+
+- **All platform differences are decided in `config.py`** — `IS_WINDOWS`, `NO_WINDOW_KWARGS`, the engine filename — and imported from there. Do not add a second `sys.platform` test elsewhere.
+- `creationflags` **does not exist on POSIX and raises ValueError**, so it cannot be passed unconditionally. That is why it travels as a kwargs dict rather than a constant.
+- **`write_bytes` drops the archive's exec bit**, so `bootstrap` re-applies `0o755` on POSIX or the engine cannot be spawned.
+- The tests **assert the Windows branches too**, not just the POSIX ones, so a branch written the wrong way round fails on either machine. That is the whole point — the author has no Mac and most contributors have no Windows.
+- **The `-m` model-folder flag is a macOS fix, not a Windows one.** The PR claimed the Windows build could also miss its models when the working directory is not the app's own. Measured, and it does not: the Windows engine loaded its models from a foreign working directory even with an empty `models/` there as a decoy, so it resolves relative to the executable. Passing the absolute path is still right — it stops depending on undocumented behaviour — but do not repeat the Windows claim.
+
 ## Licensing
 **Source-available** (not MIT): code visible, redistribution/selling/rebranding forbidden.
+
+The LICENSE has a **contributions clause**: submitting a PR licenses that work to the copyright holder under these same terms, so accepting outside code needs no separate CLA. What it does **not** do is make a future relicence free — that needs every contributor's permission. PR #1 (August 2026) was the first, so a move to GPL now requires `cc3xz` as well as the author. The cost of deferring this decision rises with each contributor merged.
 
 ## Printing / calibration
 - User's printer (Epson ET-2800, 300gsm cold-matte laminated): **color profile 9, shadow lift Medium (+14)**, sharpening Off, shift-down per paper.

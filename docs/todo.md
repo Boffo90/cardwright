@@ -82,9 +82,15 @@ Recorded so they are not re-researched from scratch:
 - **Code signing** still pending (Azure Trusted Signing ~US$10/mo). Until then
   SmartScreen warns "unknown publisher" on every download. There is an FAQ
   entry explaining it.
-- **Linux .deb** — requested at launch. Real-ESRGAN ncnn has Linux builds, but
-  `update.py` (Windows `.bat` swap), `bootstrap.py` (downloads the Windows zip)
-  and packaging all need a Linux path. A port, not a tweak. Undecided.
+- **Linux .deb** — requested at launch. Still undecided, but **cheaper than it
+  was**: the macOS port (PR #1, v2.17.5) put every platform branch behind
+  `IS_WINDOWS` in `config.py` and left a test suite that asserts both sides, so
+  Linux is now mostly a third engine zip and a packaging story rather than a
+  rewrite of `bootstrap`/`update`/`upscale`.
+- **How far to support macOS.** It runs from source and CI covers it, but there
+  is no build, no release and no Mac to test on. Reports will arrive anyway.
+  Decide whether that stays "from source, best effort" or grows a real release
+  before the first Mac bug report forces the answer.
 
 ## Known limits (not bugs)
 - MPC search depends on mpcfill.com + Google Drive; fragile if they change.
