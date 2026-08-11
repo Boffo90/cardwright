@@ -79,9 +79,18 @@ Recorded so they are not re-researched from scratch:
   contributor's permission. GPL-3.0 was the suggested fit (forks must stay
   open, nobody can close and sell it) with the name protected separately as a
   trademark note.
-- **Code signing** still pending (Azure Trusted Signing ~US$10/mo). Until then
-  SmartScreen warns "unknown publisher" on every download. There is an FAQ
-  entry explaining it.
+- **Code signing** still pending, and the cheap route is **gone**: Azure Trusted
+  Signing limits individual developers to the USA and Canada, so the ~US$10/mo
+  plan this entry used to assume is not available from Chile. Realistic options
+  are Certum Cloud or SSL.com IV, annual, cloud-HSM, and capped at 458 days
+  from March 2026. See `decisions.md` for the full reasoning, including why
+  signing alone would not settle the antivirus detection.
+- **Antivirus false positive.** Defender flags the release exe as
+  `Trojan:Win32/Wacatac.C!ml` (the installer is not flagged). Submitted to
+  Microsoft on 2026-08-11, submission `1940f3c3-54f4-42fb-8a04-3298c8eb50df`,
+  pending. **This repeats every release**: the clearance applies to one file
+  hash. The step is in `release.md`. Keep a Defender exclusion on the repo
+  folder or the build will be quarantined out from under you mid-release.
 - **Linux .deb** - requested at launch. Still undecided, but **cheaper than it
   was**: the macOS port (PR #1, v2.17.5) put every platform branch behind
   `IS_WINDOWS` in `config.py` and left a test suite that asserts both sides, so
