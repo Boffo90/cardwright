@@ -126,6 +126,30 @@ The preview is a workspace, not a picture - what you see is what prints.
 Something misbehaving? The **Log** button in the header opens a log file with
 the full details of any failure - attach it to a bug report.
 
+### If your antivirus flags it
+
+Windows Defender may report `Trojan:Win32/Wacatac.C!ml`. The `!ml` suffix means
+a machine-learning guess about the file's shape, not a match against a known
+virus, and Wacatac is Defender's catch-all for packed executables.
+
+Cardwright is a packed executable that legitimately does three things malware
+also does: it ships as one self-extracting file (PyInstaller), it downloads and
+runs another executable on first launch (the Real-ESRGAN engine), and it
+replaces its own `.exe` when you accept an update. All three are visible in the
+source in this repository.
+
+**Verify what you downloaded.** Every release lists the SHA-256 of both files:
+
+```
+certutil -hashfile Cardwright.exe SHA256
+```
+
+If it matches the release page, you have exactly the file that was published.
+You can also build it yourself from source, below.
+
+The real fix is a code-signing certificate, which is not yet in place. Until
+then each release is reported to Microsoft as a false positive.
+
 ## Run from source
 
 Runs on **Windows and macOS**, Python 3.10+. There is no packaged macOS build

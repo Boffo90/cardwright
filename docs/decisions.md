@@ -142,6 +142,15 @@ The options panel keeps each row in its **own frame**. Tk's grid shares column w
 - The tests **assert the Windows branches too**, not just the POSIX ones, so a branch written the wrong way round fails on either machine. That is the whole point - the author has no Mac and most contributors have no Windows.
 - **The `-m` model-folder flag is a macOS fix, not a Windows one.** The PR claimed the Windows build could also miss its models when the working directory is not the app's own. Measured, and it does not: the Windows engine loaded its models from a foreign working directory even with an empty `models/` there as a decoy, so it resolves relative to the executable. Passing the absolute path is still right - it stops depending on undocumented behaviour - but do not repeat the Windows claim.
 
+## Antivirus false positives and code signing (August 2026)
+Windows Defender flags the release binary as **`Trojan:Win32/Wacatac.C!ml`** (ThreatID 2147749372). Confirmed on the author's own machine, where Defender quarantined `Cardwright.exe` out of the repo root and blocked a freshly downloaded copy from being read at all.
+
+- **`!ml` means a machine-learning verdict, not a signature match.** Wacatac is Defender's catch-all for packed executables. Three things the app legitimately does put it there: PyInstaller **single-file** packaging (self-extracting, the shape malware hides in), **downloading and running another executable** at first launch (the Real-ESRGAN engine), and **replacing its own exe** through the updater's `.bat`.
+- **Do not "fix" it by dropping `--onefile`.** That is the single heaviest factor, but `update.py`'s swap script is built around the two-process onefile model and took three iterations to get right. Not worth trading a working updater for a heuristic.
+- **Azure Trusted Signing is not available to this author.** Individual developers are limited to the **USA and Canada**; organisations add the EU and UK. Chile is covered by neither, so the ~US$10/mo route recorded in `todo.md` is a dead end. The realistic options are Certum Cloud or SSL.com IV, both annual, both cloud-HSM (since 2023 the private key has to live on FIPS hardware or a cloud HSM, and a shipped USB token to Chile is its own problem). Note also that from March 2026 code-signing certificates cap at **458 days**, so it is a recurring renewal.
+- **Signing is necessary but not sufficient.** It fixes publisher identity and the SmartScreen wording, but an ML detection keyed on behaviour can still fire on a certificate with no reputation. Instant SmartScreen reputation needs an **EV** certificate, which requires organisation validation.
+- **Until then the mitigation is transparency plus reporting**: every release publishes the SHA-256 of both assets (GitHub computes them), the README and in-app FAQ explain the detection by name and tell people how to verify, and each new binary is submitted to Microsoft as a false positive. The submission clears one hash, so it repeats every release. Both steps are in `release.md`.
+
 ## Licensing
 **Source-available** (not MIT): code visible, redistribution/selling/rebranding forbidden.
 

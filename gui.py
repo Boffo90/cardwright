@@ -3560,6 +3560,29 @@ class CardSearchDialog(ctk.CTkToplevel):
 # not from what seemed likely to be asked. Most entries here cost someone a
 # confused hour or a wasted sheet of cardstock.
 FAQ = [
+    ("My antivirus flags Cardwright as a trojan. Is it infected?",
+     "No, and here is how to check rather than take my word for it.\n\n"
+     "Windows Defender reports it as Trojan:Win32/Wacatac.C!ml. The \"!ml\" "
+     "suffix means a machine-learning guess about the file's shape and "
+     "behaviour, not a match against a known virus. Wacatac is Defender's "
+     "catch-all for packed executables, and Cardwright is a packed "
+     "executable that legitimately does three things malware also does:\n\n"
+     "  - it is one self-extracting file (PyInstaller), the same packaging "
+     "malware uses to hide in\n"
+     "  - it downloads and then runs another executable, the Real-ESRGAN AI "
+     "engine, on first run\n"
+     "  - it replaces its own .exe when you accept an update\n\n"
+     "Every one of those is visible in the source, which is public at "
+     "github.com/Boffo90/cardwright.\n\n"
+     "To verify what you downloaded: every release lists the SHA-256 of both "
+     "files. Run\n"
+     "    certutil -hashfile Cardwright.exe SHA256\n"
+     "and compare it with the release page. If they match, you have exactly "
+     "the file that was published.\n\n"
+     "The real fix is a code-signing certificate, which is being worked on. "
+     "Until then, reporting the file to Microsoft as a false positive is what "
+     "clears it, and that is done for each release."),
+
     ("My printer says \"insufficient memory\" or spits out an error page.",
      "A print sheet is a real 1200 DPI page - lossless, that is around 217 MB - "
      "and a home printer has to rasterise the whole thing in its own RAM. Most "
