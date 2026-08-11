@@ -2,6 +2,23 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.9 - the antivirus question, answered in the app
+- **New FAQ entry: "My antivirus flags Cardwright as a trojan."** Raised on
+  r/mtgproxies by someone who checked the download on VirusTotal before running
+  it, which is the right instinct and deserves a real answer rather than "trust
+  me".
+- The entry names the detection (`Trojan:Win32/Wacatac.C!ml`), explains that
+  `!ml` is a machine-learning verdict about the file's shape rather than a
+  signature match, and lists the three things the app genuinely does that
+  malware also does: single-file packaging, downloading and running the AI
+  engine on first launch, and replacing its own exe when you accept an update.
+  All three are visible in the public source.
+- It also gives the `certutil` command to check the download against the
+  SHA-256 published with every release, so nobody has to take any of it on
+  faith.
+- The README carries the same explanation, and release notes now publish the
+  SHA-256 of both files.
+
 ## v2.17.8 - the back lookup no longer loses a race
 - **Fixes v2.17.7, which only worked if you waited.** Finding a gallery pick's
   back face takes two network calls, measured at **6.5 s** for Cosima, God of
