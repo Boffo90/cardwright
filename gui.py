@@ -1452,6 +1452,8 @@ class ExportDialog(ctk.CTkToplevel):
         self._thumbs_b = {}        # path -> thumbnail with the border treated
         self._border_modes = {}    # path -> "auto" | "on" | "off"
         self._slots = []           # preview hit-boxes: (x0, y0, x1, y1, path)
+        self._drops = []           # drop targets: (x0, y0, x1, y1, uid or None)
+        self._dropbar = None       # canvas id of the insertion indicator
         self._prev_job = None
         self._page = 0             # sheet the ◀▶ nav is pointing at
         self._excluded = set()     # card ids dropped from the export
@@ -2590,22 +2592,25 @@ class ExportDialog(ctk.CTkToplevel):
         self._sheet_tops = [gap + p * (H + gap) for p in range(sheets)]
 
         self._slots = []
+        # Drop targets cover EVERY usable slot, not just the filled ones: the
+        # first empty slot after the last card is where "put it at the end"
+        # lives, and without it a sheet with room offers nowhere to aim.
+        self._drops = []
         for p in range(sheets):
             st = self._sheet_tops[p]
             for k, (px, py) in enumerate(usable):
                 slot = p * per_sheet + k
-                if slot >= len(page_keys):
-                    continue
-                key = page_keys[slot]
-                if not key:
-                    continue
+                key = page_keys[slot] if slot < len(page_keys) else None
                 # the hit-box follows the drawn card, so hover and right-click
                 # keep landing on an offset back page
                 x = (print_sheet.mirror_x(px, left, bw, CW) + bdx
                      if showing_backs else px)
                 y = ph - py - CH + bdy
-                self._slots.append((X(x), st + X(y),
-                                    X(x + CW), st + X(y + CH), key))
+                box = (X(x), st + X(y), X(x + CW), st + X(y + CH))
+                if key:
+                    self._slots.append((*box, key))
+                if not showing_backs and slot <= len(page_keys):
+                    self._drops.append((*box, key))
 
         self._render_sheet = lambda p: render_sheet(p)[0]
         self._sheet_geom = (W, H, gap, sheets)
@@ -2865,6 +2870,48 @@ class ExportDialog(ctk.CTkToplevel):
 
     # ---------------------------------------------------- drag to reorder
     _DRAG_THRESH = 6
+    _DROPBAR_W = 3          # px; the insertion line drawn between slots
+
+    def _drop_at(self, cx, cy):
+        """Where a drop here would insert. Returns (index, x, y0, y1) or None.
+
+        The slot is split down the middle: the left half means "before this
+        card", the right half "after it". That is what makes the indicator
+        honest, because the line is drawn on the edge the card will land
+        against rather than always on the leading edge.
+        """
+        for x0, y0, x1, y1, key in self._drops:
+            if not (x0 <= cx <= x1 and y0 <= cy <= y1):
+                continue
+            if key is None:                       # empty slot: append
+                return len(self._order), x0, y0, y1
+            idx = next((i for i, c in enumerate(self._order)
+                        if c.uid == key), None)
+            if idx is None:
+                return None
+            if cx < (x0 + x1) / 2:
+                return idx, x0, y0, y1
+            return idx + 1, x1, y0, y1
+        return None
+
+    def _show_dropbar(self, drop, src_key):
+        """Draw the insertion line, or clear it when the drop changes nothing."""
+        self.canvas.delete("dropbar")
+        self._dropbar = None
+        if not drop:
+            return
+        idx, x, y0, y1 = drop
+        # A drop either side of the card being dragged puts it back where it
+        # started. Showing a line there would promise a move that will not
+        # happen, so nothing is drawn and the gesture reads as cancelled.
+        src = next((i for i, c in enumerate(self._order)
+                    if c.uid == src_key), None)
+        if src is not None and idx in (src, src + 1):
+            return
+        x += self._img_xoff
+        self._dropbar = self.canvas.create_rectangle(
+            x - self._DROPBAR_W // 2, y0, x + self._DROPBAR_W // 2, y1,
+            fill=theme.ACCENT, outline="", tags="dropbar")
 
     def _on_press(self, event):
         self._drag = None
@@ -2890,6 +2937,9 @@ class ExportDialog(ctk.CTkToplevel):
             self.canvas.coords(self._drag_item,
                                self.canvas.canvasx(event.x) + 12,
                                self.canvas.canvasy(event.y) + 12)
+        cx, cy = self._event_xy(event)
+        self._show_dropbar(self._drop_at(cx, cy), d["key"])
+        self.canvas.tag_raise("ghost")
         # let the user drag onto any sheet by auto-scrolling at the edges
         h = self.canvas.winfo_height()
         if event.y < 24:
@@ -2910,7 +2960,9 @@ class ExportDialog(ctk.CTkToplevel):
         d = self._drag
         self._drag = None
         self.canvas.delete("ghost")
+        self.canvas.delete("dropbar")
         self._drag_item = None
+        self._dropbar = None
         if not d:
             return
         if not d["moved"]:
@@ -2925,20 +2977,25 @@ class ExportDialog(ctk.CTkToplevel):
             self._draw_preview()
             return
         cx, cy = self._event_xy(event)
-        self._reorder(d["key"], self._key_at(cx, cy))
+        drop = self._drop_at(cx, cy)
+        if drop:
+            self._reorder(d["key"], drop[0])
 
-    def _reorder(self, src_key, tgt_key):
-        """Move the dragged card to sit just before the card it was dropped on."""
-        if not tgt_key or tgt_key == src_key:
-            return
-        src = next((c for c in self._order if c.uid == src_key), None)
-        tgt = next((c for c in self._order if c.uid == tgt_key), None)
-        if src is None or tgt is None:
-            return
-        self._push_undo("move card")
+    def _reorder(self, src_key, index):
+        """Move a card so it lands at `index` in the print order.
+
+        `index` is a position in the CURRENT list, the same one the insertion
+        line was drawn from. Pulling the card out first shifts everything after
+        it down one, so a target beyond the card's own position has to come
+        back by one or the card lands a slot late.
+        """
         order = list(self._order)
-        order.remove(src)
-        order.insert(order.index(tgt), src)
+        src = next((i for i, c in enumerate(order) if c.uid == src_key), None)
+        if src is None or index in (src, src + 1):
+            return                      # dropped back where it already was
+        self._push_undo("move card")
+        card = order.pop(src)
+        order.insert(index - 1 if index > src else index, card)
         self._order = order
         self._draw_preview()
 

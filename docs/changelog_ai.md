@@ -2,6 +2,21 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.10 (unreleased) - the sheet shows where a card will land
+- **Dragging a card now draws an insertion line** where it will go, instead of
+  leaving you to let go and find out. A slot is split down the middle: the left
+  half means before that card, the right half after it, and the line is drawn
+  on the edge the card will land against.
+- **Dropping either side of the card being dragged draws nothing**, so a
+  gesture that would change nothing reads as cancelled rather than as a move
+  that failed.
+- **Empty slots are drop targets too.** The first empty slot after the last
+  card is where "put it at the end" lives; before this a sheet with room
+  offered nowhere to aim.
+- Reordering used to work relative to whichever card you dropped on, always
+  inserting before it. It now works on the same index the indicator was drawn
+  from, so what you saw is what happens.
+
 ## v2.17.9 - the antivirus question, answered in the app
 - **New FAQ entry: "My antivirus flags Cardwright as a trojan."** Raised on
   r/mtgproxies by someone who checked the download on VirusTotal before running

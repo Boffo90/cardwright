@@ -25,12 +25,14 @@ analysis that names the inset which fixes it.
 ## Gaps worth closing
 
 ### A - Direct manipulation of the sheet
-1. **No drop feedback.** We show a ghost following the cursor, but nothing on the
-   sheet says where the card will land. `_reorder` inserts *before* the card you
-   dropped on; you find that out afterwards. Both references highlight the target.
-2. **Cannot drop into a specific slot.** Reordering is relative to another card;
-   an empty slot is not a target. proxy-print makes empty slots droppable
-   (`:front-empty` / `:back-empty` ids).
+1. ~~**No drop feedback.**~~ **Done in v2.17.10.** An insertion line follows the
+   cursor and is drawn on the edge the card will land against. A slot is split
+   down the middle: left half means before, right half means after. Dropping
+   either side of the dragged card draws nothing, so a no-op reads as cancelled
+   rather than as a move that failed.
+2. ~~**Cannot drop into a specific slot.**~~ **Done in v2.17.10.** Every usable
+   slot is a target, including the first empty one, which is where "put it at
+   the end" lives.
 3. **Cannot drag to another sheet.** `_on_drag` auto-scrolls at the canvas edges,
    so it is *nearly* there, but the drop still has to land on a card. proxy-print
    has dedicated Prev/Next drop zones that flip the page after a 200 ms hover
@@ -86,9 +88,9 @@ that names the fixing inset rather than just warning, and a preview that scrolls
 **every sheet at once** where both references paginate one page at a time.
 
 ## Priority
-**Tier 1 - the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · drop indicator +
-droppable empty slots · drag between sheets · quantity per card · change art
-from the preview.
+**Tier 1 - the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · ~~drop indicator +
+droppable empty slots~~ (v2.17.10) · drag between sheets · quantity per card ·
+change art from the preview.
 
 **Tier 2.** Multi-select · keybinds printed in the context menu · a real border-mode
 indicator · per-slot disable.
