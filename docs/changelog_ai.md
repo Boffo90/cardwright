@@ -35,6 +35,12 @@ Registro por versión. Actualizar en cada release.
   queue and setting the sheet up again.
 - A card with copies also offers *Change art for all N copies…*, so fixing a
   playset takes one action while four different basic-land arts stay possible.
+- **The card gallery no longer crops its own artwork.** The third and fourth
+  columns came out narrow, with the art cut off and the set line truncated
+  mid-word. The set-and-artist line under each card was not wrapped, so a long
+  one set that tile's width and squeezed the rest of the row. It wraps now, and
+  the window's width is derived from the grid's spacing rather than a number
+  typed once.
 - **A double-faced card picked from the Scryfall gallery now brings its back**,
   in the queue as well as here. The gallery's download link points at the front
   face only, so picking one used to queue half a card and let the sheet fall
