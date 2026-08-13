@@ -1,5 +1,21 @@
 # Cardwright - Release Flow
 
+## When to release (set 2026-08-13)
+**Batch by default.** Work lands on `main` and waits; several changes go out
+together rather than one release per fix. On 2026-08-13 five versions shipped in
+a day and at least one carried nothing a user needed that hour, which is noise
+for anyone watching the repo and makes the auto-updater nag over nothing.
+
+Two exceptions worth releasing on their own:
+- **A regression that breaks something people are already hitting.** v2.17.8
+  fixed a v2.17.7 feature that only worked if you were slow. Sitting on that
+  would have left the previous release broken.
+- **A fix for a report someone is waiting on**, where the point is to answer
+  the person.
+
+Everything else accumulates. Keep the changelog section for the pending version
+up to date as work lands, so the release itself is only the build.
+
 Steps for each version:
 1. Bump version in `version.py` + `installer.iss`.
 2. Build: `python -m PyInstaller --noconfirm --onefile --windowed --name Cardwright --icon "...icon.ico" --add-data "...icon.ico;." --collect-all customtkinter --collect-all tkinterdnd2 --workpath SCRATCH/build --distpath SCRATCH/dist --specpath SCRATCH main.py`
