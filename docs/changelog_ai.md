@@ -16,6 +16,12 @@ Registro por versión. Actualizar en cada release.
 - Reordering used to work relative to whichever card you dropped on, always
   inserting before it. It now works on the same index the indicator was drawn
   from, so what you saw is what happens.
+- **A card can be dragged to any sheet.** Every slot on every sheet is a
+  target, and the edge scroll now runs on a timer: rest the cursor near the top
+  or bottom of the preview and it keeps moving, faster the closer to the edge
+  you hold it. It used to advance one notch per mouse movement, so holding
+  still did nothing and crossing a single sheet took about ten deliberate
+  wiggles.
 
 ## v2.17.9 - the antivirus question, answered in the app
 - **New FAQ entry: "My antivirus flags Cardwright as a trojan."** Raised on

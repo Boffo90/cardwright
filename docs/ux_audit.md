@@ -33,10 +33,18 @@ analysis that names the inset which fixes it.
 2. ~~**Cannot drop into a specific slot.**~~ **Done in v2.17.10.** Every usable
    slot is a target, including the first empty one, which is where "put it at
    the end" lives.
-3. **Cannot drag to another sheet.** `_on_drag` auto-scrolls at the canvas edges,
-   so it is *nearly* there, but the drop still has to land on a card. proxy-print
-   has dedicated Prev/Next drop zones that flip the page after a 200 ms hover
-   (`PageDrop`), and in duplex it steps 2 pages so you stay on the same face.
+3. ~~**Cannot drag to another sheet.**~~ **Done in v2.17.10.** Making every
+   slot on every sheet a drop target closed half of it for free, since the
+   preview already stacks all sheets in one canvas. The other half was the edge
+   scroll: it moved one notch per motion event, so holding still did nothing
+   and crossing a sheet took about ten deliberate wiggles inside a 24 px band.
+   It runs on a timer now, accelerating with how deep into the band the cursor
+   sits, so resting at the edge *is* the gesture. Measured: about 660 px of
+   travel per second held, against a 560 px sheet.
+
+   Worth noting we did not need proxy-print's Prev/Next drop zones. Those exist
+   because it paginates one page at a time; scrolling a single stack is a
+   different shape of problem and the same gesture covers it.
 4. **No multi-select.** proxy-print carries a selection through the whole preview:
    click to select, and every context-menu action applies to the group, including
    dragging them together (`source.data.images` is a list).
@@ -89,8 +97,8 @@ that names the fixing inset rather than just warning, and a preview that scrolls
 
 ## Priority
 **Tier 1 - the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · ~~drop indicator +
-droppable empty slots~~ (v2.17.10) · drag between sheets · quantity per card ·
-change art from the preview.
+droppable empty slots~~ (v2.17.10) · ~~drag between sheets~~ (v2.17.10) ·
+quantity per card · change art from the preview.
 
 **Tier 2.** Multi-select · keybinds printed in the context menu · a real border-mode
 indicator · per-slot disable.

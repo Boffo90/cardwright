@@ -112,3 +112,78 @@ def test_a_real_move_is_undoable():
     d = _dialog(3)
     d._reorder(d._order[0].uid, 2)
     assert d._undo == ["move card"]
+
+
+# ------------------------------------------------- edge scroll while dragging
+# Every sheet lives in one scrolling canvas, so a card can be dragged to any of
+# them, but only if the view follows. The old code scrolled one notch per
+# motion event, so resting at the edge did nothing and crossing a sheet took
+# about ten deliberate wiggles. These cover the decision, not the animation.
+
+class _FakeCanvas:
+    def __init__(self, height):
+        self._h = height
+
+    def winfo_height(self):
+        return self._h
+
+
+def _dragging(cursor_y, height=560):
+    d = gui.ExportDialog.__new__(gui.ExportDialog)
+    d.canvas = _FakeCanvas(height)
+    d._drag = {"key": "card1", "moved": True}
+    d._drag_pos = (200, cursor_y)
+    d._scroll_job = None
+    d._scroll_dir = 0
+    d._scroll_step = 0.0
+    d._scheduled = []
+    d.after = lambda ms, fn: (d._scheduled.append(ms), "job")[1]
+    d.after_cancel = lambda job: d._scheduled.clear()
+    return d
+
+
+def test_the_top_edge_scrolls_up():
+    d = _dragging(cursor_y=5)
+    d._autoscroll()
+    assert d._scroll_dir == -1
+    assert d._scroll_job is not None, "resting at the edge has to keep scrolling"
+
+
+def test_the_bottom_edge_scrolls_down():
+    d = _dragging(cursor_y=558)
+    d._autoscroll()
+    assert d._scroll_dir == 1
+    assert d._scroll_job is not None
+
+
+def test_the_middle_of_the_canvas_does_not_scroll():
+    d = _dragging(cursor_y=280)
+    d._autoscroll()
+    assert d._scroll_job is None
+
+
+def test_leaving_the_band_stops_an_active_scroll():
+    d = _dragging(cursor_y=5)
+    d._autoscroll()
+    assert d._scroll_job is not None
+    d._drag_pos = (200, 280)
+    d._autoscroll()
+    assert d._scroll_job is None
+
+
+def test_deeper_into_the_band_scrolls_faster():
+    shallow = _dragging(cursor_y=38)
+    shallow._autoscroll()
+    deep = _dragging(cursor_y=1)
+    deep._autoscroll()
+    assert deep._scroll_step > shallow._scroll_step
+    assert shallow._scroll_step >= gui.ExportDialog._EDGE_MIN
+    assert deep._scroll_step <= gui.ExportDialog._EDGE_MAX
+
+
+def test_releasing_the_card_stops_the_scroll():
+    d = _dragging(cursor_y=5)
+    d._autoscroll()
+    d._drag = None
+    d._autoscroll()
+    assert d._scroll_job is None

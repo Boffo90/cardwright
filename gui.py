@@ -1454,6 +1454,10 @@ class ExportDialog(ctk.CTkToplevel):
         self._slots = []           # preview hit-boxes: (x0, y0, x1, y1, path)
         self._drops = []           # drop targets: (x0, y0, x1, y1, uid or None)
         self._dropbar = None       # canvas id of the insertion indicator
+        self._drag_pos = None      # last cursor position, widget coords
+        self._scroll_job = None    # edge auto-scroll timer while dragging
+        self._scroll_dir = 0       # -1 up, +1 down
+        self._scroll_step = 0.0    # px per tick, set from the cursor's depth
         self._prev_job = None
         self._page = 0             # sheet the ◀▶ nav is pointing at
         self._excluded = set()     # card ids dropped from the export
@@ -2654,13 +2658,13 @@ class ExportDialog(ctk.CTkToplevel):
                  f"{exp_sheets} sheet(s), {exp_pages} PDF page(s)")
 
     def destroy(self):
-        for job in (self._prev_job, self._spin_job):
+        for job in (self._prev_job, self._spin_job, self._scroll_job):
             if job:
                 try:
                     self.after_cancel(job)
                 except Exception:
                     pass
-        self._prev_job = self._spin_job = None
+        self._prev_job = self._spin_job = self._scroll_job = None
         super().destroy()
 
     def _on_yscroll(self, first, last):
@@ -2933,19 +2937,73 @@ class ExportDialog(ctk.CTkToplevel):
             d["moved"] = True
             self.canvas.delete("loupe")
             self._start_drag_ghost(d["key"])
+        self._drag_pos = (event.x, event.y)
+        self._drag_refresh()
+        self._autoscroll()
+
+    # Edge auto-scroll. Every sheet is stacked in one canvas, so a card can be
+    # dragged to any of them, but only if the view follows. This used to scroll
+    # one notch per motion event, which meant holding still at the edge did
+    # nothing and crossing a single sheet took about ten deliberate wiggles
+    # inside a 24 px band. A timer does it instead, so resting at the edge is
+    # the gesture.
+    _EDGE_BAND = 40         # px from the top/bottom edge that starts scrolling
+    _EDGE_TICK = 30         # ms between scroll steps
+    _EDGE_MIN, _EDGE_MAX = 5, 24    # px per step, by how deep into the band
+
+    def _autoscroll(self):
+        """Start, keep or stop the edge scroll based on where the cursor is."""
+        if not self._drag or not self._drag_pos:
+            return self._stop_autoscroll()
+        _, y = self._drag_pos
+        h = self.canvas.winfo_height()
+        if y < self._EDGE_BAND:
+            depth = (self._EDGE_BAND - y) / self._EDGE_BAND
+            self._scroll_dir = -1
+        elif y > h - self._EDGE_BAND:
+            depth = (y - (h - self._EDGE_BAND)) / self._EDGE_BAND
+            self._scroll_dir = 1
+        else:
+            return self._stop_autoscroll()
+        depth = min(max(depth, 0.0), 1.0)
+        self._scroll_step = (self._EDGE_MIN
+                             + depth * (self._EDGE_MAX - self._EDGE_MIN))
+        if self._scroll_job is None:
+            self._scroll_job = self.after(self._EDGE_TICK, self._autoscroll_tick)
+
+    def _stop_autoscroll(self):
+        if self._scroll_job is not None:
+            try:
+                self.after_cancel(self._scroll_job)
+            except Exception:
+                pass
+            self._scroll_job = None
+
+    def _autoscroll_tick(self):
+        self._scroll_job = None
+        if not self._drag or not self._drag_pos or not self._tall_h:
+            return
+        top = self.canvas.canvasy(0) + self._scroll_dir * self._scroll_step
+        top = min(max(top, 0), max(0, self._tall_h - self.canvas.winfo_height()))
+        self.canvas.yview_moveto(top / self._tall_h)
+        # the sheets moved under a cursor that did not, so the ghost and the
+        # insertion line have to be recomputed or they lag a scroll behind
+        self._drag_refresh()
+        self._autoscroll()
+
+    def _drag_refresh(self):
+        """Put the ghost under the cursor and redraw the insertion line."""
+        if not self._drag or not self._drag_pos:
+            return
+        x, y = self._drag_pos
         if self._drag_item is not None:
             self.canvas.coords(self._drag_item,
-                               self.canvas.canvasx(event.x) + 12,
-                               self.canvas.canvasy(event.y) + 12)
-        cx, cy = self._event_xy(event)
-        self._show_dropbar(self._drop_at(cx, cy), d["key"])
+                               self.canvas.canvasx(x) + 12,
+                               self.canvas.canvasy(y) + 12)
+        cx = self.canvas.canvasx(x) - self._img_xoff
+        cy = self.canvas.canvasy(y)
+        self._show_dropbar(self._drop_at(cx, cy), self._drag["key"])
         self.canvas.tag_raise("ghost")
-        # let the user drag onto any sheet by auto-scrolling at the edges
-        h = self.canvas.winfo_height()
-        if event.y < 24:
-            self.canvas.yview_scroll(-1, "units")
-        elif event.y > h - 24:
-            self.canvas.yview_scroll(1, "units")
 
     def _start_drag_ghost(self, key):
         thumb = self._thumbs.get(key)
@@ -2959,6 +3017,8 @@ class ExportDialog(ctk.CTkToplevel):
     def _on_release(self, event):
         d = self._drag
         self._drag = None
+        self._drag_pos = None
+        self._stop_autoscroll()
         self.canvas.delete("ghost")
         self.canvas.delete("dropbar")
         self._drag_item = None
