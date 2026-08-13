@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cardwright - print-ready TCG proxies at true 1200 DPI</title>
+<meta name="description" content="Free Windows app that turns Magic, Pokemon and Yu-Gi-Oh card images into true 1200 DPI print-ready proxies with GPU AI upscaling, then lays them out into PDFs with cut guides and cutting-machine registration marks.">
+<link rel="icon" href="banner.png">
+<meta property="og:title" content="Cardwright - print-ready TCG proxies at true 1200 DPI">
+<meta property="og:description" content="Free Windows app. GPU AI upscaling, print sheets with cut guides and registration marks.">
+<meta property="og:image" content="banner.png">
+<meta property="og:type" content="website">
+<style>
+:root{
+  --bg:#0E1116; --surface:#151A21; --surface-alt:#1C222B; --hover:#232A34;
+  --border:#2A323D; --border-strong:#626C7A;
+  --text:#E6EAF0; --dim:#A8B2C1; --muted:#848E9D;
+  --accent:#E0A33E; --accent-hover:#C98D2E; --on-accent:#17130A;
+  --success:#3FB27F;
+  --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);
+     line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:940px;margin:0 auto;padding:0 24px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+header{padding:56px 0 8px}
+header img{width:100%;max-width:940px;height:auto;border-radius:12px;
+           border:1px solid var(--border);display:block}
+.lede{font-size:1.15rem;color:var(--dim);max-width:60ch;margin:32px 0 8px}
+.lede strong{color:var(--text);font-weight:600}
+
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:28px 0 8px}
+.btn{display:inline-block;padding:13px 22px;border-radius:8px;font-weight:600;
+     font-size:.98rem;border:1px solid transparent}
+.btn-primary{background:var(--accent);color:var(--on-accent)}
+.btn-primary:hover{background:var(--accent-hover);text-decoration:none}
+.btn-ghost{border-color:var(--border-strong);color:var(--dim)}
+.btn-ghost:hover{background:var(--hover);text-decoration:none;color:var(--text)}
+.cta-note{color:var(--muted);font-size:.85rem;margin:0 0 48px}
+
+h2{font-size:1.35rem;margin:56px 0 18px;letter-spacing:-.01em}
+h2::after{content:"";display:block;width:44px;height:3px;background:var(--accent);
+          margin-top:12px;border-radius:2px}
+h3{font-size:1rem;margin:0 0 6px}
+p{margin:0 0 16px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+      padding:20px}
+.card p{color:var(--dim);font-size:.93rem;margin:0}
+
+.note{background:var(--surface);border:1px solid var(--border);
+      border-left:3px solid var(--accent);border-radius:8px;padding:20px 22px;
+      margin:20px 0}
+.note p:last-child{margin-bottom:0}
+.note code,code{background:var(--surface-alt);border:1px solid var(--border);
+                border-radius:4px;padding:2px 6px;font-size:.86em;
+                font-family:ui-monospace,Consolas,monospace;color:var(--text)}
+pre{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;overflow-x:auto}
+pre code{background:none;border:none;padding:0}
+
+ul{color:var(--dim);padding-left:20px}
+li{margin-bottom:8px}
+
+footer{margin:72px 0 48px;padding-top:24px;border-top:1px solid var(--border);
+       color:var(--muted);font-size:.86rem}
+footer a{color:var(--dim)}
+@media (max-width:560px){
+  header{padding-top:28px}
+  h2{margin-top:40px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <img src="banner.png" alt="Cardwright">
+  <p class="lede">A free Windows app that turns card images into
+    <strong>true 1200 DPI print-ready proxies</strong> using AI upscaling on your
+    own GPU, then lays them out into print sheets with cut guides and
+    cutting-machine registration marks.</p>
+
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/Boffo90/cardwright/releases/latest/download/Cardwright.exe">Download for Windows</a>
+    <a class="btn btn-ghost" href="https://github.com/Boffo90/cardwright/releases/latest">Installer and all releases</a>
+    <a class="btn btn-ghost" href="https://github.com/Boffo90/cardwright">Source on GitHub</a>
+  </div>
+  <p class="cta-note">Free. No account, no upload limits, and offline after the
+    first run. Windows 10 or 11.</p>
+</header>
+
+<h2>Why it looks different on paper</h2>
+<p>Web-based proxy builders embed roughly 300 DPI images into a PDF and call it
+1200 DPI. The page metadata says 1200; the pixels do not. Cardwright
+reconstructs real detail with an AI model chosen per card, so what reaches the
+paper is actually there.</p>
+
+<div class="grid">
+  <div class="card">
+    <h3>Real upscaling, on your GPU</h3>
+    <p>2976x4160 px per card via Vulkan. The model is picked per card: scans,
+      digital renders and photorealistic art each get the one that suits them.
+      No GPU falls back to high-quality resizing.</p>
+  </div>
+  <div class="card">
+    <h3>Cards from where you already look</h3>
+    <p>Scryfall, Gatherer, MPC Autofill, Pokemon and Yu-Gi-Oh. Type a name and a
+      gallery shows every printing, so you see what you are about to print.
+      Moxfield, Archidekt and MPC order files import directly.</p>
+  </div>
+  <div class="card">
+    <h3>Built for the cut, not just the print</h3>
+    <p>Cut guides, bleed, rounded corners, duplex backs with offset and rotation
+      correction, and Silhouette-accurate registration marks. A3, Letter, Legal
+      and Tabloid, with grids up to 4x4.</p>
+  </div>
+  <div class="card">
+    <h3>Tuned to your printer</h3>
+    <p>Nine calibration profiles, shadow lift, and test sheets for colour,
+      shadow and duplex alignment, so you dial it in once instead of guessing
+      every time.</p>
+  </div>
+  <div class="card">
+    <h3>Any card, any size</h3>
+    <p>Magic, Pokemon, Yu-Gi-Oh, or a custom size in millimetres. Bring your own
+      art with Add files and it handles that too.</p>
+  </div>
+  <div class="card">
+    <h3>An editable print sheet</h3>
+    <p>Drag to reorder, duplicate, drop cards, set a custom back, magnify to
+      check detail before committing paper. Undo and redo throughout.</p>
+  </div>
+</div>
+
+<h2>If your antivirus flags the download</h2>
+<div class="note">
+  <p>Windows Defender may report <code>Trojan:Win32/Wacatac.C!ml</code>. The
+    <code>!ml</code> suffix means a machine-learning guess about the file's
+    shape, not a match against a known virus, and Wacatac is Defender's
+    catch-all for packed executables.</p>
+  <p>Cardwright is a packed executable that legitimately does three things
+    malware also does: it ships as one self-extracting file, it downloads and
+    runs the AI engine on first launch, and it replaces its own
+    <code>.exe</code> when you accept an update. All three are visible in the
+    source.</p>
+  <p><strong>You do not have to take that on trust.</strong> Every release
+    publishes the SHA-256 of both files. Compare yours:</p>
+  <pre><code>certutil -hashfile Cardwright.exe SHA256</code></pre>
+  <p>If it matches the release page, you have exactly the file that was
+    published. Only the portable <code>.exe</code> is flagged; the installer is
+    not. A code-signing certificate is the real fix and is being worked on.</p>
+</div>
+
+<h2>Getting started</h2>
+<ul>
+  <li>Download and run it. The first launch fetches the AI engine and models
+    once, from their official sources, and detects your GPU.</li>
+  <li>Type a card name, paste a Scryfall or Gatherer link, import a decklist, or
+    drop your own images in.</li>
+  <li>Press <strong>Upscale all</strong>, then <strong>Export PDF</strong> and
+    set up the sheet.</li>
+  <li>Print at 100% scale with printer colour correction off. There is a
+    calibration sheet in the export dialog to get that right the first time.</li>
+</ul>
+<p>The app updates itself, and the <strong>Help</strong> button carries an FAQ
+  covering paper choices, cutting machines, borders and printer problems.</p>
+
+<h2>Free, and staying that way</h2>
+<p>Cardwright is free to use and always will be. The source is published so
+  anyone can read and audit what it does, though it is not open source: you may
+  study and build it for yourself, but not redistribute, rebrand or sell it. See
+  the <a href="https://github.com/Boffo90/cardwright/blob/main/LICENSE">licence</a>.</p>
+<p>It is not affiliated with Wizards of the Coast, Nintendo, The Pokemon Company
+  or Konami. Proxies are for playtesting and personal use.</p>
+<p>If it saved you money, <a href="https://www.paypal.com/paypalme/warchazzz">a
+  donation</a> is welcome and entirely optional.</p>
+
+<footer>
+  <p><a href="https://github.com/Boffo90/cardwright">GitHub</a> &nbsp;·&nbsp;
+     <a href="https://github.com/Boffo90/cardwright/releases">Releases</a> &nbsp;·&nbsp;
+     <a href="https://github.com/Boffo90/cardwright/issues">Report a problem</a></p>
+  <p>Built by Boffo90.</p>
+</footer>
+
+</div>
+</body>
+</html>
