@@ -3707,6 +3707,26 @@ class CardSearchDialog(ctk.CTkToplevel):
     COLS = 4
     THUMB = (150, 209)
 
+    # Spacing the grid is actually built with. Named because the window width
+    # is derived from them below rather than typed once and left to rot: at
+    # 720 px the fourth column was clipped, cutting the card art and the set
+    # line in half.
+    _TILE_PAD = 6       # padx inside a tile, around the thumbnail
+    _TILE_GAP = 6       # padx between tiles
+    _FRAME_PAD = 16     # the scrollable frame's own margin
+    # Scrollbar plus the frame's internal chrome. Measured, not guessed: the
+    # columns share a weight, so a window even five pixels short does not clip
+    # the edge, it quietly squeezes the last columns and crops the art inside
+    # them. A few spare pixels cost nothing; being short does not.
+    _SCROLLBAR = 30
+
+    @classmethod
+    def _grid_width(cls):
+        """Width the tile grid needs, so the last column is never cut off."""
+        tile = cls.THUMB[0] + 2 * cls._TILE_PAD
+        return (cls.COLS * (tile + 2 * cls._TILE_GAP)
+                + 2 * cls._FRAME_PAD + cls._SCROLLBAR)
+
     def __init__(self, master, on_pick, backend=mpcfill,
                  title="Search MPC Autofill",
                  placeholder="Card name (e.g. Sol Ring)",
@@ -3720,7 +3740,8 @@ class CardSearchDialog(ctk.CTkToplevel):
         self.switchable = switchable or []
         self.empty_msg = empty_msg
         self.title(title)
-        self.geometry("720x640")
+        self.geometry(f"{self._grid_width()}x640")
+        self.minsize(self._grid_width(), 420)
         self.transient(master)
         self.after(60, self.grab_set)
         self.configure(fg_color=BG)
@@ -3860,8 +3881,11 @@ class CardSearchDialog(ctk.CTkToplevel):
         sub = card["source"] or ""
         if card.get("dpi"):                  # YGOPRODeck doesn't report DPI
             sub = f"{sub} · {card['dpi']}dpi" if sub else f"{card['dpi']}dpi"
-        ctk.CTkLabel(tile, text=sub, font=(UI, 10),
-                     text_color=MUTED).pack(padx=6)
+        # Wrapped like the name above it. Without this the set-and-artist line
+        # sets the tile's width, so "SLD #2560 · Brandon L. Hunt" made its own
+        # column wide and Tk squeezed the rest of the row, cropping their art.
+        ctk.CTkLabel(tile, text=sub, font=(UI, 10), text_color=MUTED,
+                     wraplength=self.THUMB[0], justify="center").pack(padx=6)
         add = ctk.CTkButton(tile, text="Add", width=72, height=28,
                             corner_radius=theme.RADIUS_SM,
                             fg_color=GOLD, hover_color=GOLD_HOVER,
