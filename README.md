@@ -2,6 +2,9 @@
 
 # Cardwright
 
+**[Website](https://boffo90.github.io/cardwright/)** ·
+**[Download the latest release](https://github.com/Boffo90/cardwright/releases/latest)**
+
 Desktop app that turns Magic: The Gathering card images into **true 1200 DPI
 print-ready proxies** using AI upscaling on your own GPU - free, offline
 after setup, no upload limits.
