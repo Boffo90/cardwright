@@ -86,11 +86,21 @@ Recorded so they are not re-researched from scratch:
   from March 2026. See `decisions.md` for the full reasoning, including why
   signing alone would not settle the antivirus detection.
 - **Antivirus false positive.** Defender flags the release exe as
-  `Trojan:Win32/Wacatac.C!ml` (the installer is not flagged). Submitted to
-  Microsoft on 2026-08-11, submission `1940f3c3-54f4-42fb-8a04-3298c8eb50df`,
-  pending. **This repeats every release**: the clearance applies to one file
-  hash. The step is in `release.md`. Keep a Defender exclusion on the repo
+  `Trojan:Win32/Wacatac.C!ml` (the installer is not flagged). **This repeats
+  every release**: the clearance applies to one file hash, and every build is a
+  new hash. The step is in `release.md`. Keep a Defender exclusion on the repo
   folder or the build will be quarantined out from under you mid-release.
+
+  Submissions so far, newest first:
+  | Version | SHA-256 (first 8) | Date | Submission ID |
+  | --- | --- | --- | --- |
+  | 2.17.9 | `b031a2bf` | 2026-08-13 | `f669dbf4-945e-4a39-bf48-3dcda5510ff3` |
+  | 2.17.8 | `53c72c7f` | 2026-08-11 | `1940f3c3-54f4-42fb-8a04-3298c8eb50df` |
+
+  If a submission clears, note whether the detection actually stopped: two
+  cleared hashes in a row without the next build being flagged would be the
+  first evidence that reputation is accruing, and that is the thing worth
+  knowing before spending money on a certificate.
 - **Linux .deb** - requested at launch. Still undecided, but **cheaper than it
   was**: the macOS port (PR #1, v2.17.5) put every platform branch behind
   `IS_WINDOWS` in `config.py` and left a test suite that asserts both sides, so
