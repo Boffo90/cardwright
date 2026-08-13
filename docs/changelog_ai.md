@@ -22,6 +22,12 @@ Registro por versión. Actualizar en cada release.
   you hold it. It used to advance one notch per mouse movement, so holding
   still did nothing and crossing a single sheet took about ten deliberate
   wiggles.
+- **Quantity per card.** *Add 1*, *Add 3* and *Add copies…* in the right-click
+  menu, or **Ctrl+click** a card for one more. **Alt+click** removes it. The
+  menu shows how many of that card are already on the sheet and prints both
+  shortcuts, since the menu is the only place anyone will find them.
+- Copies land next to the original rather than at the end, and however many you
+  ask for arrive as **one** undo step.
 
 ## v2.17.9 - the antivirus question, answered in the app
 - **New FAQ entry: "My antivirus flags Cardwright as a trojan."** Raised on

@@ -63,18 +63,26 @@ analysis that names the inset which fixes it.
    global *Preferred Art Source* (Scryfall / MPC Autofill) plus Advanced Search;
    proxy-print puts *Set back…*, upscale, revert-to-original and bleed on the card
    itself. This is the most common reason to touch a sheet at all.
-8. **Quantity is one duplicate at a time.** proxy-print offers *Add 1* /
-   *Add 3* / *Add more…* per card. Ours is *Duplicate*, and each invocation writes
-   a physical `name (2).png` to the output folder (`_copy_of`, `gui.py:2594`).
-   That file-per-copy model is what blocks a real quantity control - see below.
+8. ~~**Quantity is one duplicate at a time.**~~ **Done in v2.17.10.** *Add 1*,
+   *Add 3* and *Add copies…* per card, plus Ctrl+click for one. Copies land
+   next to the original rather than at the end, and however many you ask for
+   they go in as **one** undo step: four presses of Ctrl+Z to take back one
+   action would read as broken. The context menu also says how many of that
+   card are already on the sheet, which is the number you actually want before
+   deciding.
+
+   The file-per-copy model that blocked this went away in v2.17.4, so this
+   turned out to be interaction work only, with no model change at all.
 
 ### D - Discoverability
 9. **Left-click cycles a three-state border mode** (auto → off → on) with no
    indicator of which state a card is in and no visible affordance. It is
    documented only in the hint line under the canvas.
-10. **No keyboard shortcuts at all** in the dialog. proxy-print prints its
-    keybinds inside the context menu (`Alt`+Click remove, `Ctrl`+Click add one),
-    which teaches them without documentation.
+10. ~~**No keyboard shortcuts at all** in the dialog.~~ **Largely done.** Ctrl+Z
+    and Ctrl+Y in v2.17.5; Ctrl+click to add a copy and Alt+click to remove in
+    v2.17.10, both printed as accelerators in the context menu the way
+    proxy-print does it, since the menu is the only place anyone will find
+    them.
 11. **One 3-line hint paragraph** carries every interaction the preview supports
     (`gui.py:1624`). Anything not in that sentence is undiscoverable.
 
@@ -98,7 +106,9 @@ that names the fixing inset rather than just warning, and a preview that scrolls
 ## Priority
 **Tier 1 - the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · ~~drop indicator +
 droppable empty slots~~ (v2.17.10) · ~~drag between sheets~~ (v2.17.10) ·
-quantity per card · change art from the preview.
+~~quantity per card~~ (v2.17.10) · **change art from the preview** is all that
+is left, and it is the expensive one: it needs the upscaling pipeline reachable
+from `ExportDialog`.
 
 **Tier 2.** Multi-select · keybinds printed in the context menu · a real border-mode
 indicator · per-slot disable.

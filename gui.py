@@ -1835,6 +1835,10 @@ class ExportDialog(ctk.CTkToplevel):
         self.canvas.bind("<ButtonPress-1>", self._on_press)
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        # Tk dispatches only the most specific binding, so these take the click
+        # instead of the plain handler rather than as well as it.
+        self.canvas.bind("<Control-ButtonRelease-1>", self._on_ctrl_release)
+        self.canvas.bind("<Alt-ButtonRelease-1>", self._on_alt_release)
         self.canvas.bind("<Button-3>", self._preview_rclick)
         self.canvas.bind("<Motion>", self._preview_motion)
         self.canvas.bind("<Leave>", self._preview_leave)
@@ -1846,10 +1850,10 @@ class ExportDialog(ctk.CTkToplevel):
             self.bind(seq, self._undo)
         for seq in ("<Control-y>", "<Control-Y>", "<Control-Shift-Z>"):
             self.bind(seq, self._redo)
-        ctk.CTkLabel(right, text="Scroll through every sheet · drag a card to "
-                     "reorder · left-click cycles the black border · "
-                     "right-click: duplicate / remove / delete a card · "
-                     "Ctrl+Z undoes",
+        ctk.CTkLabel(right, text="Drag a card to reorder, onto any sheet · "
+                     "Ctrl+click adds a copy · Alt+click removes · "
+                     "left-click cycles the black border · "
+                     "right-click for more · Ctrl+Z undoes",
                      text_color=MUTED, font=(UI, 11),
                      wraplength=self._PREVIEW_BOX[0], justify="center").grid(
             row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
@@ -3014,7 +3018,8 @@ class ExportDialog(ctk.CTkToplevel):
         self._drag_item = self.canvas.create_image(
             0, 0, anchor="nw", image=self._ghostphoto, tags="ghost")
 
-    def _on_release(self, event):
+    def _end_drag(self):
+        """Tear down the drag visuals and hand back what was being dragged."""
         d = self._drag
         self._drag = None
         self._drag_pos = None
@@ -3023,6 +3028,34 @@ class ExportDialog(ctk.CTkToplevel):
         self.canvas.delete("dropbar")
         self._drag_item = None
         self._dropbar = None
+        return d
+
+    def _on_ctrl_release(self, event):
+        """Ctrl+click a card: one more of it. Ctrl+drag still reorders."""
+        d = self._end_drag()
+        if not d:
+            return
+        if d["moved"]:
+            return self._drop_here(d, event)
+        self._add_copies(d["key"], 1)
+
+    def _on_alt_release(self, event):
+        """Alt+click a card: take it off the sheet."""
+        d = self._end_drag()
+        if not d:
+            return
+        if d["moved"]:
+            return self._drop_here(d, event)
+        self._remove_card(d["key"])
+
+    def _drop_here(self, d, event):
+        cx, cy = self._event_xy(event)
+        drop = self._drop_at(cx, cy)
+        if drop:
+            self._reorder(d["key"], drop[0])
+
+    def _on_release(self, event):
+        d = self._end_drag()
         if not d:
             return
         if not d["moved"]:
@@ -3036,10 +3069,7 @@ class ExportDialog(ctk.CTkToplevel):
             self._border_modes[path] = nxt[self._border_modes.get(path, "auto")]
             self._draw_preview()
             return
-        cx, cy = self._event_xy(event)
-        drop = self._drop_at(cx, cy)
-        if drop:
-            self._reorder(d["key"], drop[0])
+        self._drop_here(d, event)
 
     def _reorder(self, src_key, index):
         """Move a card so it lands at `index` in the print order.
@@ -3065,10 +3095,20 @@ class ExportDialog(ctk.CTkToplevel):
         key = self._key_at(cx, cy)
         if not key:
             return
+        have = self._copies_of(key)
         menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Duplicate",
-                         command=lambda k=key: self._duplicate_card(k))
-        menu.add_command(label="Remove from PDF",
+        menu.add_command(label=f"On the sheet {have}x", state="disabled")
+        menu.add_separator()
+        # The accelerators are spelled out here because the menu is the only
+        # place anyone will discover them.
+        menu.add_command(label="Add 1 copy", accelerator="Ctrl+Click",
+                         command=lambda k=key: self._add_copies(k, 1))
+        menu.add_command(label="Add 3 copies",
+                         command=lambda k=key: self._add_copies(k, 3))
+        menu.add_command(label="Add copies…",
+                         command=lambda k=key: self._ask_copies(k))
+        menu.add_separator()
+        menu.add_command(label="Remove from PDF", accelerator="Alt+Click",
                          command=lambda k=key: self._remove_card(k))
         menu.add_command(label="Delete from output folder…",
                          command=lambda k=key: self._delete_card_file(k))
@@ -3077,18 +3117,54 @@ class ExportDialog(ctk.CTkToplevel):
         finally:
             menu.grab_release()
 
-    def _duplicate_card(self, key):
-        """Add another copy of the card right after it. Nothing is written to
-        disk: the copy is a second _Card pointing at the same image."""
+    _MAX_COPIES = 99          # a sheet holds 16; past this it is a typo
+
+    def _add_copies(self, key, n=1):
+        """Add `n` more of this card, right after it. Nothing is written to
+        disk: a copy is another _Card pointing at the same image.
+
+        They go in as one undo step. Asking for four and taking four presses of
+        Ctrl+Z to take it back would make undo feel broken.
+        """
         idx = next((i for i, c in enumerate(self._order) if c.uid == key), None)
-        if idx is None:
+        if idx is None or n < 1:
             return
-        self._push_undo("duplicate card")
+        n = min(n, self._MAX_COPIES)
+        self._push_undo(f"add {n} cop{'y' if n == 1 else 'ies'}")
         src = self._order[idx]
-        dup = _Card(src.path)
-        self._order.insert(idx + 1, dup)
-        self._back_of[dup.uid] = self._back_of.get(src.uid)
+        for offset in range(n):
+            dup = _Card(src.path)
+            self._order.insert(idx + 1 + offset, dup)
+            self._back_of[dup.uid] = self._back_of.get(src.uid)
         self._draw_preview()
+
+    def _copies_of(self, key):
+        """How many of this card are on the sheet, counting the one clicked."""
+        card = next((c for c in self._order if c.uid == key), None)
+        if card is None:
+            return 0
+        return sum(1 for c in self._order if c.path == card.path)
+
+    def _ask_copies(self, key):
+        """Add an arbitrary number of copies."""
+        have = self._copies_of(key)
+        dlg = ctk.CTkInputDialog(
+            title="Add copies",
+            text=f"How many more copies?  (this card is on the sheet {have}x)",
+            fg_color=PANEL, button_fg_color=GOLD, button_hover_color=GOLD_HOVER,
+            button_text_color=GOLD_TEXT, entry_fg_color=SURFACE_INPUT,
+            entry_border_color=BORDER_STRONG, entry_text_color=TEXT,
+            text_color=TEXT)
+        raw = dlg.get_input()
+        if raw is None:
+            return
+        try:
+            n = int(raw.strip())
+        except ValueError:
+            messagebox.showinfo("Add copies",
+                                f"'{raw}' is not a number.", parent=self)
+            return
+        self._add_copies(key, n)
 
     def _remove_card(self, key, record=True):
         """Take the card out of the working set entirely (the sheets recompact);
