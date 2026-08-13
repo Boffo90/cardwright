@@ -28,6 +28,20 @@ Registro por versión. Actualizar en cada release.
   shortcuts, since the menu is the only place anyone will find them.
 - Copies land next to the original rather than at the end, and however many you
   ask for arrive as **one** undo step.
+- **Change a card's art without leaving the dialog.** *Change art…* opens the
+  same gallery the main window uses, across every catalogue; the pick is
+  downloaded and upscaled with your usual settings and drops straight into the
+  sheet. Seeing the wrong printing used to mean cancelling out, fixing the
+  queue and setting the sheet up again.
+- A card with copies also offers *Change art for all N copies…*, so fixing a
+  playset takes one action while four different basic-land arts stay possible.
+- **A double-faced card picked from the Scryfall gallery now brings its back**,
+  in the queue as well as here. The gallery's download link points at the front
+  face only, so picking one used to queue half a card and let the sheet fall
+  back on back.png. The pick carries the card's Scryfall id too, and resolving
+  that returns every face. This is the same fault fixed for MPC order files in
+  v2.17.6 and the MPC gallery in v2.17.7; Scryfall was the last route still
+  carrying it.
 
 ## v2.17.9 - the antivirus question, answered in the app
 - **New FAQ entry: "My antivirus flags Cardwright as a trojan."** Raised on

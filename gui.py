@@ -718,6 +718,19 @@ class App(_Root):
                            label=f"{card['name']}  [{src.LABEL}]", src=src.ID)
             return
 
+        if src.ID == "scryfall" and card.get("identifier"):
+            # The gallery's download url is the FRONT face, so picking a
+            # double-faced card here used to queue half a card and leave the
+            # sheet to fall back on back.png. Queue the card's id instead and
+            # let scryfall.fetch resolve every face. The exact printing and its
+            # language both survive that: an api url counts as naming a
+            # printing, so best_scan and the language preference leave it be.
+            self._add_item(f"{scryfall.SCRYFALL_API}/cards/{card['identifier']}",
+                           "scryfall",
+                           label=f"{card['name']}  [{card['source'] or src.LABEL}]",
+                           src=src.ID)
+            return
+
         base = f"{card['name']}  [{card['source'] or src.LABEL}]"
         # Same hazard as the MPC order import: two picks that share a name and
         # a source write the same file and one silently replaces the other.
@@ -3108,6 +3121,16 @@ class ExportDialog(ctk.CTkToplevel):
         menu.add_command(label="Add copies…",
                          command=lambda k=key: self._ask_copies(k))
         menu.add_separator()
+        menu.add_command(label="Change art…",
+                         command=lambda k=key: self._change_art(k, False))
+        if have > 1:
+            # Both are offered because both are wanted: fixing a playset you
+            # picked the wrong printing for, and giving four basics four
+            # different arts. Guessing which one someone meant would be wrong
+            # half the time.
+            menu.add_command(label=f"Change art for all {have} copies…",
+                             command=lambda k=key: self._change_art(k, True))
+        menu.add_separator()
         menu.add_command(label="Remove from PDF", accelerator="Alt+Click",
                          command=lambda k=key: self._remove_card(k))
         menu.add_command(label="Delete from output folder…",
@@ -3136,6 +3159,133 @@ class ExportDialog(ctk.CTkToplevel):
             dup = _Card(src.path)
             self._order.insert(idx + 1 + offset, dup)
             self._back_of[dup.uid] = self._back_of.get(src.uid)
+        self._draw_preview()
+
+    # ------------------------------------------------------------ change art
+    # Seeing the wrong printing used to mean cancelling the whole dialog,
+    # fixing the queue and starting the sheet again. The gallery already exists
+    # and so does the upscale pipeline; what was missing was reaching them from
+    # here.
+
+    def _change_art(self, key, all_copies):
+        """Pick a different printing for this card, or for every copy of it."""
+        card = next((c for c in self._order if c.uid == key), None)
+        if card is None:
+            return
+        n = self._copies_of(key) if all_copies else 1
+        CardSearchDialog(
+            self,
+            on_pick=lambda pick: self._apply_new_art(key, all_copies, pick),
+            backend=sources.SCRYFALL,
+            title=f"Change art{f' ({n} copies)' if n > 1 else ''}",
+            placeholder=sources.SCRYFALL.PLACEHOLDER,
+            empty_msg=sources.SCRYFALL.EMPTY,
+            switchable=sources.ALL,
+            query=card.path.stem.split("-")[0])
+
+    def _art_settings(self):
+        """The queue's own processing settings, so a card changed here comes
+        out of the same pipeline as one added the usual way. Most live in
+        settings.json; the model and fit-to-card switches live on the main
+        window, and are read defensively because this dialog can outlive it."""
+        app = self.master
+        s = load_settings()
+        return {
+            "model": (app.model_menu.get()
+                      if hasattr(app, "model_menu") else DEFAULT_MODEL),
+            "fit": (bool(app.fit_switch.get())
+                    if hasattr(app, "fit_switch") else FIT_TO_CARD_DEFAULT),
+            "trim": bleed_mode_code(s.get("bleed_mode")),
+            "card_size": s.get("card_size", CARD_SIZE_DEFAULT),
+            "lang": card_lang_code(s.get("card_lang")),
+            "best_scan": bool(s.get("best_scan", BEST_SCAN_DEFAULT)),
+            "ai": getattr(app, "ai_ok", False),
+        }
+
+    def _fetch_art(self, pick, cfg):
+        """Download a gallery pick and upscale it. Returns [front, back?].
+
+        The two branches mirror App._add_source_card: some catalogues hand back
+        a direct image url, others a reference for scryfall.fetch to resolve,
+        which is also what turns a double-faced card into two files.
+        """
+        src = sources.by_id(pick.get("_source", "scryfall"))
+        ref = pick.get("ref") if src.ADD_KIND == "scryfall" else None
+        if ref is None and src.ID == "scryfall" and pick.get("identifier"):
+            # The gallery's download url points at the FRONT face only, so a
+            # double-faced card picked here would arrive as half a card. The
+            # pick carries the Scryfall id too, and resolving that returns
+            # every face. Both the exact printing and its language survive:
+            # an api url counts as naming a printing, so best_scan and the
+            # language preference leave it alone.
+            ref = f"{scryfall.SCRYFALL_API}/cards/{pick['identifier']}"
+
+        if ref:
+            paths, _meta = scryfall.fetch(
+                ref, status_callback=self._set_status,
+                lang=cfg["lang"], best_scan=cfg["best_scan"])
+            targets = [str(p) for p in paths]
+        else:
+            base = re.sub(r'[<>:"/\\|?*]', "",
+                          f"{pick['name']}  [{pick.get('source') or src.LABEL}]")
+            ident = re.sub(r"[^A-Za-z0-9_-]", "",
+                           str(pick.get("identifier") or ""))[:10]
+            if ident:
+                base = f"{base} {ident}"
+            self._set_status("Downloading…")
+            targets = [str(scryfall.download_to_temp(base, pick["download"]))]
+
+        out = []
+        for t in targets:
+            self._set_status(f"Upscaling {Path(t).stem[:28]}…")
+            out.append(Path(upscale(
+                t, model_label=cfg["model"], fit_to_card=cfg["fit"],
+                rename=False, ai=cfg["ai"],
+                trim_bleed=cfg["trim"] if src.ID in ("mpc",) else "never",
+                card_size=cfg["card_size"])))
+        # remember where it came from, or the border rules treat it as Scryfall
+        for p in out:
+            self.card_sources[str(p)] = src.ID
+        return out
+
+    def _apply_new_art(self, key, all_copies, pick):
+        threading.Thread(target=self._art_worker,
+                         args=(key, all_copies, pick), daemon=True).start()
+
+    def _art_worker(self, key, all_copies, pick):
+        try:
+            cfg = self._art_settings()
+            paths = self._fetch_art(pick, cfg)
+        except Exception as e:
+            applog.log.error("Changing art failed for %r", pick.get("name"),
+                             exc_info=True)
+            self._ui(messagebox.showerror, "Could not change the art", str(e))
+            self._set_status("")
+            return
+        self._ui(self._swap_art, key, all_copies, paths)
+
+    def _swap_art(self, key, all_copies, paths):
+        """Point the card at its new image. Runs on the UI thread.
+
+        A _Card is replaced rather than edited: undo snapshots the order with a
+        shallow copy, on the understanding that a card's path never changes
+        under it. Mutating one here would rewrite history as well as the sheet.
+        """
+        target = next((c for c in self._order if c.uid == key), None)
+        if target is None:
+            return
+        front, back = paths[0], (paths[1] if len(paths) > 1 else None)
+        changing = ([c for c in self._order if c.path == target.path]
+                    if all_copies else [target])
+        self._push_undo("change art" if len(changing) == 1
+                        else f"change art on {len(changing)} copies")
+        for old in changing:
+            new = _Card(front)
+            self._order[self._order.index(old)] = new
+            self._back_of[new.uid] = back or self._back_of.get(old.uid)
+            self._back_of.pop(old.uid, None)
+        self._set_status("")
+        threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._draw_preview()
 
     def _copies_of(self, key):

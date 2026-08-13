@@ -58,11 +58,17 @@ analysis that names the inset which fixes it.
    *visible* Action History list - the buttons show one step, not the trail.
 
 ### C - Changing a card without leaving the sheet
-7. **Art cannot be changed from the preview.** Seeing the wrong printing means
-   cancelling out to the main window and re-running the card. Proxxied has a
-   global *Preferred Art Source* (Scryfall / MPC Autofill) plus Advanced Search;
-   proxy-print puts *Set back…*, upscale, revert-to-original and bleed on the card
-   itself. This is the most common reason to touch a sheet at all.
+7. ~~**Art cannot be changed from the preview.**~~ **Done in v2.17.10.**
+   *Change art…* on any card opens the same gallery the main window uses, over
+   every catalogue, and the pick is downloaded and upscaled through the queue's
+   own settings. A card with copies also offers *Change art for all N copies…*,
+   because both are wanted: fixing a playset whose printing was wrong, and
+   giving four basics four different arts.
+
+   The expensive part was supposed to be reaching the upscale pipeline from
+   `ExportDialog`. It turned out to be about thirty lines, because the gallery
+   and `upscale()` were both already callable from anywhere; what the original
+   note called cross-module was really just nobody having wired it up.
 8. ~~**Quantity is one duplicate at a time.**~~ **Done in v2.17.10.** *Add 1*,
    *Add 3* and *Add copies…* per card, plus Ctrl+click for one. Copies land
    next to the original rather than at the end, and however many you ask for
@@ -104,11 +110,9 @@ that names the fixing inset rather than just warning, and a preview that scrolls
 **every sheet at once** where both references paginate one page at a time.
 
 ## Priority
-**Tier 1 - the "feels bad" core.** ~~Undo/redo~~ (v2.17.5) · ~~drop indicator +
-droppable empty slots~~ (v2.17.10) · ~~drag between sheets~~ (v2.17.10) ·
-~~quantity per card~~ (v2.17.10) · **change art from the preview** is all that
-is left, and it is the expensive one: it needs the upscaling pipeline reachable
-from `ExportDialog`.
+**Tier 1 is done.** ~~Undo/redo~~ (v2.17.5) · ~~drop indicator + droppable empty
+slots~~ (v2.17.10) · ~~drag between sheets~~ (v2.17.10) · ~~quantity per card~~
+(v2.17.10) · ~~change art from the preview~~ (v2.17.10).
 
 **Tier 2.** Multi-select · keybinds printed in the context menu · a real border-mode
 indicator · per-slot disable.
