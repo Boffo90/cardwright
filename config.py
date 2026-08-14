@@ -433,8 +433,36 @@ BORDER_WIDTH_DEFAULT = 0.0       # percent of card width
 
 BACK_IMAGE_CANDIDATES = [ROOT / "back.png", ROOT / "back.jpg"]
 
+# Which back belongs to which game. A sheet mixing games got one back on all of
+# it, which is simply wrong on half the cards. The catalogue a card came from
+# says which game it is, so the right back can be picked per card.
+#
+# The images stay user-supplied for the same reason back.png always has: a
+# Magic card back is Wizards' artwork and a Pokemon one is Nintendo's, and
+# shipping either inside a downloadable binary is not the same as a website
+# serving it. Drop the files in next to the exe and they get used.
+GAME_BACKS = {
+    "scryfall": "back-mtg",
+    "gatherer": "back-mtg",
+    "mpc": "back-mtg",          # an MPC order is overwhelmingly Magic
+    "pokemon": "back-pokemon",
+    "ygo": "back-yugioh",
+}
 
-def find_back_image():
+
+def find_back_image(source_id=None):
+    """The card back to use, preferring one matching the card's own game.
+
+    Falls back to plain back.png, so anyone with a single back keeps the
+    behaviour they already have and nobody has to name files per game.
+    """
+    if source_id:
+        stem = GAME_BACKS.get(source_id)
+        if stem:
+            for ext in (".png", ".jpg"):
+                p = ROOT / f"{stem}{ext}"
+                if p.exists():
+                    return p
     for p in BACK_IMAGE_CANDIDATES:
         if p.exists():
             return p

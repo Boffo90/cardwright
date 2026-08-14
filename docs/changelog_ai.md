@@ -45,6 +45,17 @@ Registro por versión. Actualizar en cada release.
   a framed card would fold the frame's inner detail back out and read as a
   reflection, which is why the two cases are told apart rather than treated the
   same.
+- **Card backs are chosen per game.** Name them `back-mtg.png`,
+  `back-pokemon.png` and `back-yugioh.png` in the Cardwright folder and each
+  card takes the one for the game it came from. A sheet mixing games used to
+  print a single back over all of it, which is wrong on half the cards.
+  Anything without a matching file falls back to `back.png`, so one back keeps
+  working exactly as before, and *Choose…* still overrides everything for a
+  run. Requested on r/mtgproxies.
+- The images stay user-supplied, and that is deliberate: a Magic back is
+  Wizards' artwork and a Pokemon one is Nintendo's, and shipping either inside
+  a download is not the same as a website showing it. There is a new FAQ entry
+  spelling out the filenames.
 - **The card gallery no longer crops its own artwork.** The third and fourth
   columns came out narrow, with the art cut off and the set line truncated
   mid-word. The set-and-artist line under each card was not wrapped, so a long

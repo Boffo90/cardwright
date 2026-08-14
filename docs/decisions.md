@@ -144,6 +144,14 @@ The options panel keeps each row in its **own frame**. Tk's grid shares column w
 - The tests **assert the Windows branches too**, not just the POSIX ones, so a branch written the wrong way round fails on either machine. That is the whole point - the author has no Mac and most contributors have no Windows.
 - **The `-m` model-folder flag is a macOS fix, not a Windows one.** The PR claimed the Windows build could also miss its models when the working directory is not the app's own. Measured, and it does not: the Windows engine loaded its models from a foreign working directory even with an empty `models/` there as a decoy, so it resolves relative to the executable. Passing the absolute path is still right - it stops depending on undocumented behaviour - but do not repeat the Windows claim.
 
+## Card backs are per game, and still user-supplied (v2.17.10)
+`find_back_image(source_id)` prefers `back-mtg` / `back-pokemon` / `back-yugioh` over plain `back.png`, chosen from the catalogue the card came from (`card_sources`). A sheet mixing games printed one back over all of it before, which is wrong on half the cards.
+
+- **The images are not shipped, and that is not laziness.** A Magic back is Wizards' artwork, a Pokemon one is Nintendo's, a Yu-Gi-Oh one is Konami's. A website showing them is not the same act as a downloadable binary redistributing them, and this project is distributed. Same line already drawn over curated Drive folders.
+- **Falls back to `back.png`**, so a user with a single back sees no change at all and nobody is forced to name files per game.
+- **`GAME_BACKS` must cover every source.** A catalogue missing from it silently gets the generic back, which is exactly the kind of failure nobody notices; a test asserts every `sources.ALL` entry has a mapping.
+- MPC maps to Magic. An MPC Autofill order is overwhelmingly Magic, and a wrong guess there still lands on `back.png` if the file is absent.
+
 ## Antivirus false positives and code signing (August 2026)
 Windows Defender flags the release binary as **`Trojan:Win32/Wacatac.C!ml`** (ThreatID 2147749372). Confirmed on the author's own machine, where Defender quarantined `Cardwright.exe` out of the repo root and blocked a freshly downloaded copy from being read at all.
 

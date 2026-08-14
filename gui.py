@@ -67,6 +67,7 @@ from config import (
     card_lang_code,
     card_size_mm,
     find_back_image,
+    GAME_BACKS,
     ICON_FILE,
     IS_WINDOWS,
     load_settings,
@@ -2292,8 +2293,15 @@ class ExportDialog(ctk.CTkToplevel):
 
         fronts = [c for c in self._order if keep(c)]
         if self.backs.get() != BACKS_MODES[0]:
-            default = self._custom_back or find_back_image()
-            backs = [self._back_of.get(c.uid) or default for c in fronts]
+            # A card chosen as the back applies to everything. Otherwise each
+            # card asks for the back of its own game, so a sheet mixing Magic
+            # and Pokemon stops printing one back over both.
+            def default_for(card):
+                if self._custom_back:
+                    return self._custom_back
+                return find_back_image(self.card_sources.get(str(card.path)))
+
+            backs = [self._back_of.get(c.uid) or default_for(c) for c in fronts]
             # Backs go through the same flatten path as fronts, so they need
             # a source too or the "Backs" checkbox would control nothing.
             for b in backs:
@@ -2843,6 +2851,13 @@ class ExportDialog(ctk.CTkToplevel):
     def _back_label(self):
         if self._custom_back:
             return Path(self._custom_back).name[:16]
+        # Say when it is picking per game, so a mixed sheet does not look like
+        # it is about to print one back over everything.
+        games = {self.card_sources.get(str(c.path)) for c in self._order}
+        per_game = {g for g in games if find_back_image(g) is not None
+                    and g in GAME_BACKS}
+        if len(per_game) > 1:
+            return f"per game ({len(per_game)})"
         return "back.png (default)" if find_back_image() else "none set"
 
     def _choose_back_file(self):
@@ -3949,6 +3964,24 @@ FAQ = [
      "The real fix is a code-signing certificate, which is being worked on. "
      "Until then, reporting the file to Microsoft as a false positive is what "
      "clears it, and that is done for each release."),
+
+    ("How do I set the card back, and can I mix games on one sheet?",
+     "Cardwright does not ship card backs. A Magic back belongs to Wizards and "
+     "a Pokemon one to Nintendo, and putting their artwork inside a download "
+     "is not the same as a website showing it. So you supply the image once "
+     "and it is used from then on.\n\n"
+     "Drop a file named back.png (or .jpg) in the Cardwright folder and every "
+     "single-faced card uses it.\n\n"
+     "Mixing games on one sheet? Name them per game instead and each card "
+     "takes the right one automatically:\n\n"
+     "    back-mtg.png       Magic, from Scryfall, Gatherer or MPC\n"
+     "    back-pokemon.png   Pokemon\n"
+     "    back-yugioh.png    Yu-Gi-Oh\n\n"
+     "Anything without a matching file falls back to back.png, so you can add "
+     "just the ones you need. A card that has its own second face, like a "
+     "transforming card, always uses that instead.\n\n"
+     "To override everything for one print run, use \"Choose…\" beside Card "
+     "back in the export dialog."),
 
     ("My printer says \"insufficient memory\" or spits out an error page.",
      "A print sheet is a real 1200 DPI page - lossless, that is around 217 MB - "
