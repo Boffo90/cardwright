@@ -35,6 +35,16 @@ Registro por versión. Actualizar en cada release.
   queue and setting the sheet up again.
 - A card with copies also offers *Change art for all N copies…*, so fixing a
   playset takes one action while four different basic-land arts stay possible.
+- **Bleed can continue the card's art instead of being a flat colour.** New
+  *Extend art* option beside Black and White in Bleed color. Requested on
+  r/mtgproxies.
+- It picks its own method per card. A black-bordered card gets its frame
+  carried outward, which is what the solid frame already did. Full art gets its
+  edge **mirrored** outward, so the picture keeps going into the band the cut
+  runs through, instead of the card sitting inside a black rectangle. Mirroring
+  a framed card would fold the frame's inner detail back out and read as a
+  reflection, which is why the two cases are told apart rather than treated the
+  same.
 - **The card gallery no longer crops its own artwork.** The third and fourth
   columns came out narrow, with the art cut off and the set line truncated
   mid-word. The set-and-artist line under each card was not wrapped, so a long

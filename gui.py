@@ -1370,7 +1370,7 @@ SPINNER_FRAMES = ["◐", "◓", "◑", "◒"]
 
 GUIDE_CHOICES = ["White", "Black", "Gray", "None"]
 GUIDE_STYLE_CHOICES = ["Cross", "Corner"]
-BLEED_COLOR_CHOICES = ["Black", "White"]
+BLEED_COLOR_CHOICES = ["Black", "White", print_sheet.BLEED_EXTEND]
 
 
 def _tooltip(widget, text):

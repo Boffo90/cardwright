@@ -495,12 +495,81 @@ def _round_corners(im: Image.Image, radius_mm: float) -> Image.Image:
     return im
 
 
+# Deciding whether a card is bordered or full-art. A near-black edge means a
+# framed card, where the honest extension is to carry the frame outward; a
+# mirror there would fold the frame's INNER detail back out and read as a
+# reflection. Full art has no frame to protect, so mirroring continues the
+# picture. Thresholds follow proxy-print's add-bleed, which solves the same
+# problem and is worth agreeing with rather than diverging from by accident.
+BLEED_BLACK_THRESHOLD = 30      # per-channel value still counted as black
+BLEED_BLACK_RATIO = 0.7         # fraction of the edge that has to be black
+BLEED_STRETCH_SLICE = 8         # px of edge stretched outward on framed cards
+BLEED_MIRROR_BLEND = 4          # px of overlap, so the seam is not a hard line
+
+
+def _edge_is_framed(arr) -> bool:
+    """True when the card's outer pixels are mostly black, i.e. it has a frame."""
+    edges = np.concatenate([arr[0], arr[-1], arr[:, 0], arr[:, -1]])
+    dark = (edges < BLEED_BLACK_THRESHOLD).all(axis=1)
+    return float(dark.mean()) > BLEED_BLACK_RATIO
+
+
+def extend_bleed(im: Image.Image, bleed_px: int) -> Image.Image:
+    """Grow the card by `bleed_px` a side, continuing its own art outward.
+
+    The alternative the app shipped first is a flat colour frame, which is
+    fine on a black-bordered card and obvious on a full-art one. This keeps
+    the cut running through something that looks like the card.
+    """
+    if bleed_px <= 0:
+        return im
+    im = im.convert("RGB")
+    w, h = im.size
+    b = int(bleed_px)
+    out = Image.new("RGB", (w + 2 * b, h + 2 * b))
+    out.paste(im, (b, b))
+
+    if _edge_is_framed(np.asarray(im)):
+        # stretch a thin slice: on a frame that just continues the frame
+        s = min(BLEED_STRETCH_SLICE, w // 2, h // 2)
+        out.paste(im.crop((0, 0, s, h)).resize((b, h)), (0, b))
+        out.paste(im.crop((w - s, 0, w, h)).resize((b, h)), (w + b, b))
+        out.paste(im.crop((0, 0, w, s)).resize((w, b)), (b, 0))
+        out.paste(im.crop((0, h - s, w, h)).resize((w, b)), (b, h + b))
+        corners = ((0, 0, s, s, 0, 0), (w - s, 0, w, s, w + b, 0),
+                   (0, h - s, s, h, 0, h + b), (w - s, h - s, w, h, w + b, h + b))
+        for x0, y0, x1, y1, dx, dy in corners:
+            out.paste(im.crop((x0, y0, x1, y1)).resize((b, b)), (dx, dy))
+        return out
+
+    # full art: mirror the edge band outward. The band is taken a few pixels
+    # deeper than the bleed so the mirrored copy overlaps its own source and
+    # the join does not fall exactly on a hard edge.
+    band = min(b + BLEED_MIRROR_BLEND, w, h)
+    left = im.crop((0, 0, band, h)).transpose(Image.FLIP_LEFT_RIGHT)
+    out.paste(left.crop((band - b, 0, band, h)), (0, b))
+    right = im.crop((w - band, 0, w, h)).transpose(Image.FLIP_LEFT_RIGHT)
+    out.paste(right.crop((0, 0, b, h)), (w + b, b))
+    top = im.crop((0, 0, w, band)).transpose(Image.FLIP_TOP_BOTTOM)
+    out.paste(top.crop((0, band - b, w, band)), (b, 0))
+    bottom = im.crop((0, h - band, w, h)).transpose(Image.FLIP_TOP_BOTTOM)
+    out.paste(bottom.crop((0, 0, w, b)), (b, h + b))
+
+    # corners: flipped both ways, so each meets the two edges beside it
+    for x0, y0, dx, dy in ((0, 0, 0, 0), (w - b, 0, w + b, 0),
+                           (0, h - b, 0, h + b), (w - b, h - b, w + b, h + b)):
+        piece = im.crop((x0, y0, x0 + b, y0 + b)).transpose(
+            Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
+        out.paste(piece, (dx, dy))
+    return out
+
+
 def _flatten(png_path: Path, jpeg_quality, profile=None, sharpen=None,
              shadow=0, deepen_border=False, border_amount=1.0,
              border_width=0.0, corner_radius_mm=0.0, suffix="_sheet",
              border_style=BORDER_STYLE_CONTRAST, edge_width=CONTRAST_EDGE_WIDTH,
              edge_contrast=CONTRAST_CONTRAST,
-             edge_brightness=CONTRAST_BRIGHTNESS) -> Path:
+             edge_brightness=CONTRAST_BRIGHTNESS, bleed_px=0) -> Path:
     """
     Flatten transparent rounded corners onto black, apply the print-time
     adjustments, and write the temp file the PDF will embed.
@@ -528,6 +597,13 @@ def _flatten(png_path: Path, jpeg_quality, profile=None, sharpen=None,
                                  edge_contrast, edge_brightness)
         else:
             bg = _deepen_black_border(bg, opaque, border_amount, border_width)
+
+    # Grown last, so every adjustment above is already in the pixels being
+    # carried outward. With rounded corners on, the radius applies to the
+    # extended outline: the cut runs inside the bleed anyway, so the card's own
+    # corners are still cut round.
+    if bleed_px > 0:
+        bg = extend_bleed(bg, bleed_px)
 
     if corner_radius_mm > 0:
         out = TEMP_FOLDER / (png_path.stem + suffix + ".png")
@@ -558,6 +634,10 @@ BLEED_COLORS = {
     "Black": (0, 0, 0),
     "White": (1, 1, 1),
 }
+
+# ...or no colour at all: grow the card's own art into the bleed instead. A
+# flat frame is fine behind a black-bordered card and obvious behind full art.
+BLEED_EXTEND = "Extend art"
 
 
 # --- Silhouette / Cricut registration marks -------------------------------
@@ -938,6 +1018,15 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
 
     bleed_rgb = BLEED_COLORS.get(bleed_color, (0, 0, 0))
     ebleed = edge_bleed_mm * mm
+    # "Extend art" grows the image instead of painting a frame behind it, so
+    # the card is drawn over the whole slot-plus-bleed rather than inside it.
+    extend_art = bleed_color == BLEED_EXTEND and ebleed > 0
+    grow_px = 0
+    if extend_art:
+        # the flattened card is CARD_W wide in points; convert the bleed to
+        # that image's own pixels so the band is exactly edge_bleed_mm
+        with Image.open(images[0]) as _probe:
+            grow_px = int(round(_probe.width * (ebleed / card_w)))
     dx = back_offset[0] * mm
     dy = back_offset[1] * mm
     img_mask = "auto" if corner_radius_mm > 0 else None
@@ -1003,7 +1092,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         # a forced card uses the manual width, if one is set; auto cards
         # always measure their own
         width = border_width if mode == "on" else 0.0
-        key = (str(img), do_border, width, border_style)
+        key = (str(img), do_border, width, border_style, grow_px)
         if key not in flat_cache:
             flat_cache[key] = _flatten(img, jpeg_quality, profile, sharpen,
                                        shadow, do_border, border_amount, width,
@@ -1011,7 +1100,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                                        border_style=border_style,
                                        edge_width=edge_width,
                                        edge_contrast=edge_contrast,
-                                       edge_brightness=edge_brightness)
+                                       edge_brightness=edge_brightness,
+                                       bleed_px=grow_px)
         return flat_cache[key]
 
     placed = 0
@@ -1026,7 +1116,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
 
         for batch in group:
             # ---- front page
-            if ebleed > 0:
+            if ebleed > 0 and not extend_art:
                 c.setFillColorRGB(*bleed_rgb)
                 for k in range(len(batch)):
                     x, y = usable[k]
@@ -1038,8 +1128,14 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 if status_callback:
                     status_callback(f"Placing card {placed}/{to_place}…")
                 x, y = usable[k]
-                c.drawImage(ImageReader(str(flat(images[i]))), x, y,
-                            card_w, card_h, mask=img_mask)
+                if extend_art:
+                    c.drawImage(ImageReader(str(flat(images[i]))),
+                                x - ebleed, y - ebleed,
+                                card_w + 2 * ebleed, card_h + 2 * ebleed,
+                                mask=img_mask)
+                else:
+                    c.drawImage(ImageReader(str(flat(images[i]))), x, y,
+                                card_w, card_h, mask=img_mask)
             _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
                         cols, rows, guide_len_mm, guide_thick, guide_style,
                         guide_offset_mm, card_w, card_h, reg_clear)
