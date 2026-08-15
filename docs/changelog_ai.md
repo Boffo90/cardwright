@@ -2,7 +2,12 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.10 (unreleased) - the sheet shows where a card will land
+## v2.17.10 - the print sheet becomes editable
+
+The whole of the print-sheet UX audit's Tier 1, plus two features asked for on
+r/mtgproxies and the fixes that came out of building them.
+
+### Editing the sheet
 - **Dragging a card now draws an insertion line** where it will go, instead of
   leaving you to let go and find out. A slot is split down the middle: the left
   half means before that card, the right half after it, and the line is drawn
@@ -35,6 +40,7 @@ Registro por versión. Actualizar en cada release.
   queue and setting the sheet up again.
 - A card with copies also offers *Change art for all N copies…*, so fixing a
   playset takes one action while four different basic-land arts stay possible.
+### Printing
 - **Bleed can continue the card's art instead of being a flat colour.** New
   *Extend art* option beside Black and White in Bleed color. Requested on
   r/mtgproxies.
@@ -56,6 +62,21 @@ Registro por versión. Actualizar en cada release.
   Wizards' artwork and a Pokemon one is Nintendo's, and shipping either inside
   a download is not the same as a website showing it. There is a new FAQ entry
   spelling out the filenames.
+### Black border controls
+- **Two of the four border sliders are gone, because they did nothing.**
+  Measured across their whole range on a real card, *Edge contrast* moved the
+  treated band by 0.04 levels and *Edge brightness* by 0.03: 400% contrast gave
+  the same result as 100% to four decimals. The treatment pushes dark pixels
+  towards black and a frame pixel is already there at the lowest setting either
+  offered, so the rest of their travel had nothing left to do. Moving a control
+  and seeing nothing is what made the whole feature feel broken.
+- **The two that work are now both sliders**, renamed *Strength* and *How far
+  in*, and there is a **before and after strip** under them showing one corner
+  of the card untreated beside treated, redrawn as you drag. The sheet preview
+  draws a card about 120 px wide, so a treatment living in its outer few
+  percent was two or three pixels there and could not be judged at all.
+
+### Fixed
 - **The card gallery no longer crops its own artwork.** The third and fourth
   columns came out narrow, with the art cut off and the set line truncated
   mid-word. The set-and-artist line under each card was not wrapped, so a long
@@ -69,6 +90,12 @@ Registro por versión. Actualizar en cada release.
   that returns every face. This is the same fault fixed for MPC order files in
   v2.17.6 and the MPC gallery in v2.17.7; Scryfall was the last route still
   carrying it.
+- **A changed art now actually reaches the sheet.** The work runs on a
+  background thread and handed its result back through a helper the export
+  dialog did not own, so it failed with nothing to show for it right after the
+  download and upscale had succeeded: the file arrived in the output folder and
+  the card never changed. It failed in silence because a windowed build has
+  nowhere to print a stack trace.
 
 ## v2.17.9 - the antivirus question, answered in the app
 - **New FAQ entry: "My antivirus flags Cardwright as a trojan."** Raised on
