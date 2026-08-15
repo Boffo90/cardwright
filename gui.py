@@ -1707,20 +1707,17 @@ class ExportDialog(ctk.CTkToplevel):
                 padx=(0, 12), pady=1)
             self.border_srcs[key] = var
 
-        self.edge_width = entry_row(
-            "Edge width (%)", "edge_width",
-            round(print_sheet.CONTRAST_EDGE_WIDTH * 100, 1),
-            "contrast edges only")
-        self.edge_contrast = entry_row(
-            "Edge contrast (%)", "edge_contrast",
-            round(print_sheet.CONTRAST_CONTRAST * 100),
-            "100 = untouched")
-        self.edge_brightness = entry_row(
-            "Edge brightness", "edge_brightness",
-            round(print_sheet.CONTRAST_BRIGHTNESS * 255),
-            "-255…255")
-
-        def slider_row(label, key, default, to, unit, fmt="{:.0f}"):
+        # Edge contrast and Edge brightness used to be typed in here and are
+        # gone on purpose. Measured across their whole range on a real card,
+        # contrast moved the treated band by 0.04 levels and brightness by
+        # 0.03: the treatment pushes dark pixels to pure black, and a frame
+        # pixel is already there at the lowest setting either offers. Leaving
+        # controls that cannot change the result is worse than not having
+        # them, because moving one and seeing nothing reads as the whole
+        # feature being broken. The constants they set are still in
+        # print_sheet.
+        def slider_row(label, key, default, to, unit, fmt="{:.0f}",
+                       from_=0):
             ctk.CTkLabel(left, text=label, anchor="w", text_color=TEXT_DIM,
                          font=(UI, theme.TYPE["small"])).grid(
                 row=self._r, column=0, sticky="w", padx=(12, 8), pady=5)
@@ -1728,7 +1725,7 @@ class ExportDialog(ctk.CTkToplevel):
             fr.grid(row=self._r, column=1, sticky="w", pady=4)
             val = ctk.CTkLabel(fr, text="", width=54, text_color=MUTED,
                                font=(UI, 11))
-            sl = ctk.CTkSlider(fr, from_=0, to=to, width=175,
+            sl = ctk.CTkSlider(fr, from_=from_, to=to, width=175,
                                button_color=GOLD, progress_color=GOLD_HOVER,
                                command=lambda v: (
                                    val.configure(text=fmt.format(v) + unit),
@@ -1743,11 +1740,18 @@ class ExportDialog(ctk.CTkToplevel):
                 sl.set(v), val.configure(text=fmt.format(v) + unit))
             return sl
 
-        self.border_amount = slider_row("Amount", "border_amount",
+        # The two that actually move the result. Strength is linear across its
+        # range; depth runs 0.5 to 50, since 0 would mean no band at all.
+        self.border_amount = slider_row("Strength", "border_amount",
                                         BORDER_AMOUNT_DEFAULT, 100, "%")
+        self.edge_width = slider_row(
+            "How far in", "edge_width",
+            round(print_sheet.CONTRAST_EDGE_WIDTH * 100, 1),
+            50, "%", "{:.1f}", from_=0.5)
         self.border_width = slider_row("Manual width (forced cards)",
                                        "border_width", BORDER_WIDTH_DEFAULT,
                                        12, "%", "{:.1f}")
+        self._edge_strip = self._build_edge_strip(left)
 
         tab("Backs")
         self.backs = row("Card backs", BACKS_MODES,
@@ -2000,20 +2004,82 @@ class ExportDialog(ctk.CTkToplevel):
             return print_sheet.BORDER_STYLE_AUTO
         return print_sheet.BORDER_STYLE_CONTRAST
 
-    def _edge_width(self):
-        return self._float(self.edge_width,
-                           print_sheet.CONTRAST_EDGE_WIDTH * 100,
-                           0.5, 50.0) / 100.0
+    # -------------------------------------------------- border before/after
+    # The treatment lives in the outer few percent of the card, and the sheet
+    # preview draws a card about 120 px wide. At that size the change is two
+    # or three pixels and simply cannot be seen, which is why the controls
+    # felt inert even where they were not. This shows one corner at a usable
+    # size, untreated beside treated, right under the sliders that cause it.
+    _STRIP = (250, 104)         # canvas size: two corners plus the divider
 
+    def _build_edge_strip(self, parent):
+        ctk.CTkLabel(parent, text="Border, before and after",
+                     anchor="w", text_color=TEXT_DIM,
+                     font=(UI, theme.TYPE["small"])).grid(
+            row=self._r, column=0, columnspan=2, sticky="w",
+            padx=(12, 8), pady=(10, 2))
+        self._r += 1
+        cv = tk.Canvas(parent, width=self._STRIP[0], height=self._STRIP[1],
+                       bg=ROW, highlightthickness=1,
+                       highlightbackground=BORDER, bd=0)
+        cv.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                padx=12, pady=(0, 8))
+        self._r += 1
+        return cv
+
+    def _draw_edge_strip(self):
+        """Repaint the before/after corners from the first card on the sheet."""
+        cv = getattr(self, "_edge_strip", None)
+        if cv is None or not cv.winfo_exists():
+            return
+        cv.delete("all")
+        pair = next((self._thumbs_raw.get(str(c.path)) for c in self._order
+                     if str(c.path) in self._thumbs_raw), None)
+        if pair is None:
+            cv.create_text(self._STRIP[0] // 2, self._STRIP[1] // 2,
+                           text="loading…", fill=MUTED, font=(UI, 10))
+            return
+        work = pair[0]
+        w, h = self._STRIP[0] // 2 - 2, self._STRIP[1] - 4
+        # A corner, because that is where two treated edges meet and the
+        # effect is at its most obvious.
+        # Crop tight enough that the treated band is a large share of what is
+        # shown, and tie it to the band's own width so it keeps that share as
+        # the slider moves. Taking a fixed half of the card puts the band back
+        # to a few pixels on screen, which is the problem this strip exists to
+        # solve.
+        edge_px = self._edge_width() * min(work.width, work.height)
+        side = int(min(max(edge_px * 2.6, work.width * 0.14), work.width * 0.6))
+        box = (0, 0, side, side)
+        before = work.crop(box).resize((w, h))
+        treated = print_sheet._contrast_edges(
+            work, None, self.border_amount.get() / 100.0,
+            self._edge_width(), self._edge_contrast(), self._edge_brightness())
+        after = treated.crop(box).resize((w, h))
+        strip = PILImage.new("RGB", self._STRIP, (20, 24, 30))
+        strip.paste(before, (2, 2))
+        strip.paste(after, (self._STRIP[0] // 2 + 1, 2))
+        self._edgephoto = PILImageTk.PhotoImage(strip)
+        cv.create_image(0, 0, anchor="nw", image=self._edgephoto)
+        mid = self._STRIP[0] // 2
+        cv.create_line(mid, 0, mid, self._STRIP[1], fill=theme.ACCENT, width=1)
+        cv.create_text(6, 8, anchor="w", text="off", fill="#d7dbe4",
+                       font=(UI, 9, "bold"))
+        cv.create_text(mid + 6, 8, anchor="w", text="on", fill=theme.ACCENT,
+                       font=(UI, 9, "bold"))
+
+    def _edge_width(self):
+        return float(self.edge_width.get()) / 100.0
+
+    # Fixed now rather than typed in. Both saturate immediately: a frame pixel
+    # reaches pure black at the lowest setting either used to offer, so their
+    # whole range moved the result by hundredths of a level. See the note
+    # beside the sliders.
     def _edge_contrast(self):
-        return self._float(self.edge_contrast,
-                           print_sheet.CONTRAST_CONTRAST * 100,
-                           100.0, 400.0) / 100.0
+        return print_sheet.CONTRAST_CONTRAST
 
     def _edge_brightness(self):
-        return self._float(self.edge_brightness,
-                           print_sheet.CONTRAST_BRIGHTNESS * 255,
-                           -255.0, 255.0) / 255.0
+        return print_sheet.CONTRAST_BRIGHTNESS
 
     def _reg_inset(self):
         return self._float(self.reg_inset, print_sheet.REG_INSET_DEFAULT_MM,
@@ -2078,8 +2144,6 @@ class ExportDialog(ctk.CTkToplevel):
             "border_sources": {k: bool(v.get())
                                for k, v in self.border_srcs.items()},
             "edge_width": round(self._edge_width() * 100, 1),
-            "edge_contrast": round(self._edge_contrast() * 100),
-            "edge_brightness": round(self._edge_brightness() * 255),
             "backs": self.backs.get(),
             "back_dx": dx,
             "back_dy": dy,
@@ -2130,7 +2194,7 @@ class ExportDialog(ctk.CTkToplevel):
                        (self.back_rot, "back_rot"), (self.back_bleed, "back_bleed")):
             if key in d:
                 e.delete(0, "end"); e.insert(0, str(d[key]))
-        for key in ("border_amount", "border_width"):
+        for key in ("border_amount", "border_width", "edge_width"):
             if key in d and key in self._slider_setters:
                 self._slider_setters[key](float(d[key]))
         self.back_lbl.configure(text=self._back_label())
@@ -2374,6 +2438,7 @@ class ExportDialog(ctk.CTkToplevel):
         # a slider can leave a redraw queued; the dialog may be gone by then
         if not self.winfo_exists():
             return
+        self._draw_edge_strip()
         cols, rows, landscape = print_sheet.LAYOUTS.get(
             self.layout.get(), print_sheet.LAYOUTS[print_sheet.DEFAULT_LAYOUT])
         pw, ph = _PAGE_MM.get(self.page.get(), _PAGE_MM["A4"])
