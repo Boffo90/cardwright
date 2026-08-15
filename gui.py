@@ -2252,6 +2252,20 @@ class ExportDialog(ctk.CTkToplevel):
         self.preset_menu.configure(values=self._preset_names())
         self.preset_menu.set(self._PRESET_NONE)
 
+    def _ui(self, fn, *args):
+        """Marshal a call onto the Tk main thread (no-op if window is gone).
+
+        The same helper App has. This dialog does its own background work now
+        (the back-face lookup, changing a card's art) and was calling a method
+        it did not own: the thread died on the AttributeError with nothing to
+        show for it, so a new art downloaded and upscaled and then never
+        reached the sheet.
+        """
+        try:
+            self.after(0, lambda: fn(*args))
+        except RuntimeError:
+            pass
+
     def _set_status(self, text):
         self.after(0, lambda: self.status.configure(text=text))
 

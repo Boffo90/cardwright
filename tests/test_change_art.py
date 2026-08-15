@@ -166,3 +166,59 @@ def test_an_unknown_card_is_ignored():
     d._swap_art("not-a-card", False, [gui.Path("new.png")])
     assert _names(d) == ["a"]
     assert d._undo == []
+
+
+# ------------------------------------------------------------- the wiring
+# The art change runs on a background thread and hands the result back with
+# self._ui. That method lived only on App, so the thread died on an
+# AttributeError after the download and the upscale had already succeeded:
+# the file reached the output folder and the sheet never changed. Testing
+# _swap_art directly missed it entirely, because the break was in the handoff,
+# not the logic.
+
+def _threaded_dialog(paths):
+    d = _dialog(paths)
+    d._marshalled = []
+
+    def after(delay, fn):
+        d._marshalled.append(fn)
+        fn()                      # stand in for the Tk main loop
+    d.after = after
+    return d
+
+
+def test_the_dialog_can_marshal_onto_the_ui_thread():
+    d = _threaded_dialog(["a.png"])
+    seen = []
+    d._ui(seen.append, "value")
+    assert seen == ["value"], "_ui has to exist on this class, not just on App"
+
+
+def test_a_finished_art_change_actually_reaches_the_sheet(monkeypatch):
+    """The whole path: worker finishes, hands back through _ui, card swaps."""
+    d = _threaded_dialog(["old.png"])
+    key = d._order[0].uid
+    monkeypatch.setattr(gui.ExportDialog, "_art_settings", lambda self: {})
+    monkeypatch.setattr(gui.ExportDialog, "_fetch_art",
+                        lambda self, pick, cfg: [gui.Path("new.png")])
+
+    d._art_worker(key, False, {"name": "New Art"})
+
+    assert _names(d) == ["new"], "the download succeeded but the sheet kept the old art"
+    assert d._undo == ["change art"]
+
+
+def test_a_failed_art_change_reports_instead_of_dying_quietly(monkeypatch):
+    d = _threaded_dialog(["old.png"])
+    shown = []
+    monkeypatch.setattr(gui.ExportDialog, "_art_settings", lambda self: {})
+    monkeypatch.setattr(gui.ExportDialog, "_fetch_art",
+                        lambda self, pick, cfg: (_ for _ in ()).throw(
+                            RuntimeError("catalogue down")))
+    monkeypatch.setattr(gui.messagebox, "showerror",
+                        lambda *a, **k: shown.append(a))
+
+    d._art_worker(d._order[0].uid, False, {"name": "New Art"})
+
+    assert shown, "a failure has to surface, not vanish into a daemon thread"
+    assert _names(d) == ["old"]
