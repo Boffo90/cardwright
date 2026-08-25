@@ -11,6 +11,7 @@ Upscale pipeline.
 
 import re
 import subprocess
+import time
 from pathlib import Path
 
 from PIL import Image
@@ -116,6 +117,38 @@ def _normalize_input(file: Path, trim_bleed=False,
     return temp
 
 
+# A thumbnail or preview lock clears in well under a second; five
+# tries over two seconds is plenty and still fails fast if it will not.
+_SAVE_ATTEMPTS = 5
+_SAVE_RETRY_DELAY = 0.4
+
+
+def _save_png(im, path: Path):
+    """Write a PNG, retrying briefly while something else holds the file.
+
+    Windows hands out a lock for a moment whenever Explorer builds a
+    thumbnail for a folder, a preview pane reads it, or a sync client touches
+    it. Pillow surfaces that as a bare OSError "Invalid argument", which tells
+    the user nothing at all: reported from a real run where one card failed
+    three times in twenty seconds and the very same path wrote fine later,
+    untouched. A few retries cover the lock; if it really will not go, say
+    something a person can act on.
+    """
+    last = None
+    for attempt in range(_SAVE_ATTEMPTS):
+        try:
+            im.save(path, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
+            return
+        except OSError as e:
+            last = e
+            time.sleep(_SAVE_RETRY_DELAY)
+    raise OSError(
+        f"Could not write {path.name} after {_SAVE_ATTEMPTS} tries. Something "
+        f"else is holding the file open: close the output folder in Explorer, "
+        f"and any viewer showing that card, then run it again. "
+        f"(underlying error: {last})") from last
+
+
 def _postprocess(path: Path, fit_to_card: bool, target=None):
     """Resize to exact card size (optional) and stamp DPI metadata in place."""
     im = Image.open(path)
@@ -124,7 +157,7 @@ def _postprocess(path: Path, fit_to_card: bool, target=None):
     if fit_to_card and im.size != target:
         im = im.resize(target, Image.LANCZOS)
 
-    im.save(path, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
+    _save_png(im, path)
 
 
 def upscale(
@@ -174,7 +207,7 @@ def upscale(
         if im.mode not in ("RGB", "RGBA"):
             im = im.convert("RGBA")
         im = im.resize((card_w_px, card_h_px), Image.LANCZOS)
-        im.save(output, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
+        _save_png(im, output)
         if progress_callback:
             progress_callback(1.0)
         if status_callback:
@@ -224,7 +257,7 @@ def upscale(
             im = im.convert("RGBA")
         if fit_to_card and im.size != (card_w_px, card_h_px):
             im = im.resize((card_w_px, card_h_px), Image.LANCZOS)
-        im.save(output, "PNG", dpi=(TARGET_DPI, TARGET_DPI))
+        _save_png(im, output)
         if progress_callback:
             progress_callback(1.0)
         if status_callback:

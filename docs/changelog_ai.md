@@ -2,6 +2,16 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.11 (unreleased)
+- **A card that fails to save now retries, and says something useful if it
+  still will not.** Reported from a log where one card failed three times in
+  twenty seconds with `OSError: Invalid argument` and the identical path wrote
+  fine later, untouched. Windows hands out a brief lock whenever Explorer
+  builds a thumbnail for the output folder or a preview pane reads it, and
+  Pillow surfaces that as an error nobody can act on. Five tries over two
+  seconds cover the lock; past that the message names the card and says to
+  close the folder, and keeps the original error for a bug report.
+
 ## v2.17.10 - the print sheet becomes editable
 
 The whole of the print-sheet UX audit's Tier 1, plus two features asked for on
