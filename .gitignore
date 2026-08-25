@@ -23,6 +23,10 @@ _temp/
 settings.json
 back.png
 back.jpg
+# per-game backs (v2.17.10): same reason as back.png, this is
+# Wizards / Nintendo / Konami artwork and must not be redistributed
+back-*.png
+back-*.jpg
 MTGEnhancer.exe
 *.exe
 _update.bat
