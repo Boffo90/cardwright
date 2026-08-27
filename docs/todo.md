@@ -1,21 +1,59 @@
 # Cardwright - TODO
 
 ## ▶ START HERE (handoff, 2026-08-27)
-**v2.17.10 is released; v2.17.11 is accumulating on `main` and has not been
-built.** The tree is clean and nothing is half-finished. Releases are batched
-now rather than cut per fix, so work sits here until there is enough of it:
-see `release.md` for the rule and its two exceptions.
 
-The print-sheet UX audit's **Tier 1 is complete** (v2.17.5 and v2.17.10):
-undo/redo, a drop indicator with droppable empty slots, dragging between
-sheets, quantity per card, and changing a card's art without leaving the
-dialog. `ux_audit.md` has what is left.
+### Next task: 4x6 photo-print sheets with PNG output
+Everything needed to start is below; none of it needs re-deriving.
 
-Waiting in v2.17.11: projects (save/load the queue), cut guides that can be
-turned off on the backs, the exact-printing search made findable, and a retry
-around card saves that Windows briefly locks.
+**Who asked and why.** A user on r/mtgproxies: their cheapest local printing is
+**2 cards on a 4x6 photo print**, against 2-3x the cost for 9-up on A4 or
+Letter. Online photo labs there do not accept PDF, so they need PNG or JPG.
+They were writing their own PowerShell script to do it, and were told they can
+already use Cardwright's output folder as its input in the meantime.
 
-Nothing is urgent. Pick from "Next up", or wait for the next report.
+**Geometry, measured.** A card is 2.48 x 3.46 in.
+- **6x4 landscape fits exactly 2 cards**, margin 1.04 x 0.54 in. This is the
+  layout to add.
+- 4x6 portrait fits only 1, so it is not worth offering.
+- Sheet pixels: 300 DPI = 1800x1200 (card 744x1039) · 600 = 3600x2400 ·
+  1200 = 7200x4800 (card 2976x4157).
+
+**Two parts, very different sizes.**
+1. *The page size* is a `PDF_PAGE_SIZES` entry in `config.py`. Trivial.
+2. *PNG output* is the real work. `build_pdf` composes through reportlab, so
+   raster output is a second rendering path, not a setting.
+
+**Do not reach for a PDF rasteriser.** It is the obvious shortcut and it is
+closed: the good library is PyMuPDF, which is **AGPL**, and this ships as a
+distributed binary. Compose the sheet with Pillow instead, reusing `_flatten`
+for the cards (it already returns treated images) and the existing layout maths
+in `layout_positions` / `_block_origin`, converting points to pixels. Guides and
+registration marks would need redrawing in Pillow; `extend_bleed` is already
+pure Pillow and carries over as-is.
+
+**One question was put to the user and not yet answered**, and it should shape
+the design: *what maximum resolution does their photo lab accept?* 4x6 at
+300 DPI is a sixteenth of the pixels the upscaler produces. Many labs print at
+about 300 DPI natively so it may not matter, but if theirs takes more, offer a
+DPI choice rather than hard-coding 300 and quietly throwing the work away. If
+no answer arrives, ship the choice.
+
+### State of the tree
+**v2.17.10 is the last release. Eight commits sit unreleased on `main`** as
+v2.17.11, tree clean, 124 tests passing. Releases are batched now, see
+`release.md` for the rule and its two exceptions.
+
+Waiting in v2.17.11: multi-select in the preview, projects (save/load the
+queue), cut guides that can be turned off on the backs, the exact-printing
+search made findable, and a retry around card saves that Windows briefly locks.
+
+**Owed at the next release:** the Microsoft false-positive submission for the
+new binary. The table below has the previous ones; v2.17.10's hash
+(`817d473f`) was never submitted.
+
+The UX audit's **Tier 1 and almost all of Tier 2 are done**. What is left in
+`ux_audit.md`: per-slot disable, sort & filter, and dragging a whole selection
+as a group.
 
 ### Two things only the community can close
 - **trevorstarick** (has a Silhouette, we do not) was asked to confirm that a
@@ -34,6 +72,26 @@ Tier 1 bore that out.
 
 **Tier 1 is done.** What is left, in `ux_audit.md`: multi-select, a real
 border-mode indicator, per-slot disable, and sort & filter.
+
+## Asked for by users, assessed but not started
+Raised on r/mtgproxies in August 2026 and sized here so the next look does not
+start from nothing. **4x6 with PNG output is the top of this list and has its
+own brief in START HERE.**
+
+- **Mixed card sizes on one sheet**, to save paper across games. Card size is
+  currently one setting for the whole export and the layout code assumes every
+  slot is identical, so this needs per-card size *and* a small packing problem
+  solved. Real value for multi-game printing, not a quick one.
+- **Search every catalogue at once**, without picking a game first. Doable and
+  a good idea. The catch is measured: MPC Autofill takes about **5 seconds** to
+  answer, so an everything-search is as slow as its slowest source. The answer
+  is probably to show results as they arrive rather than waiting for all of
+  them.
+- **Collapse the main window into the export dialog.** A user's observation,
+  and a fair one: the main window is now just a queue with a search box, while
+  the export dialog is where the work happens since it gained drag, reorder,
+  quantities and change-art. Collapsing the two is the obvious end state. It is
+  also large enough that it wants a clear run rather than a spare afternoon.
 
 ## Next up (nothing blocking)
 From the July 2026 comparison against Proxy-PDF-Maker, fabricard.net and
