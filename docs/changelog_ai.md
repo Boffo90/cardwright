@@ -3,6 +3,17 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.11 (unreleased)
+- **Select several cards at once.** Click a card to select it, shift+click to
+  add or remove one, Escape to clear. The right-click menu then acts on the
+  whole selection and says how many, and a batch lands as **one** undo step,
+  not one per card. With quantity and change-art living on a card, doing
+  either to twenty of them was twenty trips through the menu.
+- **A plain click no longer cycles the black border.** That gesture is what a
+  click means everywhere else, and it changed a card's treatment with no
+  indicator and nothing to suggest a click would do anything. It moved into
+  the right-click menu, which now names the mode the card is in. Ctrl+click
+  and Alt+click are unchanged, and both take the whole selection when the card
+  you click is part of it.
 - **Projects: save and load the queue.** *Project…* in the footer, or Ctrl+S
   and Ctrl+O. A hundred cards chosen printing by printing, with their
   quantities and per-card models, used to vanish when the window closed.

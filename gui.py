@@ -1620,6 +1620,7 @@ class ExportDialog(ctk.CTkToplevel):
         self._thumbs_b = {}        # path -> thumbnail with the border treated
         self._border_modes = {}    # path -> "auto" | "on" | "off"
         self._slots = []           # preview hit-boxes: (x0, y0, x1, y1, path)
+        self._selected = set()     # card ids the next action applies to
         self._drops = []           # drop targets: (x0, y0, x1, y1, uid or None)
         self._dropbar = None       # canvas id of the insertion indicator
         self._drag_pos = None      # last cursor position, widget coords
@@ -2022,6 +2023,8 @@ class ExportDialog(ctk.CTkToplevel):
         # instead of the plain handler rather than as well as it.
         self.canvas.bind("<Control-ButtonRelease-1>", self._on_ctrl_release)
         self.canvas.bind("<Alt-ButtonRelease-1>", self._on_alt_release)
+        self.canvas.bind("<Shift-ButtonRelease-1>", self._on_shift_release)
+        self.bind("<Escape>", self._clear_selection)
         self.canvas.bind("<Button-3>", self._preview_rclick)
         self.canvas.bind("<Motion>", self._preview_motion)
         self.canvas.bind("<Leave>", self._preview_leave)
@@ -2034,8 +2037,8 @@ class ExportDialog(ctk.CTkToplevel):
         for seq in ("<Control-y>", "<Control-Y>", "<Control-Shift-Z>"):
             self.bind(seq, self._redo)
         ctk.CTkLabel(right, text="Drag a card to reorder, onto any sheet · "
+                     "click selects, shift+click adds to the selection · "
                      "Ctrl+click adds a copy · Alt+click removes · "
-                     "left-click cycles the black border · "
                      "right-click for more · Ctrl+Z undoes",
                      text_color=MUTED, font=(UI, 11),
                      wraplength=self._PREVIEW_BOX[0], justify="center").grid(
@@ -2782,6 +2785,14 @@ class ExportDialog(ctk.CTkToplevel):
                 if t:
                     surf.paste(t.resize((cw, ch)), (X(x), X(y)), corner_mask)
                     slots.append((X(x), X(y), X(x + CW), X(y + CH), key))
+                    if key in self._selected:
+                        # A ring rather than a tint: the point of selecting a
+                        # card here is to look at it, so nothing may sit on
+                        # top of the art.
+                        for i in range(3):
+                            d.rectangle([X(x) + i, X(y) + i,
+                                         X(x + CW) - 1 - i, X(y + CH) - 1 - i],
+                                        outline=theme.ACCENT)
                     if key in self._excluded:
                         ov = PILImage.new("RGBA", (cw, ch), (20, 20, 25, 150))
                         surf.paste(ov, (X(x), X(y)), ov)
@@ -3294,6 +3305,51 @@ class ExportDialog(ctk.CTkToplevel):
         self._drag_item = self.canvas.create_image(
             0, 0, anchor="nw", image=self._ghostphoto, tags="ghost")
 
+    # ---------------------------------------------------------- selection
+    # With quantity and change-art now living on a card, doing either to
+    # twenty of them was twenty trips through the menu. A plain click selects,
+    # which is what a click means everywhere else; the black-border cycle it
+    # used to do has moved into the right-click menu, where it can at least
+    # say which of its three states the card is in.
+
+    def _select_only(self, key):
+        self._selected = {key} if key else set()
+        self._draw_preview()
+
+    def _toggle_selected(self, key):
+        if not key:
+            return
+        self._selected.symmetric_difference_update({key})
+        self._draw_preview()
+
+    def _clear_selection(self, _event=None):
+        if self._selected:
+            self._selected.clear()
+            self._draw_preview()
+        return "break"
+
+    def _targets(self, key):
+        """Cards an action on `key` should apply to.
+
+        Acting on the selection only when the clicked card is part of it: a
+        right-click on some other card is about that card, and silently
+        applying to a selection elsewhere on the sheet would be a nasty
+        surprise.
+        """
+        if key in self._selected and len(self._selected) > 1:
+            # in sheet order, so copies and undo labels read predictably
+            return [c.uid for c in self._order if c.uid in self._selected]
+        return [key]
+
+    def _on_shift_release(self, event):
+        """Shift+click adds or removes one card from the selection."""
+        d = self._end_drag()
+        if not d:
+            return
+        if d["moved"]:
+            return self._drop_here(d, event)
+        self._toggle_selected(d["key"])
+
     def _end_drag(self):
         """Tear down the drag visuals and hand back what was being dragged."""
         d = self._drag
@@ -3313,7 +3369,7 @@ class ExportDialog(ctk.CTkToplevel):
             return
         if d["moved"]:
             return self._drop_here(d, event)
-        self._add_copies(d["key"], 1)
+        self._add_copies_to(self._targets(d["key"]), 1)
 
     def _on_alt_release(self, event):
         """Alt+click a card: take it off the sheet."""
@@ -3322,7 +3378,7 @@ class ExportDialog(ctk.CTkToplevel):
             return
         if d["moved"]:
             return self._drop_here(d, event)
-        self._remove_card(d["key"])
+        self._remove_cards(self._targets(d["key"]))
 
     def _drop_here(self, d, event):
         cx, cy = self._event_xy(event)
@@ -3335,17 +3391,23 @@ class ExportDialog(ctk.CTkToplevel):
         if not d:
             return
         if not d["moved"]:
-            # a plain click cycles the black border: auto -> off -> on.
-            # Per image, so every copy of the card follows - that is what
-            # gets exported.
-            path = self._path_for(d["key"])
-            nxt = {"auto": "off", "off": "on", "on": "auto"}
-            # a stray click on a card silently retreats the border otherwise
-            self._push_undo("border change")
-            self._border_modes[path] = nxt[self._border_modes.get(path, "auto")]
-            self._draw_preview()
+            self._select_only(d["key"])
             return
         self._drop_here(d, event)
+
+    def _cycle_border(self, key):
+        """Step this card's black-border treatment: auto -> off -> on.
+
+        This used to be what a plain left-click did, with no indicator of
+        which state a card was in and nothing to suggest a click would do
+        anything. Undo covers it either way, but a stray click quietly
+        retreating a border was never a good trade for the convenience.
+        """
+        path = self._path_for(key)
+        nxt = {"auto": "off", "off": "on", "on": "auto"}
+        self._push_undo("border change")
+        self._border_modes[path] = nxt[self._border_modes.get(path, "auto")]
+        self._draw_preview()
 
     def _reorder(self, src_key, index):
         """Move a card so it lands at `index` in the print order.
@@ -3371,33 +3433,52 @@ class ExportDialog(ctk.CTkToplevel):
         key = self._key_at(cx, cy)
         if not key:
             return
+        keys = self._targets(key)
+        many = len(keys) > 1
         have = self._copies_of(key)
+        mode = self._mode_for(self._path_for(key))
         menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label=f"On the sheet {have}x", state="disabled")
+        menu.add_command(
+            label=(f"{many and len(keys) or have} cards selected" if many
+                   else f"On the sheet {have}x"), state="disabled")
         menu.add_separator()
         # The accelerators are spelled out here because the menu is the only
         # place anyone will discover them.
-        menu.add_command(label="Add 1 copy", accelerator="Ctrl+Click",
-                         command=lambda k=key: self._add_copies(k, 1))
-        menu.add_command(label="Add 3 copies",
-                         command=lambda k=key: self._add_copies(k, 3))
-        menu.add_command(label="Add copies…",
-                         command=lambda k=key: self._ask_copies(k))
+        menu.add_command(label="Add 1 copy" + (" each" if many else ""),
+                         accelerator="" if many else "Ctrl+Click",
+                         command=lambda k=keys: self._add_copies_to(k, 1))
+        menu.add_command(label="Add 3 copies" + (" each" if many else ""),
+                         command=lambda k=keys: self._add_copies_to(k, 3))
+        if not many:
+            menu.add_command(label="Add copies…",
+                             command=lambda k=key: self._ask_copies(k))
         menu.add_separator()
-        menu.add_command(label="Change art…",
-                         command=lambda k=key: self._change_art(k, False))
-        if have > 1:
-            # Both are offered because both are wanted: fixing a playset you
-            # picked the wrong printing for, and giving four basics four
-            # different arts. Guessing which one someone meant would be wrong
-            # half the time.
-            menu.add_command(label=f"Change art for all {have} copies…",
-                             command=lambda k=key: self._change_art(k, True))
+        # Moved off the plain left-click, so it needs to say where it stands.
+        menu.add_command(label=f"Black border: {mode}  (click to cycle)",
+                         command=lambda k=key: self._cycle_border(k))
         menu.add_separator()
-        menu.add_command(label="Remove from PDF", accelerator="Alt+Click",
-                         command=lambda k=key: self._remove_card(k))
-        menu.add_command(label="Delete from output folder…",
-                         command=lambda k=key: self._delete_card_file(k))
+        if not many:
+            menu.add_command(label="Change art…",
+                             command=lambda k=key: self._change_art(k, False))
+            if have > 1:
+                # Both are offered because both are wanted: fixing a playset
+                # you picked the wrong printing for, and giving four basics
+                # four different arts. Guessing which one someone meant would
+                # be wrong half the time.
+                menu.add_command(label=f"Change art for all {have} copies…",
+                                 command=lambda k=key: self._change_art(k, True))
+            menu.add_separator()
+        menu.add_command(
+            label="Remove from PDF" + (f" ({len(keys)} cards)" if many else ""),
+            accelerator="" if many else "Alt+Click",
+            command=lambda k=keys: self._remove_cards(k))
+        if not many:
+            menu.add_command(label="Delete from output folder…",
+                             command=lambda k=key: self._delete_card_file(k))
+        if self._selected:
+            menu.add_separator()
+            menu.add_command(label="Clear selection", accelerator="Esc",
+                             command=self._clear_selection)
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -3405,7 +3486,7 @@ class ExportDialog(ctk.CTkToplevel):
 
     _MAX_COPIES = 99          # a sheet holds 16; past this it is a typo
 
-    def _add_copies(self, key, n=1):
+    def _add_copies(self, key, n=1, record=True):
         """Add `n` more of this card, right after it. Nothing is written to
         disk: a copy is another _Card pointing at the same image.
 
@@ -3416,7 +3497,8 @@ class ExportDialog(ctk.CTkToplevel):
         if idx is None or n < 1:
             return
         n = min(n, self._MAX_COPIES)
-        self._push_undo(f"add {n} cop{'y' if n == 1 else 'ies'}")
+        if record:
+            self._push_undo(f"add {n} cop{'y' if n == 1 else 'ies'}")
         src = self._order[idx]
         for offset in range(n):
             dup = _Card(src.path)
@@ -3551,6 +3633,26 @@ class ExportDialog(ctk.CTkToplevel):
         threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._draw_preview()
 
+    def _add_copies_to(self, keys, n):
+        """Add n copies to each of `keys`, as one undo step."""
+        if not keys:
+            return
+        label = (f"add {n} cop{'y' if n == 1 else 'ies'}"
+                 if len(keys) == 1 else
+                 f"add {n} to {len(keys)} cards")
+        self._push_undo(label)
+        for k in keys:
+            self._add_copies(k, n, record=False)
+
+    def _remove_cards(self, keys):
+        if not keys:
+            return
+        self._push_undo("remove card" if len(keys) == 1
+                        else f"remove {len(keys)} cards")
+        for k in keys:
+            self._remove_card(k, record=False)
+        self._selected.difference_update(keys)
+
     def _copies_of(self, key):
         """How many of this card are on the sheet, counting the one clicked."""
         card = next((c for c in self._order if c.uid == key), None)
@@ -3589,6 +3691,7 @@ class ExportDialog(ctk.CTkToplevel):
             self._push_undo("remove card")
         self._order = [c for c in self._order if c.uid != key]
         self._excluded.discard(key)
+        self._selected.discard(key)
         self._back_of.pop(key, None)
         threading.Thread(target=self._load_thumbs, daemon=True).start()
         self._draw_preview()

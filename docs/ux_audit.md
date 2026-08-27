@@ -81,9 +81,10 @@ analysis that names the inset which fixes it.
    turned out to be interaction work only, with no model change at all.
 
 ### D - Discoverability
-9. **Left-click cycles a three-state border mode** (auto → off → on) with no
-   indicator of which state a card is in and no visible affordance. It is
-   documented only in the hint line under the canvas.
+9. ~~**Left-click cycles a three-state border mode**~~ **Done in v2.17.11.**
+   It moved into the right-click menu, which names the mode the card is
+   currently in. A plain click selects now, which is what a click means
+   everywhere else, and a stray one no longer quietly retreats a border.
 10. ~~**No keyboard shortcuts at all** in the dialog.~~ **Largely done.** Ctrl+Z
     and Ctrl+Y in v2.17.5; Ctrl+click to add a copy and Alt+click to remove in
     v2.17.10, both printed as accelerators in the context menu the way
@@ -114,8 +115,8 @@ that names the fixing inset rather than just warning, and a preview that scrolls
 slots~~ (v2.17.10) · ~~drag between sheets~~ (v2.17.10) · ~~quantity per card~~
 (v2.17.10) · ~~change art from the preview~~ (v2.17.10).
 
-**Tier 2.** Multi-select · keybinds printed in the context menu · a real border-mode
-indicator · per-slot disable.
+**Tier 2.** ~~Multi-select~~ (v2.17.11) · ~~keybinds in the context menu~~
+(v2.17.10) · ~~border-mode indicator~~ (v2.17.11) · per-slot disable.
 
 **Tier 3.** Save/load project · sort & filter.
 
