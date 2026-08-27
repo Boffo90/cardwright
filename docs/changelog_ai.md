@@ -12,6 +12,12 @@ Registro por versión. Actualizar en cada release.
   land exactly where the front's do, so a second set that disagrees with the
   one you are cutting to is worse than none at all. Registration marks are a
   separate switch and stay put, since a cutting machine still needs them.
+- **Fetching one exact printing is now findable.** Typing
+  `Sol Ring (SLD) 2560` has always fetched that precise art rather than
+  whichever one a bare name lands on, but nothing said so: a user asked for it
+  as a new feature. The search box now shows the form in its placeholder, there
+  is an FAQ entry covering it, and the README no longer files it under
+  "decklist paste", where nobody wanting a single card would look.
 - **A card that fails to save now retries, and says something useful if it
   still will not.** Reported from a log where one card failed three times in
   twenty seconds with `OSError: Invalid argument` and the identical path wrote

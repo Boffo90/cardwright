@@ -448,7 +448,11 @@ class App(_Root):
             bar, height=theme.H_BUTTON_LG, fg_color=SURFACE_INPUT,
             border_color=BORDER_STRONG, corner_radius=theme.RADIUS_SM,
             font=(UI, theme.TYPE["body"]), text_color=TEXT,
-            placeholder_text="Card name, Scryfall or Gatherer link")
+            # Naming the exact-printing form here is the whole documentation
+            # most people will ever read: it was supported all along and a user
+            # asked for it as a feature, because nothing said it existed.
+            placeholder_text="Card name, \"Sol Ring (SLD) 2560\" for one exact "
+                             "printing, or a Scryfall / Gatherer link")
         self.ref_entry.grid(row=0, column=0, sticky="ew", padx=(12, 8), pady=12)
         self.ref_entry.bind("<Return>", lambda e: self._add_scryfall())
 
@@ -4101,6 +4105,24 @@ FAQ = [
      "When marks do cost you slots, the hint under the preview names the exact "
      "inset that keeps them all. The floor is 3.5 mm - below that most inkjets "
      "cannot print, and the mark is simply clipped off."),
+
+    ("How do I get one exact printing instead of whatever it picks?",
+     "Type the card the way a decklist writes it: the name, the set code in "
+     "brackets, then the collector number.\n\n"
+     "    Sol Ring (SLD) 2560\n\n"
+     "That fetches exactly that printing. A bare name does not choose one, so "
+     "the app picks for you, which is usually not the art you had in mind.\n\n"
+     "The line is forgiving. A quantity in front works (\"3x Sol Ring (SLD) "
+     "2560\"), the set code is case-insensitive, and a trailing marker like "
+     "[matte] or *F* is ignored. It is the same format Moxfield, Archidekt and "
+     "most deckbuilders export, so a whole decklist pastes straight in, one "
+     "card per line.\n\n"
+     "A link pins the printing just as firmly: paste a scryfall.com or "
+     "gatherer.wizards.com card URL. If the link names a language, that is "
+     "respected too.\n\n"
+     "If you would rather choose by eye, the search button opens a gallery of "
+     "every printing with thumbnails, and \"Change art\" on a card in the "
+     "export preview opens that same gallery."),
 
     ("Can I print a card size that is not in the list?",
      "Yes. Pick \"Custom size...\" in the Card size dropdown and enter the "

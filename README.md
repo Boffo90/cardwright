@@ -42,8 +42,12 @@ with print-shop features.
 - Pasting a **Scryfall or Gatherer link** goes straight to the queue - you
   already chose the printing, so nothing second-guesses it. Gatherer links
   use the Gatherer image, never a substitute.
-- **Decklist paste**: `1 Card Name (SET) 123 [matte] *F*`, exact printings
-  by set + collector number. **Archidekt and Moxfield** deck URLs too.
+- **One exact printing, by name**: type `Sol Ring (SLD) 2560` and you get that
+  art, not whichever one a bare name resolves to. Set code plus collector
+  number, the way every deckbuilder writes it. A quantity in front, a lowercase
+  set code and a trailing `[matte]` or `*F*` all work.
+- **Decklist paste**: the same line, one card per row, so a list copied out of
+  **Archidekt or Moxfield** goes in whole. Their deck URLs work too.
 - **Tokens**: optionally add every token the deck's cards make - taken from
   Scryfall's own data, so it's exact.
 - Import a decklist with the art coming from **Gatherer** instead of Scryfall,
