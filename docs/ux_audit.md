@@ -45,9 +45,12 @@ analysis that names the inset which fixes it.
    Worth noting we did not need proxy-print's Prev/Next drop zones. Those exist
    because it paginates one page at a time; scrolling a single stack is a
    different shape of problem and the same gesture covers it.
-4. **No multi-select.** proxy-print carries a selection through the whole preview:
-   click to select, and every context-menu action applies to the group, including
-   dragging them together (`source.data.images` is a list).
+4. ~~**No multi-select.**~~ **Done in v2.17.11.** Click selects, shift+click
+   adds or removes, Escape clears. The context menu acts on the selection when
+   the clicked card is part of it and says how many, and a batch arrives as one
+   undo step. Dragging a whole group together is still not possible: that is
+   the part of proxy-print's version left on the table, and it would need the
+   drop indicator to describe a multi-card landing first.
 5. **No per-slot disable.** Proxxied lets you turn individual slots off and has
    *Center Cards Across Disabled Gaps* for layouts like 3×3 minus the middle.
 
@@ -94,12 +97,15 @@ analysis that names the inset which fixes it.
     (`gui.py:1624`). Anything not in that sentence is undiscoverable.
 
 ### E - Session
-12. **No save/load of the working session.** Proxxied names the project
-    ("Untitled Project"). Already recorded in `todo.md`.
+12. ~~**No save/load of the working session.**~~ **Done in v2.17.11.** Projects
+    save the queue itself, with quantities, chosen printings and per-card
+    models, and reopen straight to Export when the upscaled files are still
+    there. What is not saved is the sheet arrangement inside this dialog,
+    which is transient by nature.
 
 ## Feature differences that are not UX
 Noted so they are not confused with the above: Proxxied has sort/filter by mana
-value and colour, page labels, an SVG cutting template (already on our list),
+value and colour, page labels, an SVG cutting template (checked and dropped, see `todo.md`),
 electronic-cutter presets that print the recommended numbers inline, ZIP export
 and decklist round-tripping. Separate decisions, separate costs.
 
@@ -118,7 +124,7 @@ slots~~ (v2.17.10) · ~~drag between sheets~~ (v2.17.10) · ~~quantity per card~
 **Tier 2.** ~~Multi-select~~ (v2.17.11) · ~~keybinds in the context menu~~
 (v2.17.10) · ~~border-mode indicator~~ (v2.17.11) · per-slot disable.
 
-**Tier 3.** Save/load project · sort & filter.
+**Tier 3.** ~~Save/load project~~ (v2.17.11) · sort & filter.
 
 ## Can Tkinter carry this?
 Item by item, honestly:
