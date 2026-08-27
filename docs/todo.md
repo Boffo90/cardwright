@@ -1,23 +1,21 @@
 # Cardwright - TODO
 
-## ▶ START HERE (handoff, 2026-08-02)
-**v2.17.3 is built, released and pushed. Nothing is half-finished; the tree is
-clean and every release from 2.12.1 to 2.17.3 is published on GitHub.**
+## ▶ START HERE (handoff, 2026-08-27)
+**v2.17.10 is released; v2.17.11 is accumulating on `main` and has not been
+built.** The tree is clean and nothing is half-finished. Releases are batched
+now rather than cut per fix, so work sits here until there is enough of it:
+see `release.md` for the rule and its two exceptions.
 
-Ten releases went out in this stretch, most of them driven by real reports from
-r/mtgproxies. **All of those threads have been answered.** The public state is
-consistent: README, FAQ (in-app, under Help) and `decisions.md` all describe
-what actually ships.
+The print-sheet UX audit's **Tier 1 is complete** (v2.17.5 and v2.17.10):
+undo/redo, a drop indicator with droppable empty slots, dragging between
+sheets, quantity per card, and changing a card's art without leaving the
+dialog. `ux_audit.md` has what is left.
 
-Nothing is urgent. Pick from "Next up" below, or wait for the next report.
+Waiting in v2.17.11: projects (save/load the queue), cut guides that can be
+turned off on the backs, the exact-printing search made findable, and a retry
+around card saves that Windows briefly locks.
 
-### The one thing worth doing first
-The in-app FAQ answer *"Which paper and layout should I use with a cutting
-machine?"* recommends A4 4×2 / 7-card. That was true when written, but **A3
-arrived in v2.17.0 with 4×4 grids** and is now the better answer: more margin
-means the registration marks stop competing with card slots, and it fits 16
-cards. The answer is not wrong, just no longer the best advice. `FAQ` lives at
-the top of `gui.py`.
+Nothing is urgent. Pick from "Next up", or wait for the next report.
 
 ### Two things only the community can close
 - **trevorstarick** (has a Silhouette, we do not) was asked to confirm that a
@@ -28,37 +26,40 @@ the top of `gui.py`.
   ProxySheets template alignment.
 
 ## Print-sheet UX revamp (opened 2026-08-04)
-The export dialog matches or beats the competition on features but not on how it
-feels to use. `ux_audit.md` compares it against Proxxied and proxy-print,
-prioritises the twelve real gaps and concludes that Tier 1 and Tier 2 are all
-reachable in CustomTkinter - a Qt rewrite is not justified yet.
+The export dialog matched or beat the competition on features but not on how it
+felt to use. `ux_audit.md` compares it against Proxxied and proxy-print,
+prioritises the twelve real gaps, and concluded that Tier 1 and Tier 2 were
+both reachable in CustomTkinter: a Qt rewrite was not justified, and building
+Tier 1 bore that out.
 
-Done so far: the file-per-copy model (v2.17.4) - copies are instances sharing an
-image, so a quantity control is now just a number - and **undo/redo** (v2.17.5).
-Next from Tier 1: a drop indicator with droppable empty slots, dragging between
-sheets, quantity per card, and changing a card's art without leaving the dialog.
+**Tier 1 is done.** What is left, in `ux_audit.md`: multi-select, a real
+border-mode indicator, per-slot disable, and sort & filter.
 
 ## Next up (nothing blocking)
 From the July 2026 comparison against Proxy-PDF-Maker, fabricard.net and
 silhouette-card-maker. Tier 1 was done in v2.17.0; these are what was ranked
 below it and still look worth having:
 
-- **SVG cut-file export** - Proxy-PDF-Maker's "Export Exact Guides". Directly
-  answers the `.studio3` requests and is far cheaper than a proprietary format.
-  **Check first** whether the *free* edition of Silhouette Studio imports SVG:
-  it may be a Designer Edition feature, which would sink the idea.
 - **Two-colour dashed cut guides** - alternating colours so a guide is visible
   against both light and dark card edges. Cheap, and better than our single
   colour.
-- **Save / load project** - export presets save *settings*; this would save the
-  working session (card list, quantities, assigned backs). Losing a hand-built
-  100-card queue on close is the pain it solves.
 - **Live image sliders** (brightness, contrast, saturation…) per card, the way
   fabricard does. Our 9 calibration profiles are better for the common case
   because they are matched to a printer; this is for the one-off card.
 
 ## Deliberately not doing
 Recorded so they are not re-researched from scratch:
+- **SVG cut-file export** - the check this was gated on came back no
+  (2026-08-27). Importing SVG needs **Designer Edition**, a paid upgrade;
+  Silhouette Studio's free Basic Edition cannot open one. The people who most
+  need a cut file handed to them are exactly the ones who could not use it,
+  and anyone on Designer Edition can already build the template themselves.
+  **DXF is the format that would work** - Basic Edition opens it, with cut
+  lines already live and no tracing - but DXF carries no unit information, so
+  it commonly lands at the wrong scale, and a cut file that imports 4% off is
+  worse than none. That is only settleable on real hardware, which this
+  project does not have: see the two questions above that have been open for
+  the same reason. Revisit if someone with a Silhouette offers to test.
 - **Colour cube (.CUBE LUT) support** - powerful, but the profile system covers
   the common case and this is for people who already know what a LUT is.
 - **Mixed card orientation, margin modes, base-PDF registration** - we have
