@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import re
 import subprocess
@@ -228,6 +229,7 @@ class QueueItem(ctk.CTkFrame):
             label = Path(ref).name
         else:
             label = ref
+        self.label = label          # untrimmed, so a project can restore it
         self.name = ctk.CTkLabel(self, text=self._trim(label), anchor="w",
                                  text_color=TEXT,
                                  font=(UI, theme.TYPE["body"]))
@@ -622,14 +624,20 @@ class App(_Root):
         # allowed to look like a primary action. Clear used to be a filled
         # button 6 px taller than its neighbours, which made the whole row
         # look misaligned.
+        # One slot rather than two: the footer was already full, and save and
+        # open belong together anyway.
+        # Column 0 is the progress bar, which stretches; the utilities run
+        # from 1 and "Upscale all" stays last as the only primary action.
+        self.project_btn = ghost("Project…", self._project_menu, 96)
+        self.project_btn.grid(row=0, column=1, padx=pad["xs"])
         ghost("Output folder", self._open_output, 118).grid(
-            row=0, column=1, padx=pad["xs"])
+            row=0, column=2, padx=pad["xs"])
         self.clear_btn = ghost("Clear", self._clear, 76)
-        self.clear_btn.grid(row=0, column=2, padx=pad["xs"])
+        self.clear_btn.grid(row=0, column=3, padx=pad["xs"])
         ghost("PDF from files…", self._export_pdf_files, 130).grid(
-            row=0, column=3, padx=pad["xs"])
+            row=0, column=4, padx=pad["xs"])
         self.pdf_btn = ghost("Export PDF…", self._export_pdf, 116)
-        self.pdf_btn.grid(row=0, column=4, padx=(pad["xs"], pad["lg"]))
+        self.pdf_btn.grid(row=0, column=5, padx=(pad["xs"], pad["lg"]))
 
         self.start_btn = ctk.CTkButton(
             footer, text="Upscale all", width=150, height=theme.H_BUTTON_LG,
@@ -637,7 +645,149 @@ class App(_Root):
             font=(UI, theme.TYPE["subtitle"], "bold"),
             fg_color=GOLD, hover_color=GOLD_HOVER, text_color=GOLD_TEXT,
             command=self._start)
-        self.start_btn.grid(row=0, column=5)
+        self.start_btn.grid(row=0, column=6)
+
+        # Named in the Project menu as accelerators, which is the only
+        # place anyone will find them.
+        for seq in ("<Control-s>", "<Control-S>"):
+            self.bind(seq, self._save_project)
+        for seq in ("<Control-o>", "<Control-O>"):
+            self.bind(seq, self._open_project)
+
+    # ============================================================== projects
+    # A queue is work: a hundred cards chosen printing by printing, with
+    # quantities and per-card models. Closing the window used to throw all of
+    # it away, and v2.17.10 made that worse by giving the session more to lose.
+    # Export presets save settings; this saves the list itself.
+
+    PROJECT_FORMAT = 1
+    PROJECT_TYPES = [("Cardwright project", "*.cwproj"), ("All files", "*.*")]
+
+    def _project_dict(self):
+        items = []
+        for it in self.items:
+            items.append({
+                "ref": str(it.ref),
+                "kind": it.kind,
+                "label": it.label,
+                "qty": it.qty,
+                "released_at": it.released_at,
+                "set_code": it.set_code,
+                "src": getattr(it, "src", None),
+                "downloads": [list(d) for d in (it.downloads or [])],
+                "model": it.model_menu.get(),
+                # Saved after upscaling, a project can go straight to Export
+                # without paying for the AI again.
+                "outputs": [str(o) for o in it.outputs],
+                "status": it.status,
+            })
+        return {
+            "cardwright_project": self.PROJECT_FORMAT,
+            "app_version": APP_VERSION,
+            "items": items,
+        }
+
+    def _save_project(self, _event=None):
+        if not self.items:
+            messagebox.showinfo("Save project",
+                                "The queue is empty, so there is nothing to "
+                                "save yet.")
+            return "break"
+        target = filedialog.asksaveasfilename(
+            title="Save project", defaultextension=".cwproj",
+            initialdir=OUTPUT_FOLDER, initialfile="deck.cwproj",
+            filetypes=self.PROJECT_TYPES)
+        if not target:
+            return "break"
+        try:
+            Path(target).write_text(
+                json.dumps(self._project_dict(), indent=1, ensure_ascii=False),
+                encoding="utf-8")
+        except OSError as e:
+            applog.log.error("Saving the project failed", exc_info=True)
+            messagebox.showerror("Save project", str(e))
+            return "break"
+        n = len(self.items)
+        messagebox.showinfo("Save project",
+                            f"Saved {n} card(s) to\n{Path(target).name}")
+        return "break"
+
+    def _open_project(self, _event=None):
+        if self.running:
+            return "break"
+        path = filedialog.askopenfilename(
+            title="Open project", initialdir=OUTPUT_FOLDER,
+            filetypes=self.PROJECT_TYPES)
+        if not path:
+            return "break"
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            applog.log.error("Opening the project failed", exc_info=True)
+            messagebox.showerror("Open project",
+                                 f"That file could not be read.\n\n{e}")
+            return "break"
+        if not isinstance(data, dict) or "cardwright_project" not in data:
+            messagebox.showerror("Open project",
+                                 "That is not a Cardwright project file.")
+            return "break"
+        if data.get("cardwright_project", 0) > self.PROJECT_FORMAT:
+            messagebox.showerror(
+                "Open project",
+                "That project was saved by a newer version of Cardwright.\n\n"
+                "Update and try again.")
+            return "break"
+        if self.items and not messagebox.askyesno(
+                "Open project",
+                f"This replaces the {len(self.items)} card(s) already in the "
+                "queue.\n\nContinue?"):
+            return "break"
+        self._load_project(data)
+        return "break"
+
+    def _load_project(self, data):
+        self._clear()
+        missing = 0
+        for row in data.get("items", []):
+            item = self._add_item(
+                row.get("ref", ""), row.get("kind", "scryfall"),
+                downloads=[tuple(d) for d in row.get("downloads") or []] or None,
+                label=row.get("label"), qty=int(row.get("qty", 1)),
+                released_at=row.get("released_at"),
+                set_code=row.get("set_code"), src=row.get("src"))
+            if row.get("model") in ROW_MODELS:
+                item.model_menu.set(row["model"])
+            # Outputs are paths, and a project outlives the files it points at.
+            # Anything gone goes back to pending rather than pretending to be
+            # done and failing at export with an empty sheet.
+            outs = [Path(o) for o in row.get("outputs") or []]
+            alive = [o for o in outs if o.exists()]
+            if outs and len(alive) < len(outs):
+                missing += 1
+            if alive and len(alive) == len(outs) and row.get("status") == "done":
+                item.outputs = alive
+                item.set_status("done", f"Done ({item.qty} copies)"
+                                if item.qty > 1 else "Done", 1)
+        self._refresh_empty()
+        n = len(self.items)
+        msg = f"Loaded {n} card(s)."
+        if missing:
+            msg += (f"\n\n{missing} of them had upscaled files that are no "
+                    "longer on disk, so they are queued to run again.")
+        messagebox.showinfo("Open project", msg)
+
+    def _project_menu(self):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Save project…", accelerator="Ctrl+S",
+                         command=self._save_project)
+        menu.add_command(label="Open project…", accelerator="Ctrl+O",
+                         command=self._open_project)
+        try:
+            x = self.project_btn.winfo_rootx()
+            y = self.project_btn.winfo_rooty() + self.project_btn.winfo_height()
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
 
     # ============================================================ queue ops
     def _refresh_empty(self):

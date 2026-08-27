@@ -48,6 +48,10 @@ with print-shop features.
   set code and a trailing `[matte]` or `*F*` all work.
 - **Decklist paste**: the same line, one card per row, so a list copied out of
   **Archidekt or Moxfield** goes in whole. Their deck URLs work too.
+- **Save and load a project**: the queue itself, not just settings. A
+  hand-built list with its quantities, chosen printings and per-card models
+  survives closing the app. Save it after upscaling and it reopens ready to
+  export, without paying for the AI again.
 - **Tokens**: optionally add every token the deck's cards make - taken from
   Scryfall's own data, so it's exact.
 - Import a decklist with the art coming from **Gatherer** instead of Scryfall,

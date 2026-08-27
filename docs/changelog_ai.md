@@ -3,6 +3,14 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.11 (unreleased)
+- **Projects: save and load the queue.** *Project…* in the footer, or Ctrl+S
+  and Ctrl+O. A hundred cards chosen printing by printing, with their
+  quantities and per-card models, used to vanish when the window closed.
+  Export presets save settings; this saves the list.
+- Save it after upscaling and it reopens **done**, straight to Export, without
+  running the AI again. A project outlives the images it points at, though, so
+  any card whose files are no longer on disk comes back queued rather than
+  pretending to be finished and exporting an empty slot. It says how many.
 - **Cut guides can be turned off on the back pages.** New *Cut guides on backs
   too* switch in the Cutting tab, on by default so nothing changes for anyone
   who liked it as it was. Asked for by someone printing duplex, who could not
