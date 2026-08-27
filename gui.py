@@ -1639,6 +1639,17 @@ class ExportDialog(ctk.CTkToplevel):
         self.guide_thick = entry_row("Guide thickness (pt)", "guide_thick", 0.4)
         self.guide_offset = entry_row("Guide offset (mm)", "guide_offset", 0.0,
                                       "gap from the card")
+        # Duplex drift means the back's guides never land exactly where the
+        # front's do, so a second set that disagrees with the one you are
+        # cutting to is worse than none. Reported by someone printing duplex.
+        self.back_guides = ctk.CTkSwitch(
+            left, text="Cut guides on backs too",
+            font=(UI, theme.TYPE["small"]), command=self._refresh_preview)
+        if s.get("back_guides", True):
+            self.back_guides.select()
+        self.back_guides.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                              padx=12, pady=(2, 4))
+        self._r += 1
         self.corner_radius = entry_row("Corner radius (mm)", "corner_radius",
                                        0.0, "0 = square")
         self.shift_down = entry_row("Shift down (mm)", "shift_down", 0.0,
@@ -2152,6 +2163,7 @@ class ExportDialog(ctk.CTkToplevel):
             "edge_bleed": self._edge_bleed(),
             "bleed_color": self.bleed_color.get(),
             "guides": self.guides.get(),
+            "back_guides": bool(self.back_guides.get()),
             "guide_style": self.guide_style.get(),
             "guide_len": self._guide_len(),
             "guide_thick": self._guide_thick(),
@@ -2173,6 +2185,9 @@ class ExportDialog(ctk.CTkToplevel):
         if "reg_marks" in d:
             (self.reg_marks.select if d["reg_marks"] else
              self.reg_marks.deselect)()
+        if "back_guides" in d:
+            (self.back_guides.select if d["back_guides"] else
+             self.back_guides.deselect)()
         om(self.bleed_color, "bleed_color"); om(self.guides, "guides")
         om(self.guide_style, "guide_style"); om(self.quality, "quality")
         om(self.sharpen, "sharpen"); om(self.shadow, "shadow")
@@ -3535,6 +3550,7 @@ class ExportDialog(ctk.CTkToplevel):
             edge_bleed_mm=self._edge_bleed(),
             bleed_color=self.bleed_color.get(),
             guide_color=self.guides.get(),
+            back_guides=bool(self.back_guides.get()),
             guide_len_mm=self._guide_len(),
             guide_thick=self._guide_thick(),
             guide_style=self.guide_style.get(),

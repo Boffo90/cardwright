@@ -927,6 +927,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               pages_per_file=0, backs=None, back_offset=(0.0, 0.0),
               back_bleed_mm=1.5, back_rotation_deg=0.0, shift_down_mm=0.0,
               edge_bleed_mm=0.0, bleed_color="Black", guide_color="White",
+              back_guides=True,
               guide_len_mm=4.0, guide_thick=0.4, guide_style="Cross",
               guide_offset_mm=0.0, corner_radius_mm=0.0,
               layout=DEFAULT_LAYOUT, deepen_border=False, border_modes=None,
@@ -973,6 +974,11 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     never white paper or the neighboring card.
     bleed_color:    key of BLEED_COLORS for that frame.
     guide_color:    key of GUIDE_COLORS for the corner cross guides.
+    back_guides:    draw those guides on the BACK pages too. On by default,
+                    which is how it always behaved. Turning it off matters for
+                    duplex: the back's guides never land exactly where the
+                    front's do, so a second set that disagrees with the one you
+                    are cutting to is worse than none. You cut by the front.
     Returns the list of files written.
     """
     images = [Path(p) for p in images]
@@ -1171,9 +1177,11 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                                 x - bleed, y - bleed,
                                 card_w + 2 * bleed, card_h + 2 * bleed,
                                 mask=img_mask)
-                _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
-                            cols, rows, guide_len_mm, guide_thick, guide_style,
-                            guide_offset_mm, card_w, card_h, back_clear)
+                if back_guides:
+                    _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
+                                cols, rows, guide_len_mm, guide_thick,
+                                guide_style, guide_offset_mm, card_w, card_h,
+                                back_clear)
                 c.restoreState()
                 if reg_marks:
                     _draw_reg_marks(c, pw, ph, reg_inset_mm, reg_length_mm,

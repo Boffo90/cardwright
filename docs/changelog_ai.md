@@ -3,6 +3,15 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.11 (unreleased)
+- **Cut guides can be turned off on the back pages.** New *Cut guides on backs
+  too* switch in the Cutting tab, on by default so nothing changes for anyone
+  who liked it as it was. Asked for by someone printing duplex, who could not
+  find the setting because it was not there: guides were one global choice
+  applied to both faces.
+- The reasoning is worth keeping: duplex drift means the back's guides never
+  land exactly where the front's do, so a second set that disagrees with the
+  one you are cutting to is worse than none at all. Registration marks are a
+  separate switch and stay put, since a cutting machine still needs them.
 - **A card that fails to save now retries, and says something useful if it
   still will not.** Reported from a log where one card failed three times in
   twenty seconds with `OSError: Invalid argument` and the identical path wrote
