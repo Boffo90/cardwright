@@ -39,18 +39,18 @@ obvious end state, and large enough to want a clear run). Both are described
 under "Asked for by users".
 
 ### State of the tree
-**v2.17.10 is the last release. Eleven commits sit unreleased on `main`** as
-v2.17.11, tree clean, 155 tests passing. Releases are batched now, see
-`release.md` for the rule and its two exceptions.
-
-Waiting in v2.17.11: multi-select in the preview, projects (save/load the
+**v2.17.11 is released and pushed** (2026-08-28), tree clean, 155 tests
+passing. It carried multi-select in the preview, projects (save/load the
 queue), cut guides that can be turned off on the backs, the exact-printing
 search made findable, a retry around card saves that Windows briefly locks,
-4x6 photo sheets with PNG/JPEG output, and the two-axis page shift.
+4x6 photo sheets with PNG/JPEG output, and the two-axis page shift. Releases
+are batched, see `release.md` for the rule and its two exceptions.
 
-**Owed at the next release:** the Microsoft false-positive submission for the
-new binary. The table below has the previous ones; v2.17.10's hash
-(`817d473f`) was never submitted.
+**Owed right now, and only the author can do it:** the Microsoft
+false-positive submission, for *two* binaries. v2.17.10's hash was never
+submitted and v2.17.11's is new. Both are in the table below. It is a web form
+(<https://www.microsoft.com/en-us/wdsi/filesubmission>, "Software developer" /
+"Incorrectly detected as malware"), so it cannot be automated from here.
 
 The UX audit's **Tier 1 and almost all of Tier 2 are done**. What is left in
 `ux_audit.md`: per-slot disable, sort & filter, and dragging a whole selection
@@ -158,6 +158,8 @@ Recorded so they are not re-researched from scratch:
   Submissions so far, newest first:
   | Version | SHA-256 (first 8) | Date | Submission ID |
   | --- | --- | --- | --- |
+  | 2.17.11 | `cb0b7626` | **not submitted** | - |
+  | 2.17.10 | `817d473f` | **not submitted** | - |
   | 2.17.9 | `b031a2bf` | 2026-08-13 | `f669dbf4-945e-4a39-bf48-3dcda5510ff3` |
   | 2.17.8 | `53c72c7f` | 2026-08-11 | `1940f3c3-54f4-42fb-8a04-3298c8eb50df` |
 
