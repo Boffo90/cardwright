@@ -2,6 +2,15 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.12 (unreleased)
+- **Help → About now links to Discussions**, beside Report a bug. Separate on
+  purpose: the user who reported the page-shift problem went to Reddit rather
+  than open an issue, and that report only arrived because somebody happened to
+  be reading. Issues is a high bar for "is this supposed to work like this?".
+  Discussions was turned on for the repo at the same time, along with issue
+  forms that ask for the printer and the feed rather than leaving them to be
+  guessed at.
+
 ## v2.17.11 - projects, photo prints, and a sheet that moves
 - **The page shift now moves both ways on both axes.** *Shift down* takes
   negative numbers and *Shift right* is new, so the whole layout can go up,

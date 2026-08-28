@@ -4680,6 +4680,12 @@ class HelpDialog(ctk.CTkToplevel):
         para("Links", bold=True)
         link("Releases and source", f"https://github.com/{GITHUB_REPO}")
         link("Report a bug", f"https://github.com/{GITHUB_REPO}/issues")
+        # Separate from the bug link on purpose. A user with a five-line gripe
+        # about their printer went to Reddit rather than file an issue, and
+        # that report only arrived because somebody happened to be reading.
+        # Issues is a high bar for "is this supposed to work like this?".
+        link("Ask or suggest something",
+             f"https://github.com/{GITHUB_REPO}/discussions")
         link("Donate", DONATE_URL)
 
         para("Licence", bold=True)
