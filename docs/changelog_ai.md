@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.12 (unreleased)
+## v2.17.12 - set up a sheet before you have any cards
 - **The export dialog opens with an empty queue.** It used to refuse, saying to
   run UPSCALE ALL first, so laying out a sheet meant upscaling a throwaway card
   just to reach the settings - or to reach *Add cards…*, which loads finished
