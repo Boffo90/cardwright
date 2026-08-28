@@ -10,6 +10,13 @@ Registro por versión. Actualizar en cada release.
   Reported by a user who wanted to set a sheet up and add cards to it from
   outside the queue. Export, Calibration and Shadow test grey out until there
   is a card, since all three need one.
+- **Cut guides moved to the Cutting tab**, above the registration marks. Both
+  are answers to "how do I separate these cards", and Layout had grown to
+  sixteen rows doing two jobs while Cutting used a third of its height. Layout
+  is now where things sit on the page; Cutting is what you do to it after.
+  Guides come first there because everyone cuts and only some people own a
+  machine. (The v2.17.11 notes already said the *Cut guides on backs too*
+  switch was in Cutting. It was not, it was in Layout. Now it is.)
 - **The Layout and Image tabs no longer hide their last rows.** Adding the
   second page-shift axis pushed Layout past the bottom of the panel and the
   overflow was simply invisible: no scrollbar, nothing to suggest a control was

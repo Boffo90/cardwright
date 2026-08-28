@@ -1818,25 +1818,6 @@ class ExportDialog(ctk.CTkToplevel):
                                     "0 = cards touching")
         self.bleed_color = row("Bleed color", BLEED_COLOR_CHOICES,
                                s.get("bleed_color", "Black"))
-        self.guides = row("Cut guides", GUIDE_CHOICES,
-                          s.get("guides", "White"))
-        self.guide_style = row("Guide style", GUIDE_STYLE_CHOICES,
-                               s.get("guide_style", "Cross"))
-        self.guide_len = entry_row("Guide length (mm)", "guide_len", 4.0)
-        self.guide_thick = entry_row("Guide thickness (pt)", "guide_thick", 0.4)
-        self.guide_offset = entry_row("Guide offset (mm)", "guide_offset", 0.0,
-                                      "gap from the card")
-        # Duplex drift means the back's guides never land exactly where the
-        # front's do, so a second set that disagrees with the one you are
-        # cutting to is worse than none. Reported by someone printing duplex.
-        self.back_guides = ctk.CTkSwitch(
-            left, text="Cut guides on backs too",
-            font=(UI, theme.TYPE["small"]), command=self._refresh_preview)
-        if s.get("back_guides", True):
-            self.back_guides.select()
-        self.back_guides.grid(row=self._r, column=0, columnspan=2, sticky="w",
-                              padx=12, pady=(2, 4))
-        self._r += 1
         self.corner_radius = entry_row("Corner radius (mm)", "corner_radius",
                                        0.0, "0 = square")
         # Two axes and both signs. It began as down-only, for cardstock that
@@ -1860,6 +1841,33 @@ class ExportDialog(ctk.CTkToplevel):
         self._r += 1
 
         tab("Cutting")
+        # Both halves of "how do I separate these cards" live here: guides for
+        # scissors or a guillotine first, because everyone cuts and only some
+        # people own a machine, then the registration marks below.
+        #
+        # They used to sit on Layout, which had grown to sixteen rows doing two
+        # jobs at once while this tab used a third of its height. Layout is
+        # where things sit on the page; cutting is what you do to it after.
+        self.guides = row("Cut guides", GUIDE_CHOICES,
+                          s.get("guides", "White"))
+        self.guide_style = row("Guide style", GUIDE_STYLE_CHOICES,
+                               s.get("guide_style", "Cross"))
+        self.guide_len = entry_row("Guide length (mm)", "guide_len", 4.0)
+        self.guide_thick = entry_row("Guide thickness (pt)", "guide_thick", 0.4)
+        self.guide_offset = entry_row("Guide offset (mm)", "guide_offset", 0.0,
+                                      "gap from the card")
+        # Duplex drift means the back's guides never land exactly where the
+        # front's do, so a second set that disagrees with the one you are
+        # cutting to is worse than none. Reported by someone printing duplex.
+        self.back_guides = ctk.CTkSwitch(
+            left, text="Cut guides on backs too",
+            font=(UI, theme.TYPE["small"]), command=self._refresh_preview)
+        if s.get("back_guides", True):
+            self.back_guides.select()
+        self.back_guides.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                              padx=12, pady=(2, 4))
+        self._r += 1
+
         self.reg_marks = ctk.CTkSwitch(
             left, text="Registration marks", command=self._refresh_preview)
         if s.get("reg_marks"):
