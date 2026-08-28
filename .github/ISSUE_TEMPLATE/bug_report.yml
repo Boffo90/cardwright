@@ -65,4 +65,4 @@ body:
       label: Log
       description: >-
         Paste the last few dozen lines of cardwright.log, or drag the file in.
-      render: text
+      render: shell
