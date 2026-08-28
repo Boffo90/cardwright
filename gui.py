@@ -2113,7 +2113,11 @@ class ExportDialog(ctk.CTkToplevel):
         btns = ctk.CTkFrame(self, fg_color="transparent")
         btns.grid(row=2, column=0, columnspan=2, sticky="e",
                   padx=20, pady=(0, 14))
-        ctk.CTkButton(btns, text="Cancel", width=88, height=theme.H_BUTTON,
+        # "Close", not "Cancel". Export no longer closes the dialog, so this
+        # is the only way out and it has nothing left to cancel - and after an
+        # export that has already been written, "Cancel" reads like it might
+        # undo it.
+        ctk.CTkButton(btns, text="Close", width=88, height=theme.H_BUTTON,
                       corner_radius=theme.RADIUS_SM,
                       font=(UI, theme.TYPE["body"]),
                       fg_color="transparent", hover_color=GRAY_HOVER,
@@ -3987,11 +3991,16 @@ class ExportDialog(ctk.CTkToplevel):
         names = "\n".join(Path(f).name for f in files[:8])
         if len(files) > 8:
             names += f"\n... (+{len(files) - 8} more)"
+        # Stays open. This dialog is a workspace - order, copies, per-card art
+        # and border modes, none of it saved anywhere - and closing on a
+        # successful export threw all of it away. Reprinting one sheet with a
+        # single card moved meant rebuilding the arrangement from scratch.
+        self.export_btn.configure(state="normal", text="Export")
+        self._set_status("")
         messagebox.showinfo(
             f"{self.out_format.get()} ready",
             f"{len(self._order)} card(s) -> {len(files)} file(s), "
             f"{total_mb:.0f} MB total:\n\n{names}", parent=self)
-        self.destroy()
 
     def _failed(self, e):
         self.export_btn.configure(state="normal", text="Export")

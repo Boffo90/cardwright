@@ -2,6 +2,16 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.13 (unreleased)
+- **Exporting no longer closes the export dialog.** The dialog is a workspace -
+  order, copies, per-card art and border modes, none of it saved anywhere - and
+  closing on a successful export threw all of that away. Reprinting a sheet
+  with one card moved meant rebuilding the whole arrangement. Reported by a
+  user who kept losing their layout to their own successful exports.
+- The button that leaves now says **Close** rather than *Cancel*. Export does
+  not close the dialog any more, so Cancel had nothing left to cancel, and
+  after files have already been written "Cancel" reads like it might undo them.
+
 ## v2.17.12 - set up a sheet before you have any cards
 - **The export dialog opens with an empty queue.** It used to refuse, saying to
   run UPSCALE ALL first, so laying out a sheet meant upscaling a throwaway card
