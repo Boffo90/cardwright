@@ -299,9 +299,29 @@ PARALLEL_JOBS = 3
 
 # 3x3 cards of exactly 63x88 mm per page, no gutters (fewer cuts),
 # with crop tick marks in the margins.
-PDF_PAGE_SIZES = ["A4", "Letter", "A3", "Legal", "Tabloid", "A5"]
+# 4x6 is the photo-lab print, not a paper size, and it is here because in
+# some countries two cards on a 4x6 photo print is several times cheaper than
+# nine on A4 or Letter. It holds exactly 2 cards, landscape, with 13.2 mm of
+# margin on the long edge and 6.8 mm on the short one - see the
+# "2x1 landscape" grid in print_sheet.
+PDF_PAGE_SIZES = ["A4", "Letter", "A3", "Legal", "Tabloid", "A5", "4x6 photo"]
 
 PDF_DEFAULT_PAGE = "Letter"
+
+# What the sheet is written as. The photo labs that make 4x6 worth having
+# generally do not accept PDF at all, so the raster formats are not a
+# convenience - for those users they are the only usable output.
+OUTPUT_FORMATS = {"PDF": None, "PNG": "PNG", "JPEG": "JPEG"}
+
+OUTPUT_FORMAT_DEFAULT = "PDF"
+
+# Resolution for the raster formats. 300 is what most labs print at natively
+# and 4x6 at 300 is 1800x1200, a sixteenth of the pixels the upscaler makes;
+# the higher settings exist because some labs accept more and throwing that
+# work away silently would be the wrong default to hard-code.
+OUTPUT_DPI_CHOICES = ["300", "600", "1200"]
+
+OUTPUT_DPI_DEFAULT = "300"
 
 # Image encoding inside the PDF.
 #   Lossless -> PNG/Flate, pixel-for-pixel identical to the upscaled card.

@@ -1,51 +1,39 @@
 # Cardwright - TODO
 
-## ▶ START HERE (handoff, 2026-08-27)
+## ▶ START HERE (handoff, 2026-08-28)
 
-### Next task: 4x6 photo-print sheets with PNG output
-Everything needed to start is below; none of it needs re-deriving.
+### 4x6 photo sheets with PNG output: **done**
+Shipped in v2.17.11. New *4x6 photo* page size, *2x1 landscape* grid, and
+*Output format* (PDF / PNG / JPEG) with a DPI choice on the Image tab.
 
-**Who asked and why.** A user on r/mtgproxies: their cheapest local printing is
-**2 cards on a 4x6 photo print**, against 2-3x the cost for 9-up on A4 or
-Letter. Online photo labs there do not accept PDF, so they need PNG or JPG.
-They were writing their own PowerShell script to do it, and were told they can
-already use Cardwright's output folder as its input in the meantime.
+Raster output goes through `_RasterCanvas` in `print_sheet.py`, a Pillow
+stand-in for the canvas calls `build_pdf` makes, so there is one layout
+implementation rather than two - guides, ticks, bleed frames, registration
+marks and mirrored backs all come through unchanged. The reasoning, including
+why rasterising the PDF was closed off, is in `decisions.md`.
 
-**Geometry, measured.** A card is 2.48 x 3.46 in.
-- **6x4 landscape fits exactly 2 cards**, margin 1.04 x 0.54 in. This is the
-  layout to add.
-- 4x6 portrait fits only 1, so it is not worth offering.
-- Sheet pixels: 300 DPI = 1800x1200 (card 744x1039) · 600 = 3600x2400 ·
-  1200 = 7200x4800 (card 2976x4157).
+**The one question that was put to the user is still unanswered**: what
+maximum resolution their photo lab accepts. It no longer blocks anything - the
+DPI is a choice (300 / 600 / 1200) rather than a hard-coded 300, which is what
+was planned if no answer came. If they do reply, the only thing worth changing
+is which value the dropdown defaults to.
 
-**Two parts, very different sizes.**
-1. *The page size* is a `PDF_PAGE_SIZES` entry in `config.py`. Trivial.
-2. *PNG output* is the real work. `build_pdf` composes through reportlab, so
-   raster output is a second rendering path, not a setting.
-
-**Do not reach for a PDF rasteriser.** It is the obvious shortcut and it is
-closed: the good library is PyMuPDF, which is **AGPL**, and this ships as a
-distributed binary. Compose the sheet with Pillow instead, reusing `_flatten`
-for the cards (it already returns treated images) and the existing layout maths
-in `layout_positions` / `_block_origin`, converting points to pixels. Guides and
-registration marks would need redrawing in Pillow; `extend_bleed` is already
-pure Pillow and carries over as-is.
-
-**One question was put to the user and not yet answered**, and it should shape
-the design: *what maximum resolution does their photo lab accept?* 4x6 at
-300 DPI is a sixteenth of the pixels the upscaler produces. Many labs print at
-about 300 DPI natively so it may not matter, but if theirs takes more, offer a
-DPI choice rather than hard-coding 300 and quietly throwing the work away. If
-no answer arrives, ship the choice.
+### Next task: pick from the list below
+Nothing is teed up. The two that were sized and ranked highest after 4x6 are
+**mixed card sizes on one sheet** (needs per-card size plus a small packing
+problem) and **collapsing the main window into the export dialog** (the
+obvious end state, and large enough to want a clear run). Both are described
+under "Asked for by users".
 
 ### State of the tree
-**v2.17.10 is the last release. Eight commits sit unreleased on `main`** as
-v2.17.11, tree clean, 124 tests passing. Releases are batched now, see
+**v2.17.10 is the last release. Nine commits sit unreleased on `main`** as
+v2.17.11, tree clean, 140 tests passing. Releases are batched now, see
 `release.md` for the rule and its two exceptions.
 
 Waiting in v2.17.11: multi-select in the preview, projects (save/load the
 queue), cut guides that can be turned off on the backs, the exact-printing
-search made findable, and a retry around card saves that Windows briefly locks.
+search made findable, a retry around card saves that Windows briefly locks,
+and 4x6 photo sheets with PNG/JPEG output.
 
 **Owed at the next release:** the Microsoft false-positive submission for the
 new binary. The table below has the previous ones; v2.17.10's hash
@@ -75,8 +63,8 @@ border-mode indicator, per-slot disable, and sort & filter.
 
 ## Asked for by users, assessed but not started
 Raised on r/mtgproxies in August 2026 and sized here so the next look does not
-start from nothing. **4x6 with PNG output is the top of this list and has its
-own brief in START HERE.**
+start from nothing. 4x6 with PNG output was the top of this list and shipped in
+v2.17.11.
 
 - **Mixed card sizes on one sheet**, to save paper across games. Card size is
   currently one setting for the whole export and the layout code assumes every

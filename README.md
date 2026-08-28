@@ -75,12 +75,18 @@ The preview is a workspace, not a picture - what you see is what prints.
 
 ### Print sheets
 - Layouts: **3×3 portrait**, **4×2 landscape**, **7-card Silhouette**, plus
-  **3×4** and **4×4** for the bigger sheets - A3 and Tabloid fit 16 cards.
+  **3×4** and **4×4** for the bigger sheets - A3 and Tabloid fit 16 cards,
+  and **2×1 landscape** for the 4x6 photo print.
 - Card sizes: **MTG / Pokémon (63×88)**, **Yu-Gi-Oh (59×86)**, mini (44×68),
   tarot (70×120), plus **any custom size** you enter in mm. Pokémon cards are
   the same size as Magic cards, so they work as-is.
-- Pages: **A4, Letter, A3, Legal, Tabloid, A5**. Lossless or JPEG PDF, split
-  into one file per N pages.
+- Pages: **A4, Letter, A3, Legal, Tabloid, A5**, and **4x6 photo** - two cards
+  on a photo print, which in some countries costs a fraction of nine cards on
+  A4 or Letter.
+- Output as **PDF, PNG or JPEG**. Photo labs commonly refuse PDF, so the raster
+  formats are there for them, at 300, 600 or 1200 DPI (4x6 at 300 DPI is
+  1800×1200). PDFs are lossless or JPEG, and split into one file per N pages;
+  a bitmap has no pages, so each sheet is its own file.
 - Cut guides with adjustable style (cross or corner crop marks), length,
   thickness and offset; margin ticks; optional rounded corners.
 - Edge bleed with selectable colour, page shift for thick-stock feeding.

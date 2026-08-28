@@ -42,6 +42,10 @@ from config import (
     PDF_DEFAULT_QUALITY,
     PAGES_PER_FILE,
     PAGES_PER_FILE_DEFAULT,
+    OUTPUT_FORMATS,
+    OUTPUT_FORMAT_DEFAULT,
+    OUTPUT_DPI_CHOICES,
+    OUTPUT_DPI_DEFAULT,
     SHARPEN_MODES,
     SHARPEN_DEFAULT,
     SHADOW_LIFTS,
@@ -1510,6 +1514,7 @@ class ImportDialog(ctk.CTkToplevel):
 _PAGE_MM = {
     "Letter": (215.9, 279.4), "A4": (210.0, 297.0), "A3": (297.0, 420.0),
     "A5": (148.0, 210.0), "Legal": (215.9, 355.6), "Tabloid": (279.4, 431.8),
+    "4x6 photo": (101.6, 152.4),
 }
 
 # Cards are kept at WORK_SIZE in memory: big enough for the detector to
@@ -1836,6 +1841,14 @@ class ExportDialog(ctk.CTkToplevel):
                                    "0.5–1")
 
         tab("Image")
+        # Format first: it decides what the rest of this tab even applies to.
+        # Photo labs generally refuse PDF, which is the whole reason the 4x6
+        # page size is worth having, so PNG/JPEG are a first-class output and
+        # not an afterthought.
+        self.out_format = row("Output format", list(OUTPUT_FORMATS.keys()),
+                              s.get("out_format", OUTPUT_FORMAT_DEFAULT))
+        self.out_dpi = row("Image DPI", OUTPUT_DPI_CHOICES,
+                           s.get("out_dpi", OUTPUT_DPI_DEFAULT))
         self.quality = row("Quality", list(PDF_QUALITY_MODES.keys()),
                            s.get("quality", PDF_DEFAULT_QUALITY))
         self.profile = row("Color profile", profile_labels, saved_profile)
@@ -2121,6 +2134,15 @@ class ExportDialog(ctk.CTkToplevel):
     def _corner_radius(self):
         return self._float(self.corner_radius, 0.0, 0.0, 6.0)
 
+    def _is_pdf(self):
+        return OUTPUT_FORMATS.get(self.out_format.get()) is None
+
+    def _out_dpi(self):
+        try:
+            return int(self.out_dpi.get())
+        except (TypeError, ValueError):
+            return int(OUTPUT_DPI_DEFAULT)
+
     def _pick_card_size(self, name):
         """Same editor as the main window, so either place can define one."""
         if name != CUSTOM_SIZE_EDIT:
@@ -2302,6 +2324,8 @@ class ExportDialog(ctk.CTkToplevel):
             "layout": self.layout.get(),
             "page": self.page.get(),
             "quality": self.quality.get(),
+            "out_format": self.out_format.get(),
+            "out_dpi": self.out_dpi.get(),
             "split": self.split.get(),
             "profile": self._profile_id(),
             "sharpen": self.sharpen.get(),
@@ -2348,6 +2372,7 @@ class ExportDialog(ctk.CTkToplevel):
         om(self.bleed_color, "bleed_color"); om(self.guides, "guides")
         om(self.guide_style, "guide_style"); om(self.quality, "quality")
         om(self.sharpen, "sharpen"); om(self.shadow, "shadow")
+        om(self.out_format, "out_format"); om(self.out_dpi, "out_dpi")
         om(self.border, "border"); om(self.backs, "backs")
         if "profile" in d:
             prof = CALIBRATION_PROFILES.get(d["profile"])
@@ -2922,9 +2947,12 @@ class ExportDialog(ctk.CTkToplevel):
         self.canvas.configure(scrollregion=(0, 0, max(W, canvas_w), total_h))
         self._render_visible()
 
-        pages = sheets * 2 if duplex else sheets      # PDF pages
+        # A raster export has no pages: every sheet is its own file, so
+        # counting "PDF pages" there would name something that never exists.
+        pages = sheets * 2 if duplex else sheets
+        unit = "PDF page" if self._is_pdf() else "file"
         self.preview_title.configure(
-            text=f"{sheets} sheet(s) · {pages} PDF page(s)")
+            text=f"{sheets} sheet(s) · {pages} {unit}(s)")
         self._update_nav(sheets)
         self.side_btn.configure(state="normal" if duplex else "disabled")
         if not duplex:
@@ -2939,7 +2967,7 @@ class ExportDialog(ctk.CTkToplevel):
         drop = f", {dropped} dropped" if dropped else ""
         self.summary.configure(
             text=f"{len(exp_fronts)} card(s) from the {self.source}{drop} -> "
-                 f"{exp_sheets} sheet(s), {exp_pages} PDF page(s)")
+                 f"{exp_sheets} sheet(s), {exp_pages} {unit}(s)")
 
     def destroy(self):
         for job in (self._prev_job, self._spin_job, self._scroll_job):
@@ -3754,12 +3782,15 @@ class ExportDialog(ctk.CTkToplevel):
 
     # ------------------------------------------------------------- actions
     def _export(self):
+        fmt = OUTPUT_FORMATS.get(self.out_format.get())
+        ext = {None: ".pdf", "PNG": ".png", "JPEG": ".jpg"}[fmt]
+        label = self.out_format.get()
         target = filedialog.asksaveasfilename(
             parent=self,
-            defaultextension=".pdf",
+            defaultextension=ext,
             initialdir=OUTPUT_FOLDER,
-            initialfile="print-sheet.pdf",
-            filetypes=[("PDF", "*.pdf")])
+            initialfile=f"print-sheet{ext}",
+            filetypes=[(label, f"*{ext}")])
         if not target:
             return
 
@@ -3800,6 +3831,8 @@ class ExportDialog(ctk.CTkToplevel):
             reg_length_mm=self._reg_length(),
             reg_thick_mm=self._reg_thick(),
             pages_per_file=PAGES_PER_FILE.get(self.split.get(), 0),
+            image_format=fmt,
+            image_dpi=self._out_dpi(),
             backs=backs,
             back_offset=self._offsets(),
             back_bleed_mm=self._bleed(),
@@ -3854,7 +3887,7 @@ class ExportDialog(ctk.CTkToplevel):
         if len(files) > 8:
             names += f"\n... (+{len(files) - 8} more)"
         messagebox.showinfo(
-            "PDF ready",
+            f"{self.out_format.get()} ready",
             f"{len(self.images)} card(s) -> {len(files)} file(s), "
             f"{total_mb:.0f} MB total:\n\n{names}", parent=self)
         self.destroy()
@@ -4385,6 +4418,18 @@ FAQ = [
      "before running the cards, not after. If the grid you picked will not "
      "fit on the page at that size, the export says so - use a bigger paper "
      "or a smaller grid."),
+
+    ("My print shop is cheapest on 4x6 photo prints, and will not take a PDF.",
+     "Set Page size to \"4x6 photo\" and Card grid to \"2x1 landscape\": that "
+     "is two cards per print, which in some countries costs a fraction of "
+     "nine cards on A4 or Letter.\n\n"
+     "Then set Output format on the Image tab to PNG or JPEG - photo labs "
+     "usually accept nothing else. Each sheet comes out as its own numbered "
+     "file, so File split does not apply.\n\n"
+     "Image DPI decides the size: 300 gives 1800x1200 pixels, which is what "
+     "most labs print at natively, and 600 and 1200 are there for the ones "
+     "that take more. Ask yours what it accepts - sending more pixels than it "
+     "wants is harmless, sending fewer is not."),
 
     ("Which paper and layout should I use with a cutting machine?",
      "A3 or Tabloid, if your printer takes them. At the default mark geometry "

@@ -3,6 +3,22 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.11 (unreleased)
+- **4x6 photo prints, and PNG / JPEG output.** New *4x6 photo* page size and
+  *2x1 landscape* grid: two cards on a photo print, which in some countries
+  costs a fraction of nine cards on A4 or Letter. Asked for by a user whose
+  local shop prices it that way.
+- The page size alone would have been useless to them, because the labs that
+  price it that way generally do not accept PDF at all. So *Output format* on
+  the Image tab now offers **PNG** and **JPEG** beside PDF, at 300, 600 or
+  1200 DPI. 4x6 at 300 is 1800x1200; the higher settings are for labs that
+  take more, since 300 is a sixteenth of the pixels the upscaler makes and
+  throwing that away by default would be the wrong call.
+- Raster output is the whole sheet, not just the cards: cut guides, margin
+  ticks, bleed frames, registration marks and mirrored duplex backs all come
+  through, because it is the same layout code drawing into pixels rather than
+  a second implementation. A bitmap has no pages, so each sheet is its own
+  numbered file and *File split* does not apply - the preview says "file(s)"
+  instead of "PDF page(s)" when a raster format is selected.
 - **Select several cards at once.** Click a card to select it, shift+click to
   add or remove one, Escape to clear. The right-click menu then acts on the
   whole selection and says how many, and a batch lands as **one** undo step,

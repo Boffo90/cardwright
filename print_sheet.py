@@ -25,7 +25,7 @@ from reportlab import rl_config
 rl_config.useA85 = 0
 
 from reportlab.lib.pagesizes import A3, A4, A5, LEGAL, letter, TABLOID
-from reportlab.lib.units import mm
+from reportlab.lib.units import inch, mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
@@ -55,6 +55,9 @@ LAYOUTS = {
     # grid path, so no special casing is needed.
     "3×4 portrait": (3, 4, False),
     "4×4 portrait": (4, 4, False),
+    # For the 4x6 photo print, which fits exactly two cards side by side once
+    # it is turned landscape. Portrait 4x6 fits only one, so it is not offered.
+    "2×1 landscape": (2, 1, True),
 }
 DEFAULT_LAYOUT = "3×3 portrait"
 
@@ -82,6 +85,10 @@ MARK_GAP = 1 * mm     # gap between block edge and tick start
 PAGES = {
     "A4": A4, "Letter": letter, "A3": A3, "A5": A5,
     "Legal": LEGAL, "Tabloid": TABLOID,
+    # Held portrait like every other entry; "2x1 landscape" turns it. Two
+    # 63x88 cards then leave 13.2 mm of margin on the long edge and 6.8 on
+    # the short one, which clears MIN_BOTTOM comfortably.
+    "4x6 photo": (4 * inch, 6 * inch),
 }
 
 # The card block never gets closer than this to the paper's bottom edge
@@ -919,6 +926,178 @@ def mirror_x(x, ox, block_w, card_w):
 
 
 # --------------------------------------------------------------------------
+# raster output
+# --------------------------------------------------------------------------
+#
+# Photo labs routinely refuse PDF, which is exactly the audience the 4x6 page
+# size exists for, so a sheet has to be able to come out as PNG or JPEG too.
+#
+# The obvious shortcut is to build the PDF and rasterise it, and it is closed:
+# the good rasteriser is PyMuPDF, which is AGPL, and this ships as a
+# distributed binary. The next idea, a second Pillow implementation of the
+# sheet, is worse than it looks - the layout is not the hard part (registration
+# marks, blocked slots, bleed frames, mirrored backs, guide clearances all
+# are), and a copy of that would drift out of step with the original within a
+# release or two.
+#
+# So instead this implements the handful of canvas calls build_pdf makes, in
+# Pillow, and the same drawing code produces either a PDF page or a bitmap.
+
+
+class _RasterCanvas:
+    """A drop-in stand-in for reportlab's Canvas that draws with Pillow.
+
+    Coordinates are reportlab's throughout: points, origin bottom-left, y up.
+    They are converted on the way in, so callers need to know nothing.
+
+    Only what build_pdf uses is implemented. The one real simplification is
+    `rotate`, which here means "turn everything drawn until restoreState about
+    the page centre" rather than a general transform - that is what the back
+    rotation is, and a full matrix would be code with no caller.
+
+    Pages are handed to `on_page` as they are finished and then dropped, so a
+    long export holds one page in memory rather than all of them: at 1200 DPI
+    an A4 page is over 400 MB.
+    """
+
+    def __init__(self, pagesize, dpi, on_page=None):
+        self.scale = dpi / 72.0
+        self.dpi = dpi
+        self.pw, self.ph = pagesize
+        self.px_w = max(1, int(round(self.pw * self.scale)))
+        self.px_h = max(1, int(round(self.ph * self.scale)))
+        self._on_page = on_page
+        self._tx = self._ty = 0.0
+        self._stroke = (0, 0, 0)
+        self._fill = (0, 0, 0)
+        self._lw = 1
+        self._stack = []
+        # (angle, layer, pen) while a rotated state is open, else None
+        self._rot = None
+        self._new_page()
+
+    # -- pages ------------------------------------------------------------
+    def _new_page(self):
+        self._page = Image.new("RGB", (self.px_w, self.px_h), (255, 255, 255))
+        self._draw = ImageDraw.Draw(self._page)
+
+    @property
+    def _target(self):
+        """Where drawing lands: the page, or the layer awaiting rotation."""
+        return self._rot[1] if self._rot else self._page
+
+    @property
+    def _pen(self):
+        return self._rot[2] if self._rot else self._draw
+
+    def showPage(self):
+        if self._on_page:
+            self._on_page(self._page)
+        self._new_page()
+
+    def save(self):
+        """No-op: pages left through showPage as they were finished."""
+
+    def setTitle(self, _title):
+        pass
+
+    # -- state ------------------------------------------------------------
+    def saveState(self):
+        self._stack.append((self._tx, self._ty, self._stroke, self._fill,
+                            self._lw, self._rot))
+
+    def restoreState(self):
+        tx, ty, stroke, fill, lw, rot = self._stack.pop()
+        if self._rot is not None and self._rot is not rot:
+            angle, layer, _ = self._rot
+            self._rot = rot
+            # Pillow and reportlab both take a positive angle as
+            # counter-clockwise on the printed page, so the sign carries over.
+            spun = layer.rotate(angle, resample=Image.BICUBIC,
+                                center=(self.px_w / 2, self.px_h / 2))
+            self._target.paste(spun, (0, 0), spun)
+        self._tx, self._ty, self._stroke, self._fill, self._lw = (
+            tx, ty, stroke, fill, lw)
+
+    def translate(self, dx, dy):
+        self._tx += dx
+        self._ty += dy
+
+    def rotate(self, angle):
+        layer = Image.new("RGBA", (self.px_w, self.px_h), (0, 0, 0, 0))
+        self._rot = (angle, layer, ImageDraw.Draw(layer))
+
+    # -- pens -------------------------------------------------------------
+    @staticmethod
+    def _rgb(r, g, b):
+        return tuple(int(round(max(0.0, min(1.0, v)) * 255)) for v in (r, g, b))
+
+    def setStrokeColorRGB(self, r, g, b):
+        self._stroke = self._rgb(r, g, b)
+
+    def setFillColorRGB(self, r, g, b):
+        self._fill = self._rgb(r, g, b)
+
+    def setLineWidth(self, w):
+        # A hairline still has to be one pixel, or guides vanish at 300 DPI.
+        self._lw = max(1, int(round(w * self.scale)))
+
+    # -- geometry ---------------------------------------------------------
+    def _px(self, x, y):
+        """Point in the current translation -> pixel, y flipped."""
+        return ((x + self._tx) * self.scale,
+                self.px_h - (y + self._ty) * self.scale)
+
+    # -- drawing ----------------------------------------------------------
+    def line(self, x0, y0, x1, y1):
+        self._pen.line([self._px(x0, y0), self._px(x1, y1)],
+                       fill=self._stroke, width=self._lw)
+
+    def rect(self, x, y, w, h, stroke=1, fill=0):
+        x0, y0 = self._px(x, y + h)          # top-left in pixel space
+        x1, y1 = self._px(x + w, y)          # bottom-right
+        box = [int(round(x0)), int(round(y0)),
+               int(round(x1)) - 1, int(round(y1)) - 1]
+        if box[2] < box[0] or box[3] < box[1]:
+            return
+        self._pen.rectangle(
+            box,
+            fill=self._fill if fill else None,
+            outline=self._stroke if stroke else None,
+            width=self._lw if stroke else 1)
+
+    def drawImage(self, img, x, y, w, h, mask=None):
+        # reportlab is handed an ImageReader; it keeps the path on .fileName.
+        src = getattr(img, "fileName", img)
+        tw = max(1, int(round(w * self.scale)))
+        th = max(1, int(round(h * self.scale)))
+        with Image.open(src) as im:
+            im = im.convert("RGBA" if mask == "auto" else "RGB")
+            im = im.resize((tw, th), Image.LANCZOS)
+        x0, y0 = self._px(x, y + h)
+        at = (int(round(x0)), int(round(y0)))
+        self._target.paste(im, at, im if mask == "auto" else None)
+
+
+def _raster_target(out_path: Path, fmt: str, index: int, total: int) -> Path:
+    ext = ".png" if fmt == "PNG" else ".jpg"
+    if total <= 1:
+        return out_path.with_suffix(ext)
+    return out_path.with_name(f"{out_path.stem}-{index:02d}{ext}")
+
+
+def _save_raster(page: Image.Image, target: Path, fmt: str, dpi: int,
+                 quality: int) -> None:
+    if fmt == "JPEG":
+        # 4:4:4. Chroma subsampling on a sheet of card art is visible on the
+        # coloured frame edges, which is precisely where the cut lands.
+        page.save(target, "JPEG", quality=quality, subsampling=0,
+                  dpi=(dpi, dpi))
+    else:
+        page.save(target, "PNG", dpi=(dpi, dpi))
+
+
+# --------------------------------------------------------------------------
 # public API
 # --------------------------------------------------------------------------
 
@@ -940,6 +1119,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               reg_inset_mm=REG_INSET_DEFAULT_MM,
               reg_length_mm=REG_LENGTH_DEFAULT_MM,
               reg_thick_mm=1.0, reg_pattern=REG_PATTERNS[0],
+              image_format=None, image_dpi=300,
               status_callback=None) -> list[Path]:
     """
     Compose `images` (paths, in order) into one or more print-sheet PDFs.
@@ -979,6 +1159,10 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     duplex: the back's guides never land exactly where the
                     front's do, so a second set that disagrees with the one you
                     are cutting to is worse than none. You cut by the front.
+    image_format:   None = PDF. "PNG" or "JPEG" instead renders each sheet
+                    as a bitmap at image_dpi, for photo labs that do not
+                    accept PDF. A bitmap has no pages, so every sheet is its
+                    own file and pages_per_file does not apply.
     Returns the list of files written.
     """
     images = [Path(p) for p in images]
@@ -1079,7 +1263,12 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     # sheet selection the progress read "card 3/90" while only 9 were going
     # into the PDF.
     to_place = sum(len(b) for b in batches)
-    if pages_per_file and pages_per_file > 0:
+    raster = image_format is not None
+    if raster:
+        # A bitmap holds one page, so the sheets are already one file each and
+        # there is nothing for pages_per_file to split.
+        groups = [batches]
+    elif pages_per_file and pages_per_file > 0:
         groups = [batches[i:i + pages_per_file]
                   for i in range(0, len(batches), pages_per_file)]
     else:
@@ -1088,6 +1277,20 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     out_path = Path(out_path)
     written = []
     flat_cache = {}
+
+    # Raster pages are written the moment they are finished and then let go:
+    # at 1200 DPI one A4 page is over 400 MB, so holding a whole export would
+    # be the difference between working and not.
+    total_pages = len(batches) * (2 if backs is not None else 1)
+    # No lossless JPEG exists, so a lossless export falls back to the
+    # near-lossless quality the PDF path already offers by that name.
+    sheet_q = jpeg_quality or 97
+
+    def sink(page_img):
+        target = _raster_target(out_path, image_format,
+                                len(written) + 1, total_pages)
+        _save_raster(page_img, target, image_format, image_dpi, sheet_q)
+        written.append(target)
 
     modes = border_modes or {}
 
@@ -1117,7 +1320,10 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
         else:
             target = out_path.with_name(f"{out_path.stem}-{gi + 1:02d}{out_path.suffix}")
 
-        c = canvas.Canvas(str(target), pagesize=page)
+        if raster:
+            c = _RasterCanvas(page, image_dpi, on_page=sink)
+        else:
+            c = canvas.Canvas(str(target), pagesize=page)
         c.setTitle("Cardwright print sheet")
 
         for batch in group:
@@ -1189,7 +1395,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 c.showPage()
 
         c.save()
-        written.append(target)
+        if not raster:
+            written.append(target)
 
     for t in flat_cache.values():
         try:

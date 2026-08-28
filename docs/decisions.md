@@ -33,6 +33,45 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden - in a manual picker the user can see the thumbnail and judge.
 
+## 4x6 photo prints and raster output (v2.17.11)
+Asked for on r/mtgproxies by someone whose cheapest local printing is **two
+cards on a 4x6 photo print**, against 2-3x the cost for nine on A4 or Letter.
+
+- **The page holds exactly two cards, landscape.** 63x88 mm twice across a
+  6x4 in print leaves 13.2 mm of margin on each long edge and 6.8 mm on each
+  short one. Portrait 4x6 fits one card, so it is not offered: a grid whose
+  answer is "one" is a worse version of choosing a bigger paper.
+- **PNG/JPEG is the point, not a bonus.** The labs that price 4x6 that way
+  generally refuse PDF outright, so without raster output the page size is
+  useless to the person who asked for it.
+- **Do not rasterise the PDF.** It is the obvious shortcut and it is closed:
+  the good rasteriser is PyMuPDF, which is **AGPL**, and this ships as a
+  distributed binary. Ghostscript is AGPL too. Nothing in the permissive tier
+  renders a PDF well enough to print from.
+- **One layout implementation, not two.** A second Pillow renderer was the
+  other obvious move and it is the trap: the layout is not the hard part
+  (registration marks, blocked slots, bleed frames, mirrored backs, guide
+  keep-clear boxes are), and a copy of that drifts out of step within a
+  release or two. Instead `_RasterCanvas` implements the handful of canvas
+  calls `build_pdf` makes - `line`, `rect`, `drawImage`, the state stack -
+  in Pillow, and the same drawing code produces either output.
+- Its one simplification is `rotate`, which means "turn everything drawn
+  until `restoreState` about the page centre" rather than a general transform.
+  That is exactly what the duplex back rotation is; a full matrix would be
+  code with no caller.
+- **DPI is a choice, not 300 hard-coded.** 4x6 at 300 DPI is 1800x1200, a
+  sixteenth of the pixels the upscaler produces. Most labs print at about 300
+  natively so it usually does not matter, but the user was asked what theirs
+  accepts and no answer came, and silently throwing away the AI's work on a
+  lab that takes more is the worse failure. 300 / 600 / 1200 are offered.
+- **Every sheet is its own file.** A bitmap has no pages, so `pages_per_file`
+  does not apply and the preview counts "file(s)" rather than "PDF page(s)".
+  Pages are written the moment they are finished and released: at 1200 DPI one
+  A4 page is over 400 MB, so holding a whole export would be the difference
+  between working and not.
+- JPEG is written at **4:4:4** (no chroma subsampling). Subsampling shows on
+  coloured card-frame edges, which is precisely where the cut lands.
+
 ## Custom card size (v2.17.3)
 **One** user-defined size, stored in settings as `custom_card_size: [w, h]`. Everything downstream already went through `card_size_mm` / `card_size_px`, so teaching those two about it was the whole change - the upscaler, the sheet builder and the preview followed for free.
 - A managed list of named sizes was considered and skipped: the request was "can I set my own", and a list is a lot of interface for a need nobody has described. Revisit if someone asks for two at once.

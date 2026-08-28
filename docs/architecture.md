@@ -11,7 +11,7 @@ All source in `C:/Users/smyo9/upscaler`.
 - `scryfall.py` - fetch by name/link/decklist/Gatherer/Archidekt; `resolve_decklist`, `fetch_archidekt`, `_fetch_gatherer`, `download_to_temp` (handles Drive, timeout 120).
 - `mpcfill.py` - mpcfill.com API: `search`, `download`, `fetch_thumb`.
 - `ygoprodeck.py` - Yu-Gi-Oh catalogue (db.ygoprodeck.com), same interface as `mpcfill.py` so `CardSearchDialog` can drive either.
-- `print_sheet.py` - `build_pdf` (3×3 / 4×2 layouts, quality, calibration, shadow, sharpen, bleed, duplex, split), `build_calibration`, `build_shadow_test`, `_deepen_black_border`.
+- `print_sheet.py` - `build_pdf` (3×3 / 4×2 / 2×1 layouts, quality, calibration, shadow, sharpen, bleed, duplex, split), `build_calibration`, `build_shadow_test`, `_deepen_black_border`. `build_pdf` also writes PNG/JPEG: pass `image_format` and it draws through `_RasterCanvas` instead of reportlab's. That class is a stand-in for the handful of canvas calls `build_pdf` makes, implemented in Pillow, so there is **one** layout implementation rather than a second one to keep in step. Rasterising the finished PDF is not an option: the good rasteriser is PyMuPDF and it is AGPL.
 - `bootstrap.py` - first-run download of engine + models; `probe_gpu`. Picks the platform's engine zip; on POSIX it re-applies the exec bit, which `write_bytes` drops.
 - `update.py` - auto-update from GitHub Releases; `_write_swap_script`. Returns early off Windows: releases carry Windows assets only.
 - `tests/` - `test_platform.py` covers every platform branch, asserting the **Windows** side as well as the POSIX one, from either OS. `.github/workflows/tests.yml` runs it on windows-latest and macos-latest. Run `python -m pytest tests/` before a release.
