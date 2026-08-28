@@ -1087,13 +1087,14 @@ class App(_Root):
         return images, source, srcs
 
     def _export_pdf(self):
+        # Opens even with nothing upscaled. The dialog is where sheets are
+        # built - grids, guides, page shift, bleed - and none of that needs a
+        # card to be worth looking at. Refusing to open it meant upscaling a
+        # throwaway card just to reach the settings, or to add finished cards
+        # from disk with "Add cards…", which the dialog can already do.
         if self.running:
             return
         images, source, srcs = self._export_images()
-        if not images:
-            messagebox.showerror("Nothing to export",
-                                 "No upscaled cards found. Run UPSCALE ALL first.")
-            return
         ExportDialog(self, images, source, card_sources=srcs)
 
     def _export_pdf_files(self):
@@ -1609,11 +1610,19 @@ class ExportDialog(ctk.CTkToplevel):
     def __init__(self, master, images, source, card_sources=None):
         super().__init__(master)
         self.images = images
+        # Opened with nothing: the summary has no origin to name, because
+        # anything on the sheet got there through "Add cards…".
+        self._started_empty = not images
         self.source = source
         # path -> catalogue id, so border treatment can be skipped per source
         self.card_sources = card_sources or {}
         self.title("Export print sheet")
-        self.geometry("980x760")
+        # Tall enough that the fullest tab (Layout) shows every row without
+        # scrolling, but never taller than the screen: on a short laptop the
+        # window shrinks and the tab bodies scroll instead. 760 was set when
+        # the tabs held fewer controls and the last two rows fell off the
+        # bottom with nothing to say they were there.
+        self.geometry(f"980x{min(880, self.winfo_screenheight() - 60)}")
         self.transient(master)
         self.after(60, self.grab_set)
         self.configure(fg_color=BG)
@@ -1681,7 +1690,14 @@ class ExportDialog(ctk.CTkToplevel):
 
         # ------------------------------------------------ left: controls
         # Grouped into tabs: ~30 controls in one scrolling column was the
-        # dialog's worst usability problem. Each tab now fits without scrolling.
+        # dialog's worst usability problem, and a tab is short enough to read
+        # at a glance.
+        #
+        # Each tab body scrolls anyway. It used to rely on every tab happening
+        # to fit, which is a promise the next control breaks: adding the second
+        # page-shift axis pushed the Layout tab two rows past the panel and the
+        # overflow was simply invisible, with no scrollbar to suggest anything
+        # was missing. The bars only appear when a tab actually overflows.
         panel = ctk.CTkFrame(self, width=430, fg_color=PANEL,
                              corner_radius=theme.RADIUS_LG)
         panel.grid(row=1, column=0, sticky="nsw", padx=(16, 8), pady=8)
@@ -1698,18 +1714,29 @@ class ExportDialog(ctk.CTkToplevel):
             text_color=TEXT_DIM, text_color_disabled=MUTED,
             anchor="w")
         self.tabs.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0, 6))
+        # The rows go into a scrollable body inside each tab, never into the
+        # tab frame itself, so a tab that outgrows the panel scrolls instead of
+        # hiding its last controls.
+        self._tab_body = {}
         for _name in ("Layout", "Image", "Backs", "Cutting", "Tests"):
             self.tabs.add(_name)
-            self.tabs.tab(_name).grid_columnconfigure(1, weight=1)
+            holder = self.tabs.tab(_name)
+            holder.grid_columnconfigure(0, weight=1)
+            holder.grid_rowconfigure(0, weight=1)
+            body = ctk.CTkScrollableFrame(holder, fg_color="transparent",
+                                          corner_radius=0)
+            body.grid(row=0, column=0, sticky="nsew")
+            body.grid_columnconfigure(1, weight=1)
+            self._tab_body[_name] = body
         self.tabs._segmented_button.configure(font=(UI, theme.TYPE["small"]))
 
-        left = self.tabs.tab("Layout")
+        left = self._tab_body["Layout"]
         self._r = 0
 
         def tab(name):
             """Point the row helpers at another tab and restart its grid."""
             nonlocal left
-            left = self.tabs.tab(name)
+            left = self._tab_body[name]
             self._r = 0
 
         def row(label, values, initial):
@@ -3002,6 +3029,12 @@ class ExportDialog(ctk.CTkToplevel):
         self.preview_title.configure(
             text=f"{sheets} sheet(s) · {pages} {unit}(s)")
         self._update_nav(sheets)
+        # Calibration and the shadow test render a real card through the
+        # pipeline, and Export has nothing to lay out: all three need the sheet
+        # to be non-empty, which it no longer always is.
+        has_cards = bool(self._order)
+        for _b in (self.export_btn, self.cal_btn, self.shadow_btn):
+            _b.configure(state="normal" if has_cards else "disabled")
         self.side_btn.configure(state="normal" if duplex else "disabled")
         if not duplex:
             self.side_btn.set("Fronts")
@@ -3013,9 +3046,20 @@ class ExportDialog(ctk.CTkToplevel):
         exp_pages = exp_sheets * 2 if duplex else exp_sheets
         dropped = len(fronts) - len(exp_fronts)
         drop = f", {dropped} dropped" if dropped else ""
-        self.summary.configure(
-            text=f"{len(exp_fronts)} card(s) from the {self.source}{drop} -> "
-                 f"{exp_sheets} sheet(s), {exp_pages} {unit}(s)")
+        if not self._order:
+            self.summary.configure(
+                # Short on purpose: this label shares its row with the
+                # status text and a long string runs under it.
+                text="No cards yet - set the sheet up, or "
+                     "“Add cards…”")
+        elif self._started_empty:
+            self.summary.configure(
+                text=f"{len(exp_fronts)} card(s) added{drop} -> "
+                     f"{exp_sheets} sheet(s), {exp_pages} {unit}(s)")
+        else:
+            self.summary.configure(
+                text=f"{len(exp_fronts)} card(s) from the {self.source}{drop} "
+                     f"-> {exp_sheets} sheet(s), {exp_pages} {unit}(s)")
 
     def destroy(self):
         for job in (self._prev_job, self._spin_job, self._scroll_job):
@@ -3937,7 +3981,7 @@ class ExportDialog(ctk.CTkToplevel):
             names += f"\n... (+{len(files) - 8} more)"
         messagebox.showinfo(
             f"{self.out_format.get()} ready",
-            f"{len(self.images)} card(s) -> {len(files)} file(s), "
+            f"{len(self._order)} card(s) -> {len(files)} file(s), "
             f"{total_mb:.0f} MB total:\n\n{names}", parent=self)
         self.destroy()
 
@@ -3955,7 +3999,7 @@ class ExportDialog(ctk.CTkToplevel):
         if not target:
             return
         self.cal_btn.configure(state="disabled", text="Building...")
-        card = self.images[0]
+        card = self._order[0].path
         page = self.page.get()
         shift, shift_x = self._shift(), self._shift_x()
 
@@ -3994,7 +4038,7 @@ class ExportDialog(ctk.CTkToplevel):
         if not target:
             return
         self.shadow_btn.configure(state="disabled", text="Building...")
-        card = self.images[0]
+        card = self._order[0].path
         page = self.page.get()
         profile = self._profile_id()
         shift, shift_x = self._shift(), self._shift_x()

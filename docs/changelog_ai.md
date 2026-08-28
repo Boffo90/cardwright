@@ -3,6 +3,20 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.12 (unreleased)
+- **The export dialog opens with an empty queue.** It used to refuse, saying to
+  run UPSCALE ALL first, so laying out a sheet meant upscaling a throwaway card
+  just to reach the settings - or to reach *Add cards…*, which loads finished
+  cards from disk and was sitting inside the dialog you could not open.
+  Reported by a user who wanted to set a sheet up and add cards to it from
+  outside the queue. Export, Calibration and Shadow test grey out until there
+  is a card, since all three need one.
+- **The Layout and Image tabs no longer hide their last rows.** Adding the
+  second page-shift axis pushed Layout past the bottom of the panel and the
+  overflow was simply invisible: no scrollbar, nothing to suggest a control was
+  there. The Image tab had been over since the output-format rows landed. The
+  dialog now opens tall enough for the fullest tab, capped to the screen so a
+  short laptop still fits, and every tab body scrolls when it has to instead of
+  relying on all of them happening to fit.
 - **Help → About now links to Discussions**, beside Report a bug. Separate on
   purpose: the user who reported the page-shift problem went to Reddit rather
   than open an issue, and that report only arrived because somebody happened to
