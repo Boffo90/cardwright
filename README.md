@@ -89,7 +89,7 @@ The preview is a workspace, not a picture - what you see is what prints.
   a bitmap has no pages, so each sheet is its own file.
 - Cut guides with adjustable style (cross or corner crop marks), length,
   thickness and offset; margin ticks; optional rounded corners.
-- Edge bleed with selectable colour, page shift for thick-stock feeding.
+- Edge bleed with selectable colour, and a **page shift on both axes, both directions** - move the whole layout off the strip your printer's feed cannot use, with the preview showing how far it will actually go.
 
 ### Cutting machines (Silhouette / Cricut)
 - **Registration marks** for print & cut: 3-mark standard and 4-mark

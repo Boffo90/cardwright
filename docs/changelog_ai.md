@@ -3,6 +3,22 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.11 (unreleased)
+- **The page shift now moves both ways on both axes.** *Shift down* takes
+  negative numbers and *Shift right* is new, so the whole layout can go up,
+  down, left or right instead of down only. Reported by an Epson ET-8500
+  owner whose rear top loader eats 0.8 in of the page and leaves roller marks
+  on every sheet: no amount of downward shift reaches that edge, and they were
+  going back to another tool over it.
+- The line under the two entries says how far the shift can actually go on the
+  current page and grid, and warns when a value has been clamped at the paper
+  edge. That matters because the room is often smaller than the printer
+  wastes - Letter 3x3 leaves 4.7 mm, which no shift can turn into 20 - and
+  the honest answer is a smaller grid or a bigger page, not a bigger number.
+- Guides and margin ticks move with the cards, the preview shows the clamped
+  result rather than what was typed, and the calibration, shadow and duplex
+  test sheets take the same shift so a proof lands where the real sheet will.
+  With registration marks on it is still ignored, since the cutter aligns to
+  the marks and already compensates.
 - **4x6 photo prints, and PNG / JPEG output.** New *4x6 photo* page size and
   *2x1 landscape* grid: two cards on a photo print, which in some countries
   costs a fraction of nine cards on A4 or Letter. Asked for by a user whose

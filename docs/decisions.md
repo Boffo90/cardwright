@@ -33,6 +33,34 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden - in a manual picker the user can see the thumbnail and judge.
 
+## Page shift is two axes, both signs (v2.17.11)
+Reported on Reddit by an Epson ET-8500 owner: the rear top loader wastes
+**0.8 in** of the page and leaves roller marks. The shift was down-only, for
+heavy cardstock that feeds late and clips the top, and down is the one
+direction that does not help them.
+
+- **Which edge is unusable depends on the tray**, so a control that reaches
+  one edge covers roughly one printer in four. Both signs of both axes.
+  `shift_down_mm` keeps its meaning (positive = down) so old settings and
+  presets carry over; `shift_right_mm` is the new one.
+- **Clamped, not free.** `_on_page` keeps the block inside `MIN_BOTTOM` on all
+  four edges. A block too large to fit even centred is centred anyway, so the
+  overflow is shared rather than dumped on one edge.
+- **The preview shares the export's placement** (`block_origin_mm`) instead of
+  recomputing it. It used to do its own centring and its own clamp, which is
+  how it could show a shift the export then clamped away.
+- **Say how much room there is.** The available range is half the margin the
+  grid leaves, and it is frequently less than the printer wastes: Letter 3x3
+  gives 4.7 mm against the 20 mm this user needs. Clamping in silence would
+  read as the setting being broken, so the hint names the number and points at
+  the real fix - a smaller grid or a bigger page.
+- **Registration marks still ignore it.** The cutter finds the marks wherever
+  the paper actually fed and cuts relative to them, so it self-compensates;
+  moving only the cards would break the card-to-mark relationship. Unchanged,
+  and now stated in the hint.
+- The calibration, shadow and duplex test sheets take the shift too. A proof
+  printed somewhere other than where the real sheet lands is not a proof.
+
 ## 4x6 photo prints and raster output (v2.17.11)
 Asked for on r/mtgproxies by someone whose cheapest local printing is **two
 cards on a 4x6 photo print**, against 2-3x the cost for nine on A4 or Letter.

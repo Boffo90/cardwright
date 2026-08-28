@@ -1812,8 +1812,25 @@ class ExportDialog(ctk.CTkToplevel):
         self._r += 1
         self.corner_radius = entry_row("Corner radius (mm)", "corner_radius",
                                        0.0, "0 = square")
+        # Two axes and both signs. It began as down-only, for cardstock that
+        # feeds late and clips the top; a rear top loader eats the far end
+        # instead and no downward shift reaches that. Which edge is unusable
+        # depends on the tray, so the control has to reach all four.
         self.shift_down = entry_row("Shift down (mm)", "shift_down", 0.0,
-                                    "late paper feed")
+                                    "negative = up")
+        self.shift_right = entry_row("Shift right (mm)", "shift_right", 0.0,
+                                     "negative = left")
+        # How far the shift can actually go is not obvious: it is whatever
+        # margin the grid leaves on the page, and it can be less than the
+        # printer needs. Say the number rather than clamping in silence -
+        # the report that prompted this needed 20 mm, which Letter 3x3 cannot
+        # give at all.
+        self.shift_hint = ctk.CTkLabel(
+            left, text="", text_color=MUTED, font=(UI, 11),
+            wraplength=400, justify="left")
+        self.shift_hint.grid(row=self._r, column=0, columnspan=2, sticky="w",
+                             padx=12, pady=(0, 4))
+        self._r += 1
 
         tab("Cutting")
         self.reg_marks = ctk.CTkSwitch(
@@ -2111,7 +2128,13 @@ class ExportDialog(ctk.CTkToplevel):
         return (self._float(self.back_dx), self._float(self.back_dy))
 
     def _shift(self):
-        return self._float(self.shift_down, 0.0, 0.0)
+        return self._float(self.shift_down, 0.0, -100.0, 100.0)
+
+    def _shift_x(self):
+        return self._float(self.shift_right, 0.0, -100.0, 100.0)
+
+    def _shifted(self):
+        return bool(self._shift() or self._shift_x())
 
     def _bleed(self):
         return self._float(self.back_bleed, 1.5, 0.0, 3.0)
@@ -2351,6 +2374,7 @@ class ExportDialog(ctk.CTkToplevel):
             "guide_offset": self._guide_offset(),
             "corner_radius": self._corner_radius(),
             "shift_down": self._shift(),
+            "shift_right": self._shift_x(),
         }
 
     def _apply_settings(self, d: dict):
@@ -2380,6 +2404,7 @@ class ExportDialog(ctk.CTkToplevel):
                 self.profile.set(prof[0])
         for e, key in ((self.edge_bleed, "edge_bleed"),
                        (self.shift_down, "shift_down"),
+                       (self.shift_right, "shift_right"),
                        (self.guide_len, "guide_len"),
                        (self.guide_thick, "guide_thick"),
                        (self.guide_offset, "guide_offset"),
@@ -2688,13 +2713,16 @@ class ExportDialog(ctk.CTkToplevel):
         g = 2 * eb
         bw = cols * CW + (cols - 1) * g
         bh = rows * CH + (rows - 1) * g
-        left = (pw - bw) / 2
-        # with registration marks the cutter aligns to the marks, so shift-down
-        # is ignored (see build_pdf) - keep the preview in step
+        # with registration marks the cutter aligns to the marks, so the page
+        # shift is ignored (see build_pdf) - keep the preview in step
         reg_on = bool(self.reg_marks.get())
-        top = (ph - bh) / 2 + (0.0 if reg_on else self._shift())
-        if ph - top - bh < 3:
-            top = ph - bh - 3
+        # Placement comes from print_sheet rather than being recomputed here,
+        # so the preview cannot disagree with the export about where a shift
+        # lands - including when it is clamped at the paper edge.
+        left, top = print_sheet.block_origin_mm(
+            pw, ph, bw, bh,
+            0.0 if reg_on else self._shift_x(),
+            0.0 if reg_on else self._shift())
 
         def X(v):
             return int(v * s)
@@ -2735,6 +2763,26 @@ class ExportDialog(ctk.CTkToplevel):
         sheets = max(1, -(-len(fronts) // per_sheet))
         self._page = max(0, min(self._page, sheets - 1))
 
+        # Room to move: the shift is measured from centre, so each axis can
+        # give away half its margin before hitting the printable edge.
+        room_x = max(0.0, (pw - bw) / 2 - 3.0)
+        room_y = max(0.0, (ph - bh) / 2 - 3.0)
+        want_x, want_y = self._shift_x(), self._shift()
+        if reg_on and self._shifted():
+            self.shift_hint.configure(
+                text="Ignored while registration marks are on: the cutter "
+                     "aligns to the marks.", text_color=MUTED)
+        elif abs(want_x) > room_x + 0.05 or abs(want_y) > room_y + 0.05:
+            self.shift_hint.configure(
+                text=f"⚠ Clamped to the paper. This grid leaves "
+                     f"±{room_x:.1f} mm across and ±{room_y:.1f} mm "
+                     f"down - a smaller grid or a bigger page gives more.",
+                text_color="#e0b050")
+        else:
+            self.shift_hint.configure(
+                text=f"Room to move: ±{room_x:.1f} mm across, "
+                     f"±{room_y:.1f} mm down.", text_color=MUTED)
+
         if not reg_on:
             self.reg_hint.configure(
                 text="Off - cards use every slot.", text_color=MUTED)
@@ -2768,8 +2816,8 @@ class ExportDialog(ctk.CTkToplevel):
                      f"{lost}.{fix}",
                 text_color="#e0b050")
         else:
-            shift_note = (" Shift-down is ignored: the cutter aligns to the "
-                          "marks." if self._shift() else "")
+            shift_note = (" The page shift is ignored: the cutter aligns to "
+                          "the marks." if self._shifted() else "")
             self.reg_hint.configure(
                 text=f"✓ All {len(all_pos)} slots usable with these marks." + shift_note,
                 text_color="#7cc47c")
@@ -3847,6 +3895,7 @@ class ExportDialog(ctk.CTkToplevel):
             guide_offset_mm=self._guide_offset(),
             corner_radius_mm=self._corner_radius(),
             shift_down_mm=self._shift(),
+            shift_right_mm=self._shift_x(),
         )
 
         def build():
@@ -3908,12 +3957,13 @@ class ExportDialog(ctk.CTkToplevel):
         self.cal_btn.configure(state="disabled", text="Building...")
         card = self.images[0]
         page = self.page.get()
-        shift = self._shift()
+        shift, shift_x = self._shift(), self._shift_x()
 
         def build():
             try:
                 print_sheet.build_calibration(
                     card, target, page, shift_down_mm=shift,
+                    shift_right_mm=shift_x,
                     status_callback=self._set_status)
                 self.after(0, lambda: self._cal_done(target))
             except Exception as e:
@@ -3947,12 +3997,13 @@ class ExportDialog(ctk.CTkToplevel):
         card = self.images[0]
         page = self.page.get()
         profile = self._profile_id()
-        shift = self._shift()
+        shift, shift_x = self._shift(), self._shift_x()
 
         def build():
             try:
                 print_sheet.build_shadow_test(
                     card, target, page, profile, shift_down_mm=shift,
+                    shift_right_mm=shift_x,
                     status_callback=self._set_status)
                 self.after(0, lambda: self._shadow_done(target))
             except Exception as e:
@@ -3991,6 +4042,7 @@ class ExportDialog(ctk.CTkToplevel):
             back_rotation_deg=self._back_rot(),
             edge_bleed_mm=self._edge_bleed(),
             shift_down_mm=self._shift(),
+            shift_right_mm=self._shift_x(),
         )
 
         def build():
@@ -4430,6 +4482,22 @@ FAQ = [
      "most labs print at natively, and 600 and 1200 are there for the ones "
      "that take more. Ask yours what it accepts - sending more pixels than it "
      "wants is harmless, sending fewer is not."),
+
+    ("My printer's rear feed leaves roller marks, or loses part of the page.",
+     "Move the whole layout away from the edge it cannot use. *Shift down* and "
+     "*Shift right* on the Layout tab both take negative numbers, so the block "
+     "goes up, down, left or right - shift down -8 moves it 8 mm toward the "
+     "top of the page.\n\n"
+     "Guides and margin ticks move with the cards, so what you cut to is still "
+     "correct. The preview shows the result, and the line under the two "
+     "entries says how far you can actually go on this page and grid.\n\n"
+     "If the room is smaller than what your printer wastes, no shift will fix "
+     "it: the cards simply do not fit clear of the dead zone. A rear top "
+     "loader that eats 0.8 in leaves Letter 3x3 no way out - drop to 4x2 "
+     "landscape, or move to Legal, A3 or Tabloid.\n\n"
+     "With registration marks on, the shift is ignored on purpose: the cutter "
+     "finds the marks wherever the paper actually fed and cuts relative to "
+     "them, so it already compensates."),
 
     ("Which paper and layout should I use with a cutting machine?",
      "A3 or Tabloid, if your printer takes them. At the default mark geometry "

@@ -91,17 +91,53 @@ PAGES = {
     "4x6 photo": (4 * inch, 6 * inch),
 }
 
-# The card block never gets closer than this to the paper's bottom edge
-# (typical inkjet unprintable margin).
+# The card block never gets closer than this to any paper edge (typical
+# inkjet unprintable margin).
 MIN_BOTTOM = 3 * mm
 
 
-def _block_origin(pw, ph, block_w, block_h, shift_down_mm=0.0):
-    """Centered block, optionally shifted down (for printers whose heavy
-    cardstock feeds late and clips the top of the page)."""
-    ox = (pw - block_w) / 2
+def _on_page(v, size, page):
+    """Keep one axis of the block inside the printable area.
+
+    A block that cannot fit even centred is centred anyway, so what it loses
+    is shared between the two edges instead of all going to one.
+    """
+    if size >= page - 2 * MIN_BOTTOM:
+        return (page - size) / 2
+    return max(MIN_BOTTOM, min(v, page - size - MIN_BOTTOM))
+
+
+def _block_origin(pw, ph, block_w, block_h, shift_down_mm=0.0,
+                  shift_right_mm=0.0):
+    """Centered block, then nudged by the page shift and kept on the paper.
+
+    The shift is about how a printer feeds, not about the layout. Heavy
+    cardstock feeding late clips the top of the page, which is what this
+    started as (down only). A rear top loader mangles the far end instead: an
+    Epson ET-8500 owner reported losing 0.8 in and getting roller marks on
+    every sheet, and no amount of downward shift reaches that. Which edge is
+    unusable depends on the tray, so both signs of both axes are needed -
+    down-only covers one printer in four.
+
+    Positive is down and right. The result is clamped to the printable area,
+    so an over-large shift stops at the edge rather than walking cards off it.
+    """
+    ox = (pw - block_w) / 2 + shift_right_mm * mm
     oy = (ph - block_h) / 2 - shift_down_mm * mm
-    return ox, max(MIN_BOTTOM, oy)
+    return _on_page(ox, block_w, pw), _on_page(oy, block_h, ph)
+
+
+def block_origin_mm(pw_mm, ph_mm, bw_mm, bh_mm, shift_x_mm=0.0,
+                    shift_y_mm=0.0):
+    """`_block_origin` in millimetres, with y measured DOWN from the top edge.
+
+    That is the frame the export preview draws in. It is shared rather than
+    reimplemented there so the preview cannot disagree with the export about
+    where the block actually lands - including when the shift is clamped.
+    """
+    ox, oy = _block_origin(pw_mm * mm, ph_mm * mm, bw_mm * mm, bh_mm * mm,
+                           shift_y_mm, shift_x_mm)
+    return ox / mm, ph_mm - oy / mm - bh_mm
 
 
 # --------------------------------------------------------------------------
@@ -1105,6 +1141,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
               sharpen_name="Off", profile_id=1, shadow_name="Off",
               pages_per_file=0, backs=None, back_offset=(0.0, 0.0),
               back_bleed_mm=1.5, back_rotation_deg=0.0, shift_down_mm=0.0,
+              shift_right_mm=0.0,
               edge_bleed_mm=0.0, bleed_color="Black", guide_color="White",
               back_guides=True,
               guide_len_mm=4.0, guide_thick=0.4, guide_style="Cross",
@@ -1159,6 +1196,11 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     duplex: the back's guides never land exactly where the
                     front's do, so a second set that disagrees with the one you
                     are cutting to is worse than none. You cut by the front.
+    shift_down_mm / shift_right_mm: move the whole card block on the paper,
+                    positive down and right, to dodge the part of the page a
+                    printer's feed cannot use. Clamped to the printable area,
+                    and ignored when reg_marks is on (the cutter aligns to the
+                    marks, so it self-compensates).
     image_format:   None = PDF. "PNG" or "JPEG" instead renders each sheet
                     as a bitmap at image_dpi, for photo labs that do not
                     accept PDF. A bitmap has no pages, so every sheet is its
@@ -1203,7 +1245,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     # them, so it self-compensates. Shifting only the cards would break that
     # card-to-mark relationship (and push cards under the marks).
     ox, oy = _block_origin(pw, ph, block_w, block_h,
-                           0.0 if reg_marks else shift_down_mm)
+                           0.0 if reg_marks else shift_down_mm,
+                           0.0 if reg_marks else shift_right_mm)
     guide_rgb = GUIDE_COLORS.get(guide_color, (1, 1, 1))
 
     bleed_rgb = BLEED_COLORS.get(bleed_color, (0, 0, 0))
@@ -1408,7 +1451,8 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
 
 
 def build_calibration(image_path, out_path, page_name="A4",
-                      shift_down_mm=0.0, status_callback=None) -> Path:
+                      shift_down_mm=0.0, shift_right_mm=0.0,
+                      status_callback=None) -> Path:
     """
     One page with the same card rendered through all 9 calibration
     profiles, numbered, to print and compare against a real card.
@@ -1417,7 +1461,8 @@ def build_calibration(image_path, out_path, page_name="A4",
     page = PAGES.get(page_name, A4)
     pw, ph = page
     block_w, block_h = COLS * CARD_W, ROWS * CARD_H
-    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm)
+    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm,
+                           shift_right_mm)
 
     c = canvas.Canvas(str(out_path), pagesize=page)
     c.setTitle("Cardwright calibration sheet")
@@ -1460,6 +1505,7 @@ def build_calibration(image_path, out_path, page_name="A4",
 def build_duplex_test(out_path, page_name="A4", layout=DEFAULT_LAYOUT,
                       back_offset=(0.0, 0.0), back_rotation_deg=0.0,
                       edge_bleed_mm=0.0, shift_down_mm=0.0,
+                      shift_right_mm=0.0,
                       status_callback=None) -> Path:
     """
     Two-page duplex registration test. Page 1 draws the card grid (outlines +
@@ -1476,7 +1522,8 @@ def build_duplex_test(out_path, page_name="A4", layout=DEFAULT_LAYOUT,
     gutter = 2 * edge_bleed_mm * mm
     block_w = cols * CARD_W + (cols - 1) * gutter
     block_h = rows * CARD_H + (rows - 1) * gutter
-    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm)
+    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm,
+                           shift_right_mm)
     dx, dy = back_offset[0] * mm, back_offset[1] * mm
 
     c = canvas.Canvas(str(out_path), pagesize=page)
@@ -1535,7 +1582,8 @@ def build_duplex_test(out_path, page_name="A4", layout=DEFAULT_LAYOUT,
 
 
 def build_shadow_test(image_path, out_path, page_name="A4", profile_id=1,
-                      shift_down_mm=0.0, status_callback=None) -> Path:
+                      shift_down_mm=0.0, shift_right_mm=0.0,
+                      status_callback=None) -> Path:
     """
     One page with the same card at 9 shadow-lift levels (the chosen color
     profile already applied), labeled with the +N value. Pick the lowest
@@ -1547,7 +1595,8 @@ def build_shadow_test(image_path, out_path, page_name="A4", profile_id=1,
     page = PAGES.get(page_name, A4)
     pw, ph = page
     block_w, block_h = COLS * CARD_W, ROWS * CARD_H
-    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm)
+    ox, oy = _block_origin(pw, ph, block_w, block_h, shift_down_mm,
+                           shift_right_mm)
 
     c = canvas.Canvas(str(out_path), pagesize=page)
     c.setTitle("Cardwright shadow test")

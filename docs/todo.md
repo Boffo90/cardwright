@@ -18,6 +18,19 @@ DPI is a choice (300 / 600 / 1200) rather than a hard-coded 300, which is what
 was planned if no answer came. If they do reply, the only thing worth changing
 is which value the dropdown defaults to.
 
+### Page shift on both axes: **done**
+Also v2.17.11. *Shift down* takes negative numbers and *Shift right* is new,
+so the whole layout moves in any direction instead of down only. Reported by
+**XTR3M3brutality** on Reddit: an Epson ET-8500/8550 rear top loader wastes
+0.8 in of the page and leaves roller marks, and down-only could not reach that
+edge - they said they were going back to proxxied.com over it.
+
+The hint under the two entries names how much room the current page and grid
+actually leave, because it is often less than the printer wastes (Letter 3x3
+gives 4.7 mm against the 20 mm they need) and silence there reads as a broken
+setting. **Worth telling them**: on that printer the answer is 4x2 landscape,
+Legal, A3 or Tabloid - Letter 3x3 cannot dodge 0.8 in at any setting.
+
 ### Next task: pick from the list below
 Nothing is teed up. The two that were sized and ranked highest after 4x6 are
 **mixed card sizes on one sheet** (needs per-card size plus a small packing
@@ -26,14 +39,14 @@ obvious end state, and large enough to want a clear run). Both are described
 under "Asked for by users".
 
 ### State of the tree
-**v2.17.10 is the last release. Nine commits sit unreleased on `main`** as
-v2.17.11, tree clean, 140 tests passing. Releases are batched now, see
+**v2.17.10 is the last release. Eleven commits sit unreleased on `main`** as
+v2.17.11, tree clean, 155 tests passing. Releases are batched now, see
 `release.md` for the rule and its two exceptions.
 
 Waiting in v2.17.11: multi-select in the preview, projects (save/load the
 queue), cut guides that can be turned off on the backs, the exact-printing
 search made findable, a retry around card saves that Windows briefly locks,
-and 4x6 photo sheets with PNG/JPEG output.
+4x6 photo sheets with PNG/JPEG output, and the two-axis page shift.
 
 **Owed at the next release:** the Microsoft false-positive submission for the
 new binary. The table below has the previous ones; v2.17.10's hash
@@ -119,6 +132,10 @@ Recorded so they are not re-researched from scratch:
   people move here from Proxxied. See `decisions.md`.
 
 ## Open questions for the author
+- **GitHub issues appear to be restricted.** XTR3M3brutality said so in August
+  2026 and reported their bug on Reddit instead, which is how it nearly went
+  unheard. Check the repo's issue settings: bug reports arriving only where
+  someone happens to be reading is not a reporting channel.
 - **Licence.** The author said in July 2026 that they do not care about the code
   being open source and only want donations. Nothing was changed. If it is ever
   revisited: **decide before merging the first PR** - the current LICENSE takes
