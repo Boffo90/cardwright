@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.11 (unreleased)
+## v2.17.11 - projects, photo prints, and a sheet that moves
 - **The page shift now moves both ways on both axes.** *Shift down* takes
   negative numbers and *Shift right* is new, so the whole layout can go up,
   down, left or right instead of down only. Reported by an Epson ET-8500
