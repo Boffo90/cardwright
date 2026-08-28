@@ -39,16 +39,26 @@ obvious end state, and large enough to want a clear run). Both are described
 under "Asked for by users".
 
 ### State of the tree
-**v2.17.11 is released and pushed** (2026-08-28), tree clean, 155 tests
-passing. It carried multi-select in the preview, projects (save/load the
-queue), cut guides that can be turned off on the backs, the exact-printing
-search made findable, a retry around card saves that Windows briefly locks,
-4x6 photo sheets with PNG/JPEG output, and the two-axis page shift. Releases
-are batched, see `release.md` for the rule and its two exceptions.
+**v2.17.12 is released and pushed** (2026-08-28), tree clean, 155 tests
+passing. Releases are batched, see `release.md` for the rule and its two
+exceptions.
+
+Two releases went out that day. v2.17.11 carried multi-select in the preview,
+projects (save/load the queue), cut guides that can be turned off on the backs,
+the exact-printing search made findable, a retry around card saves that Windows
+briefly locks, 4x6 photo sheets with PNG/JPEG output, and the two-axis page
+shift. v2.17.12 followed because that page shift pushed the Layout tab past the
+bottom of the panel with no scrollbar, so two controls were invisible: it fixes
+that, opens the export dialog with an empty queue, moves the cut guides to the
+Cutting tab, and links Discussions from About.
+
+**v2.17.12 broke the batching rule on purpose**, under the "regression people
+are already hitting" exception in `release.md`: v2.17.11 shipped with a control
+you could not reach.
 
 **Owed right now, and only the author can do it:** the Microsoft
-false-positive submission, for *two* binaries. v2.17.10's hash was never
-submitted and v2.17.11's is new. Both are in the table below. It is a web form
+false-positive submission, for *three* binaries. v2.17.10's hash was never
+submitted, and v2.17.11 and v2.17.12 followed. Both are in the table below. It is a web form
 (<https://www.microsoft.com/en-us/wdsi/filesubmission>, "Software developer" /
 "Incorrectly detected as malware"), so it cannot be automated from here.
 
@@ -154,6 +164,7 @@ Recorded so they are not re-researched from scratch:
   Submissions so far, newest first:
   | Version | SHA-256 (first 8) | Date | Submission ID |
   | --- | --- | --- | --- |
+  | 2.17.12 | `baf347b3` | **not submitted** | - |
   | 2.17.11 | `cb0b7626` | **not submitted** | - |
   | 2.17.10 | `817d473f` | **not submitted** | - |
   | 2.17.9 | `b031a2bf` | 2026-08-13 | `f669dbf4-945e-4a39-bf48-3dcda5510ff3` |
