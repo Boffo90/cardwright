@@ -132,10 +132,6 @@ Recorded so they are not re-researched from scratch:
   people move here from Proxxied. See `decisions.md`.
 
 ## Open questions for the author
-- **GitHub issues appear to be restricted.** XTR3M3brutality said so in August
-  2026 and reported their bug on Reddit instead, which is how it nearly went
-  unheard. Check the repo's issue settings: bug reports arriving only where
-  someone happens to be reading is not a reporting channel.
 - **Licence.** The author said in July 2026 that they do not care about the code
   being open source and only want donations. Nothing was changed. If it is ever
   revisited: **decide before merging the first PR** - the current LICENSE takes

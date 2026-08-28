@@ -1,0 +1,80 @@
+name: Something is wrong with the printed sheet
+description: Alignment, card size, colour, cut guides, registration marks, roller marks
+title: "[print] "
+labels: ["bug", "printing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Printing problems usually come down to the printer and the paper rather
+        than the card, so those questions come first.
+
+        **A photo of the sheet settles most of these faster than any
+        description.** Drag one into the last box.
+
+  - type: input
+    id: version
+    attributes:
+      label: Cardwright version
+      description: Help → About, first line.
+      placeholder: "2.17.11"
+    validations:
+      required: true
+
+  - type: input
+    id: printer
+    attributes:
+      label: Printer, and which tray or feed you print from
+      description: >-
+        The feed matters as much as the model. Rear and top loaders waste a
+        different part of the page than the main cassette does.
+      placeholder: "Epson ET-8550, rear top loader"
+    validations:
+      required: true
+
+  - type: input
+    id: layout
+    attributes:
+      label: Page size, card grid and card size
+      description: The first three rows of the Layout tab in the export dialog.
+      placeholder: "Letter, 3x3 portrait, MTG / Pokemon (63x88 mm)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What the sheet does, and what it should do instead
+      description: >-
+        Measurements help more than adjectives. "The top row is clipped by
+        about 8 mm" is something we can act on; "the alignment is off" is not.
+    validations:
+      required: true
+
+  - type: textarea
+    id: settings
+    attributes:
+      label: Anything you changed from the defaults
+      description: >-
+        Edge bleed, cut guides, page shift, registration marks, duplex offsets,
+        colour profile, sharpening. Saving an export preset and pasting its
+        entry from settings.json covers all of it at once.
+
+  - type: checkboxes
+    id: scale
+    attributes:
+      label: Before filing
+      options:
+        - label: >-
+            I printed at 100% scale, with "fit to page" / "shrink oversized
+            pages" turned off. Printing at anything else is the most common
+            reason cards come out the wrong size.
+        - label: >-
+            I checked the FAQ in Help → FAQ. Roller marks, lost page edges,
+            marks eating card slots and photo-lab printing all have entries.
+
+  - type: textarea
+    id: photo
+    attributes:
+      label: Photo of the sheet
+      description: Drag the image in here. A ruler beside the cards is a bonus.

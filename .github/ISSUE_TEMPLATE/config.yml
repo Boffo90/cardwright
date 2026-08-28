@@ -1,0 +1,20 @@
+# Blank issues stay ON, deliberately. A form that does not fit someone's
+# problem must not be the reason the report never arrives - in August 2026 a
+# printing bug reached us on Reddit instead, and only because somebody happened
+# to be reading that day.
+blank_issues_enabled: true
+
+contact_links:
+  - name: Ask something, or float a half-formed idea
+    url: https://github.com/Boffo90/cardwright/discussions
+    about: >-
+      Discussions are lower effort than an issue. "Is this supposed to work
+      like this?", "has anyone printed on X paper", and features you have not
+      thought all the way through belong here.
+
+  - name: Windows Defender flagged the download
+    url: https://github.com/Boffo90/cardwright#if-your-antivirus-flags-it
+    about: >-
+      Known false positive, and there is nothing to report. The README explains
+      why it happens and every release publishes the SHA-256 of both files so
+      you can verify what you downloaded is what was built.

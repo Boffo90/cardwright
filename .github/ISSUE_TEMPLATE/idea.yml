@@ -1,0 +1,39 @@
+name: Ask for something
+description: A feature, a setting, a catalogue, a paper size
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Say what you are trying to *do* rather than what you think the app
+        should add. The best features here started as somebody describing their
+        actual printing setup: two cards on a 4x6 photo print, and a page shift
+        that reaches the edge their printer wastes, both arrived that way and
+        both were built differently from what was first suggested.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: >-
+        The problem, not the solution. If your print shop, your printer or your
+        cutting machine is part of it, name the model - the constraint is
+        usually there.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you do it today?
+      description: >-
+        Another tool, a manual workaround, or not at all. Knowing what you are
+        working around says a lot about what would actually help.
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >-
+        Screenshots, a tool that already does it well, or a link to the thread
+        where this came up.

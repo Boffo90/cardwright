@@ -1,0 +1,68 @@
+name: Something went wrong in the app
+description: Crashes, cards that will not download, upscaling failures, anything that is not the printed sheet
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **The log is the single most useful thing you can attach.** The app
+        writes `cardwright.log` next to itself, which for a normal install is:
+
+        ```
+        %LOCALAPPDATA%\Cardwright\cardwright.log
+        ```
+
+        It records what actually failed, including errors that never reach the
+        window. It is capped at half a megabyte, so it is safe to paste.
+
+  - type: input
+    id: version
+    attributes:
+      label: Cardwright version
+      description: Help → About, first line.
+      placeholder: "2.17.11"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (running from source)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did, step by step
+      description: >-
+        Include the card, set and collector number if it is about one card in
+        particular. A bug that only happens on one printing is a different bug
+        from one that happens on all of them.
+      placeholder: |
+        1. Pasted a decklist of 40 cards
+        2. Clicked Upscale
+        3. Three cards finished, the rest stayed queued
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: >-
+        Paste the last few dozen lines of cardwright.log, or drag the file in.
+      render: text

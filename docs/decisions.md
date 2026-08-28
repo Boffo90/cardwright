@@ -33,6 +33,29 @@ A bare card name opens the printing gallery; a link or decklist line does not (`
 - Gatherer picks are queued as a **reference**, not a direct URL, so `scryfall.fetch` handles them and converts Gatherer's webp to PNG. Do not shortcut that into a plain download.
 - Printings whose `image_status` is `placeholder`/`missing` are labelled "no real scan" rather than hidden - in a manual picker the user can see the thumbnail and judge.
 
+## Where bug reports arrive (2026-08-28)
+A user said GitHub issues were "restricted in this repository" and reported a
+printing bug on Reddit instead, which only reached us because somebody happened
+to be reading that day. **Checked, and nothing was restricted**: `has_issues` is
+true, the Issues tab and its New issue button are visible logged out, there are
+no interaction limits, and the repo is neither archived nor a fork.
+
+Two explanations fit, and the fix is the same for both:
+- **The fork.** `cc3xz/cardwright` has `has_issues=false`, which is GitHub's
+  default for a fork, and the tab is hidden there entirely. Anyone who lands on
+  a fork through search sees exactly what he described.
+- **Not signed in.** Logged out, `/issues/new/choose` bounces to the sign-in
+  page. Someone who does not use GitHub reads that as being locked out.
+
+So the answer was not a setting, it was that issues are the wrong front door
+for a five-line gripe. **Discussions is now enabled** as the low-effort channel,
+and there are three issue forms (printing, app bug, feature) plus a config that
+points at Discussions and at the antivirus README section.
+
+**Blank issues stay ON.** A form that does not fit someone's problem must never
+be the reason a report never arrives - that is the failure this whole entry is
+about, and switching `blank_issues_enabled` off would rebuild it deliberately.
+
 ## Page shift is two axes, both signs (v2.17.11)
 Reported on Reddit by an Epson ET-8500 owner: the rear top loader wastes
 **0.8 in** of the page and leaves roller marks. The shift was down-only, for
