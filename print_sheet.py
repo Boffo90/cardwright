@@ -1254,12 +1254,51 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
     # "Extend art" grows the image instead of painting a frame behind it, so
     # the card is drawn over the whole slot-plus-bleed rather than inside it.
     extend_art = bleed_color == BLEED_EXTEND and ebleed > 0
-    grow_px = 0
-    if extend_art:
-        # the flattened card is CARD_W wide in points; convert the bleed to
-        # that image's own pixels so the band is exactly edge_bleed_mm
-        with Image.open(images[0]) as _probe:
-            grow_px = int(round(_probe.width * (ebleed / card_w)))
+
+    _width_cache = {}
+
+    def _img_width(img):
+        key = str(img)
+        if key not in _width_cache:
+            with Image.open(img) as probe:
+                _width_cache[key] = probe.width
+        return _width_cache[key]
+
+    def bleed_px(img, bleed_pt):
+        """A bleed width in points, in one image's own pixels.
+
+        Measured per image rather than once from the first card: the card is
+        drawn card_w wide whatever its resolution, so the same millimetre ring
+        is a different pixel count in each. Backs make that routine - a
+        user-supplied back.png and a double-faced card's own back face are
+        rarely the same size.
+        """
+        if bleed_pt <= 0:
+            return 0
+        return int(round(_img_width(img) * (bleed_pt / card_w)))
+
+    def bleed_fit(img, bleed_pt):
+        """(pixels to grow by, what those pixels are actually worth in points).
+
+        A ring has to be a whole number of pixels, so it lands slightly off the
+        millimetres asked for. Drawing the rect from what the pixels really
+        came to, rather than from the nominal figure, keeps the card inside it
+        at exactly card_w - which is the entire point of the ring. Only the
+        backs can do this: a front's rect is pinned by the gutter the layout
+        was built from.
+        """
+        px = bleed_px(img, bleed_pt)
+        if px <= 0:
+            return 0, 0.0
+        return px, px / _img_width(img) * card_w
+    # Backs are drawn into a rect this much larger on every edge, so duplex
+    # drift never exposes white paper when cutting along the front's guides.
+    # The IMAGE has to grow to match, or that larger rect just scales the card
+    # up: at the 1.5 mm default the back came out 4.7% too wide and 3.4% too
+    # tall - not even the same aspect ratio, since 1.5 mm is a different
+    # fraction of 63 than of 88. Invisible on a plain card back, and the reason
+    # a double-faced card's back never lined up with its front.
+    back_bleed_pt = back_bleed_mm * mm
     dx = back_offset[0] * mm
     dy = back_offset[1] * mm
     img_mask = "auto" if corner_radius_mm > 0 else None
@@ -1337,14 +1376,16 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
 
     modes = border_modes or {}
 
-    def flat(img):
+    def flat(img, grow=0):
         # "auto" follows the global switch; "on"/"off" are per-card overrides
         mode = modes.get(str(img), "auto")
         do_border = deepen_border if mode == "auto" else (mode == "on")
         # a forced card uses the manual width, if one is set; auto cards
         # always measure their own
         width = border_width if mode == "on" else 0.0
-        key = (str(img), do_border, width, border_style, grow_px)
+        # grow is in the key: the same file is a front with one ring and a
+        # back with another, and they are two different flattened images.
+        key = (str(img), do_border, width, border_style, grow)
         if key not in flat_cache:
             flat_cache[key] = _flatten(img, jpeg_quality, profile, sharpen,
                                        shadow, do_border, border_amount, width,
@@ -1353,7 +1394,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                                        edge_width=edge_width,
                                        edge_contrast=edge_contrast,
                                        edge_brightness=edge_brightness,
-                                       bleed_px=grow_px)
+                                       bleed_px=grow)
         return flat_cache[key]
 
     placed = 0
@@ -1384,10 +1425,12 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                     status_callback(f"Placing card {placed}/{to_place}…")
                 x, y = usable[k]
                 if extend_art:
-                    c.drawImage(ImageReader(str(flat(images[i]))),
-                                x - ebleed, y - ebleed,
-                                card_w + 2 * ebleed, card_h + 2 * ebleed,
-                                mask=img_mask)
+                    c.drawImage(
+                        ImageReader(str(flat(images[i],
+                                             bleed_px(images[i], ebleed)))),
+                        x - ebleed, y - ebleed,
+                        card_w + 2 * ebleed, card_h + 2 * ebleed,
+                        mask=img_mask)
                 else:
                     c.drawImage(ImageReader(str(flat(images[i]))), x, y,
                                 card_w, card_h, mask=img_mask)
@@ -1401,7 +1444,7 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
 
             # ---- mirrored back page (duplex, flip on long edge)
             if backs is not None:
-                bleed = back_bleed_mm * mm
+                bleed = back_bleed_pt
                 c.saveState()
                 if back_rotation_deg:
                     # rotate the whole back layout about the page centre to
@@ -1420,12 +1463,15 @@ def build_pdf(images, out_path, page_name="A4", quality=PDF_DEFAULT_QUALITY,
                 for k, i in enumerate(batch):
                     x, y = usable[k]
                     x = mirror_x(x, ox, block_w, card_w)
-                    # oversized by the bleed on every edge: small duplex
-                    # drift stays covered when cutting along the front
-                    c.drawImage(ImageReader(str(flat(backs[i]))),
-                                x - bleed, y - bleed,
-                                card_w + 2 * bleed, card_h + 2 * bleed,
-                                mask=img_mask)
+                    # The image carries its own bleed ring, so the card
+                    # inside it still lands at exactly card_w x card_h and
+                    # matches the front it has to line up with.
+                    gpx, gpt = bleed_fit(backs[i], bleed)
+                    c.drawImage(
+                        ImageReader(str(flat(backs[i], gpx))),
+                        x - gpt, y - gpt,
+                        card_w + 2 * gpt, card_h + 2 * gpt,
+                        mask=img_mask)
                 if back_guides:
                     _draw_marks(c, ox, oy, block_w, block_h, gutter, guide_rgb,
                                 cols, rows, guide_len_mm, guide_thick,

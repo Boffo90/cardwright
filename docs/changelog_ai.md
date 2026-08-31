@@ -3,6 +3,21 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.13 (unreleased)
+- **Double-faced backs now come out the same size as their fronts.** The back
+  bleed was not adding a margin, it was magnifying the card: at the 1.5 mm
+  default the back printed **4.7% too wide and 3.4% too tall**, and since
+  1.5 mm is a bigger fraction of 63 than of 88, not even at the right aspect
+  ratio. Invisible on a plain card back, which is symmetric with nothing near
+  its edge to compare against. Fatal on a double-faced card, whose back is a
+  real card face whose frame has to line up with the front's. Reported by
+  someone who had never once got a DFC to line up.
+- The image now grows its own bleed ring the way *Extend art* does for fronts,
+  so the card inside stays exactly 63x88 mm. Measured after: back and front
+  match to 1.0000 at every bleed setting, and mirroring the back sheet lands it
+  on the front to within 0.085 mm, one pixel at 300 DPI, on every layout.
+- The ring is measured per image rather than once from the first card. Backs
+  routinely mix sizes - a user-supplied `back.png` next to a DFC's own upscaled
+  back face - and one pixel count cannot be right for both.
 - **Exporting no longer closes the export dialog.** The dialog is a workspace -
   order, copies, per-card art and border modes, none of it saved anywhere - and
   closing on a successful export threw all of that away. Reprinting a sheet
