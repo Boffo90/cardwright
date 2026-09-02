@@ -259,13 +259,42 @@ class _Pokemon:
         return pokemon.fetch_thumb(url)
 
 
+# --------------------------------------------------------------------------
+# Riftbound (Riftcodex)
+# --------------------------------------------------------------------------
+
+class _Riftbound:
+    ID = "riftbound"
+    LABEL = "Riftbound"
+    ADD_KIND = "card"
+    EMPTY = "No matches on Riftcodex."
+    PLACEHOLDER = "Card name (e.g. Jinx - Rebel)"
+    # No CARD_SIZE_HINT: a Riftbound card is 63x88 mm like Magic, so the
+    # default size is already right - including the Battlefields, whose art is
+    # landscape but whose cardboard is not.
+    NOTE = ("Images come from Riot's own CDN at 744×1039, the same class as "
+            "Scryfall. Battlefields are turned upright to fit the sheet; the "
+            "printed card is one you hold sideways.")
+
+    @staticmethod
+    def search(query: str, limit: int = 60) -> list[dict]:
+        import riftbound
+        return riftbound.search(query, limit)
+
+    @staticmethod
+    def fetch_thumb(url: str) -> bytes | None:
+        import riftbound
+        return riftbound.fetch_thumb(url)
+
+
 SCRYFALL = _Scryfall
 GATHERER = _Gatherer
 MPC = _MPC
 YGO = _YGO
 POKEMON = _Pokemon
+RIFTBOUND = _Riftbound
 
-ALL = [SCRYFALL, GATHERER, MPC, POKEMON, YGO]
+ALL = [SCRYFALL, GATHERER, MPC, POKEMON, YGO, RIFTBOUND]
 
 
 def by_id(source_id: str):

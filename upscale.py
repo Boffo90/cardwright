@@ -78,13 +78,76 @@ def _crop_mpc_bleed(im):
     return im.crop((x0, y0, round(x0 + cw), round(y0 + ch)))
 
 
+# Which way a sideways card is turned upright. 90 is counter-clockwise in
+# Pillow, so the printed card is one you turn clockwise to read.
+#
+# The direction turns out not to matter for the case this exists for: a
+# Riftbound Battlefield sits between two players and prints its rules text
+# BOTH ways up, so it reads correctly whichever way you turn it. Kept as a
+# named constant anyway, for whatever landscape card shows up next.
+ROTATE_LANDSCAPE_DEG = 90
+
+# How close an image's aspect has to be to the card's, turned on its side,
+# before we treat it as a sideways card rather than some other wide picture.
+# A Battlefield is 1039x744 = 1.3965 against 88:63 = 1.3968, so the match is
+# exact; the tolerance is only there to keep a random banner from being
+# rotated behind the user's back.
+_SIDEWAYS_TOLERANCE = 0.10
+
+
+def _orient_to_card(file: Path, card_px, status_callback=None) -> Path | None:
+    """A rotated copy of `file`, or None when it is already the right way up.
+
+    Every card size the app offers is portrait and fit-to-card resizes to
+    those pixels, so a landscape image would simply be squashed into a
+    portrait slot. Turning it is what the card physically is: a Riftbound
+    Battlefield's art is 1039x744, exactly 88:63 on its side, and the card
+    itself is an ordinary 63x88 you hold sideways.
+    """
+    if not card_px:
+        return None
+    card_w, card_h = card_px
+    if not card_w or not card_h or card_w == card_h:
+        return None
+    with Image.open(file) as probe:
+        w, h = probe.size
+    if not w or not h or w == h:
+        return None
+    if (w > h) == (card_w > card_h):
+        return None                      # already the same way up
+
+    # It disagrees with the card. Only turn it when it is the same shape as
+    # the card lying down, not merely wider than tall.
+    want = card_h / card_w
+    got = w / h
+    if abs(got - want) / want > _SIDEWAYS_TOLERANCE:
+        return None
+
+    if status_callback:
+        status_callback("Turning a sideways card upright…")
+    im = Image.open(file)
+    if im.mode not in ("RGB", "RGBA"):
+        im = im.convert("RGBA")
+    out = TEMP_FOLDER / (file.stem + "_rot.png")
+    im.rotate(ROTATE_LANDSCAPE_DEG, expand=True).save(out)
+    return out
+
+
 def _normalize_input(file: Path, trim_bleed=False,
-                     status_callback=None) -> Path:
+                     status_callback=None, card_px=None) -> Path:
     """
     Real-ESRGAN reads png/jpg/webp. Anything else (or images with odd modes)
     is converted to a temporary PNG first. If trim_bleed is set and the image
     looks like an MPC full-bleed card, its bleed is cropped off first.
+
+    A card that arrives lying down is stood up first, so the bleed detector
+    below sees the portrait shape it expects and the AI gets the same input it
+    would from any other source.
     """
+    turned = _orient_to_card(file, card_px, status_callback)
+    if turned is not None:
+        file = turned
+
     plain = file.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
 
     # True/False stay valid so nothing else has to change; "always" skips the
@@ -198,7 +261,9 @@ def upscale(
         # No compatible GPU (or engine missing): plain high-quality resize.
         # Still yields a correctly sized 1200 DPI file, just without the AI
         # detail reconstruction.
-        source = _normalize_input(file, trim_bleed, status_callback)
+        source = _normalize_input(file, trim_bleed,
+                                  status_callback,
+                                  (card_w_px, card_h_px))
         out_name = generate_output_name(file) if rename else file.stem + ".png"
         output = OUTPUT_FOLDER / out_name
         if status_callback:
@@ -238,7 +303,8 @@ def upscale(
 
     model_name, scale = MODELS.get(model_label, MODELS[AUTO_SCAN_MODEL])
 
-    source = _normalize_input(file, trim_bleed, status_callback)
+    source = _normalize_input(file, trim_bleed, status_callback,
+                              (card_w_px, card_h_px))
 
     out_name = generate_output_name(file) if rename else file.stem + ".png"
     output = OUTPUT_FOLDER / out_name

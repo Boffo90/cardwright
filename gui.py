@@ -1924,8 +1924,8 @@ class ExportDialog(ctk.CTkToplevel):
         for i, (key, label) in enumerate(
                 (("scryfall", "Scryfall"), ("gatherer", "Gatherer"),
                  ("mpc", "MPC"), ("pokemon", "Pokémon"),
-                 ("ygo", "Yu-Gi-Oh"), ("file", "Uploads"),
-                 ("back", "Backs"))):
+                 ("ygo", "Yu-Gi-Oh"), ("riftbound", "Riftbound"),
+                 ("file", "Uploads"), ("back", "Backs"))):
             var = ctk.BooleanVar(
                 value=bool(saved_srcs.get(key, BORDER_SOURCES.get(key, True))))
             ctk.CTkCheckBox(srcfr, text=label, variable=var, width=20,
@@ -4474,7 +4474,8 @@ FAQ = [
      "takes the right one automatically:\n\n"
      "    back-mtg.png       Magic, from Scryfall, Gatherer or MPC\n"
      "    back-pokemon.png   Pokemon\n"
-     "    back-yugioh.png    Yu-Gi-Oh\n\n"
+     "    back-yugioh.png    Yu-Gi-Oh\n"
+     "    back-riftbound.png Riftbound\n\n"
      "Anything without a matching file falls back to back.png, so you can add "
      "just the ones you need. A card that has its own second face, like a "
      "transforming card, always uses that instead.\n\n"

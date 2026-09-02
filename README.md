@@ -77,6 +77,8 @@ The preview is a workspace, not a picture - what you see is what prints.
 - Layouts: **3×3 portrait**, **4×2 landscape**, **7-card Silhouette**, plus
   **3×4** and **4×4** for the bigger sheets - A3 and Tabloid fit 16 cards,
   and **2×1 landscape** for the 4x6 photo print.
+- Games: **Magic** (Scryfall, Gatherer, MPC Autofill), **Pokémon**,
+  **Yu-Gi-Oh** and **Riftbound**, all from one search box.
 - Card sizes: **MTG / Pokémon (63×88)**, **Yu-Gi-Oh (59×86)**, mini (44×68),
   tarot (70×120), plus **any custom size** you enter in mm. Pokémon cards are
   the same size as Magic cards, so they work as-is.

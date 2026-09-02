@@ -31,6 +31,16 @@ gives 4.7 mm against the 20 mm they need) and silence there reads as a broken
 setting. **Worth telling them**: on that printer the answer is 4x2 landscape,
 Legal, A3 or Tabloid - Letter 3x3 cannot dodge 0.8 in at any setting.
 
+### Riftbound: **done**
+Shipped in v2.17.13 via Riftcodex (no API key, Riot's own images at 744x1039).
+Battlefields are stood upright on the way in rather than needing the
+mixed-orientation layout work. Reasoning in `decisions.md`.
+
+**Untested against real hardware**: nobody here has printed a Battlefield. The
+quarter turn is the only thing that could look wrong, and it should not - a
+Battlefield prints its rules text both ways up because it sits between two
+players.
+
 ### Next task: pick from the list below
 Nothing is teed up. The two that were sized and ranked highest after 4x6 are
 **mixed card sizes on one sheet** (needs per-card size plus a small packing
@@ -88,36 +98,6 @@ border-mode indicator, per-slot disable, and sort & filter.
 Raised on r/mtgproxies in August 2026 and sized here so the next look does not
 start from nothing. 4x6 with PNG output was the top of this list and shipped in
 v2.17.11.
-
-- **Riftbound (Riot's LoL TCG)**, asked for by the author. Assessed
-  2026-08-31 and it looks like the easiest catalogue we have added:
-  - **Riftcodex** (`https://api.riftcodex.com`, `/cards`, `/sets`, OpenAPI at
-    `/openapi.json`) needs **no API key**, which is what blocks apitcg.com and
-    therefore One Piece / Digimon / Dragon Ball. Probed live: 1451 cards
-    across 8 sets, paged `?limit=&page=`, fields `name`, `set`,
-    `collector_number`, `classification.type`, `orientation`,
-    `media.image_url`.
-  - **Images come from Riot's own CDN** (`cmsassets.rgpub.io`, Sanity) at
-    **744x1039 PNG**, the same class as Scryfall's 745x1040 and far above the
-    Pokemon ceiling of 600x825. Nothing to mitigate.
-  - **Do not ask the CDN for a bigger one.** `?w=3000` returns 3000x4190 and
-    it is Sanity upsampling the 744-wide original: measured edge energy falls
-    from 13.17 to 4.41. It would feed the AI a blurred image while looking
-    like more detail. Take the native size and let our own pipeline upscale.
-  - **Battlefields are landscape** - 71 of the 1451, and all 71 landscape
-    cards are Battlefields. Their images are 1039x744, the *same aspect* as
-    88:63, so a Battlefield is a normal 63x88 card rotated, not a different
-    size. That means it needs a 90 degrees rotation on fetch, **not** the
-    mixed-orientation layout work under "Deliberately not doing".
-  - Shape of the work: a `riftbound.py` with `search` / `download` /
-    `fetch_thumb`, the same interface `ygoprodeck.py` copies from
-    `mpcfill.py` so `CardSearchDialog` can drive it, plus the game entry and
-    a `back-riftbound.png`. The rotation is the only new idea in it.
-  - Riftcodex is an unofficial fan project, not affiliated with Riot, and the
-    images are Riot's. Same footing as the other catalogues, and the README's
-    "Card data and images" section would need a line.
-  - The author looked at **piltoverarchives** and did not like how it handles
-    cards; Riftcodex was found separately and is the recommendation.
 
 - **Mixed card sizes on one sheet**, to save paper across games. Card size is
   currently one setting for the whole export and the layout code assumes every
@@ -222,7 +202,9 @@ Recorded so they are not re-researched from scratch:
   745×1040. A source limit, not ours. Mitigated by pre-scaling before the AI.
 - **One Piece / Digimon / Dragon Ball**: `apitcg.com` covers all three but
   demands an API key on every call, which a binary handed to strangers cannot
-  honour. Blocked on that, not on the data existing.
+  honour. Blocked on that, not on the data existing. Riftbound shipped in
+  v2.17.13 precisely because Riftcodex asks for no key - if an open API turns
+  up for these three, the same shape of module works.
 - **mpcfill OCR fork (GPL)** - consuming their HTTP API would be fine (GPL
   covers distributing code, not using a service); we must NOT vendor their code.
   Waiting on their API/spec.

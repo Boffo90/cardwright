@@ -3,6 +3,19 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.13 (unreleased)
+- **Riftbound is a catalogue now.** Riot's League of Legends TCG, in the same
+  search box as everything else, through the open Riftcodex API. Asked for by
+  the author.
+- No API key, which is what still blocks One Piece, Digimon and Dragon Ball,
+  and the images are Riot's own at **744x1039** - the same class as Scryfall,
+  with none of the detail loss Pokemon has.
+- **Battlefields print correctly.** They are the only landscape cards, and
+  their art is exactly a 63x88 card lying down, so they are stood upright on
+  the way in and come out as ordinary cards you hold sideways. Any landscape
+  image now gets the same treatment instead of being squashed into a portrait
+  slot - but only when it is the card's own shape turned over, so a wide
+  picture that is not a card is left alone.
+- `back-riftbound.png` joins the per-game card backs.
 - **Double-faced cards imported through Gatherer now bring both faces.** A DFC
   is two Gatherer records, and only the first was being fetched, so the card
   arrived with its front alone - silently, because a one-faced card is a

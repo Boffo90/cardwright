@@ -56,6 +56,41 @@ points at Discussions and at the antivirus README section.
 be the reason a report never arrives - that is the failure this whole entry is
 about, and switching `blank_issues_enabled` off would rebuild it deliberately.
 
+## Riftbound via Riftcodex, and sideways cards (v2.17.13)
+Riftbound is Riot's LoL TCG. The author asked for it after finding
+piltoverarchives unsatisfying.
+
+- **Riftcodex (`api.riftcodex.com`) needs no API key.** That is the whole
+  decision. apitcg.com covers One Piece, Digimon and Dragon Ball and demands a
+  key on every call, which a binary handed to strangers cannot honour - those
+  three are still blocked on exactly that, so an open API is what made this one
+  possible.
+- **Images are Riot's own CDN at 744x1039 PNG**, the same class as Scryfall's
+  745x1040 and far above the 600x825 ceiling every Pokemon catalogue has.
+  Nothing to mitigate, no NOTE about lost detail needed.
+- **Never ask that CDN for a bigger image.** It is Sanity, and `?w=3000`
+  cheerfully returns 3000x4190 by upsampling the 744-wide original: measured
+  edge energy falls from 13.17 to 4.41. It would feed the AI a blurred image
+  dressed as detail. The `?w=` parameter is used for thumbnails only, going
+  down, where resizing is exactly what is wanted.
+- **Search merges `exact` and `fuzzy`.** `/cards/name?exact=` returns every
+  printing of a name and is uncapped; `/cards/fuzzy=` is capped at 10 by the
+  server but catches partial typing and alternate arts. Exact first, or the
+  three printings of "Jinx - Rebel" arrive buried among Demolitionist and
+  Loose Cannon.
+- **Battlefields are sideways cards, not a different size.** They are the only
+  landscape cards, 71 of 1451, and their art is 1039x744 - the same aspect as
+  88:63 lying down. So the cardboard is an ordinary 63x88 and the fix is a
+  quarter turn on the way in (`_orient_to_card`), **not** the mixed-orientation
+  layout work under "Deliberately not doing".
+- The turn happens in `_normalize_input`, the one funnel every source's image
+  passes through before the AI, so it also rescues a landscape upload that
+  would otherwise be squashed into a portrait slot. It only fires when the
+  image is the card's shape lying down, within 10%, so a wide picture that is
+  not a card is left alone rather than rotated behind the user's back.
+- Rotation direction does not matter for the case it exists for: a Battlefield
+  sits between two players and prints its rules text **both ways up**.
+
 ## Page shift is two axes, both signs (v2.17.11)
 Reported on Reddit by an Epson ET-8500 owner: the rear top loader wastes
 **0.8 in** of the page and leaves roller marks. The shift was down-only, for

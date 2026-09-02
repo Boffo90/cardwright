@@ -435,6 +435,9 @@ BORDER_SOURCES = {
     "mpc": False,
     "pokemon": True,
     "ygo": True,
+    # Riftbound art is a full-bleed digital render with no black frame to
+    # deepen, the same reason MPC is off: there is nothing there to find.
+    "riftbound": False,
     "file": True,
     "back": False,
 }
@@ -467,6 +470,7 @@ GAME_BACKS = {
     "mpc": "back-mtg",          # an MPC order is overwhelmingly Magic
     "pokemon": "back-pokemon",
     "ygo": "back-yugioh",
+    "riftbound": "back-riftbound",
 }
 
 
