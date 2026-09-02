@@ -3,6 +3,15 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.13 (unreleased)
+- **Double-faced cards imported through Gatherer now bring both faces.** A DFC
+  is two Gatherer records, and only the first was being fetched, so the card
+  arrived with its front alone - silently, because a one-faced card is a
+  perfectly ordinary thing. Same bug whether you set *Images from: Gatherer* in
+  the decklist import or pasted a Gatherer link. The Scryfall path was always
+  fine, which is why it looked like the importer losing the back.
+- Both faces come from Gatherer, named so the sheet still pairs them. If either
+  face is missing there, both fall back to Scryfall rather than printing two
+  that do not match each other.
 - **Double-faced backs now come out the same size as their fronts.** The back
   bleed was not adding a margin, it was magnifying the card: at the 1.5 mm
   default the back printed **4.7% too wide and 3.4% too tall**, and since

@@ -145,15 +145,25 @@ def _png_urls(card: dict) -> list[tuple[str, str]]:
     return results
 
 
+def two_faced(card: dict) -> bool:
+    """True when a card is two physical faces, not one piece of cardboard.
+
+    Split, flip and adventure cards also carry two `card_faces`, but Scryfall
+    gives those a top-level image and leaves the faces without images of their
+    own - the same test `_png_urls` uses to decide how many files a card is
+    worth downloading. Everything that needs the distinction asks here, so the
+    answers cannot drift apart.
+    """
+    if card.get("image_uris"):
+        return False
+    faces = card.get("card_faces") or []
+    return (len(faces) == 2
+            and all((f.get("image_uris") or {}).get("png") for f in faces))
+
+
 def back_face_name(name: str) -> str | None:
     """
     The name of a card's second PHYSICAL face, or None if it has only one.
-
-    Split, flip and adventure cards also carry two `card_faces`, but they are
-    one piece of cardboard. Scryfall gives those a top-level image and leaves
-    the faces without images of their own, which is the same test `_png_urls`
-    uses to decide how many files a card is worth downloading. Reusing it here
-    keeps the two answers from disagreeing.
 
     Returns None rather than raising: a catalogue pick should still queue if
     Scryfall is unreachable or does not know the name.
@@ -166,14 +176,9 @@ def back_face_name(name: str) -> str | None:
     except requests.RequestException:
         return None
 
-    if card.get("image_uris"):
+    if not two_faced(card):
         return None
-    faces = card.get("card_faces") or []
-    if len(faces) != 2:
-        return None
-    if not all((f.get("image_uris") or {}).get("png") for f in faces):
-        return None
-    return (faces[1].get("name") or "").strip() or None
+    return ((card["card_faces"][1].get("name") or "").strip() or None)
 
 
 # --------------------------------------------------------------------------
@@ -578,6 +583,27 @@ def _fetch_gatherer(g: dict, status_callback=None):
     else:
         base = f"gatherer-{mid}"
         meta = {"released_at": None, "set": None}
+
+    # A double-faced card is TWO Gatherer records and Scryfall lists both ids
+    # in multiverse_ids, front first. Taking only the first is how a DFC
+    # imported through Gatherer arrived with its back missing - and silently,
+    # because a card with one face is a perfectly ordinary thing.
+    mids = (card or {}).get("multiverse_ids") or []
+    if card is not None and two_faced(card) and len(mids) >= 2:
+        try:
+            paths = []
+            for face_mid, label in zip(mids[:2], ("-front", "-back")):
+                paths += _gatherer_image(face_mid, f"{base}{label}",
+                                         status_callback)
+            return paths, meta
+        except ScryfallError:
+            # Half a card is worse than a consistent one: if either face is
+            # missing from Gatherer, take both from Scryfall rather than
+            # printing two faces that do not match each other.
+            if status_callback:
+                status_callback("Gatherer is missing a face - "
+                                "using Scryfall's images...")
+            return _download_card(card, status_callback)
 
     try:
         return _gatherer_image(mid, base, status_callback), meta
