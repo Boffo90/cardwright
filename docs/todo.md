@@ -204,7 +204,9 @@ Recorded so they are not re-researched from scratch:
   demands an API key on every call, which a binary handed to strangers cannot
   honour. Blocked on that, not on the data existing. Riftbound shipped in
   v2.17.13 precisely because Riftcodex asks for no key - if an open API turns
-  up for these three, the same shape of module works.
+  up for these three, the same shape of module works. Note this is a limit on
+  *searching* them from here: a **card list** prints them today, because it
+  only needs image URLs and does not care who produced them.
 - **mpcfill OCR fork (GPL)** - consuming their HTTP API would be fine (GPL
   covers distributing code, not using a service); we must NOT vendor their code.
   Waiting on their API/spec.

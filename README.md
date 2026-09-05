@@ -57,6 +57,12 @@ with print-shop features.
 - Import a decklist with the art coming from **Gatherer** instead of Scryfall,
   or load an **MPC Autofill order `.xml`** to get exactly the art you picked
   there.
+- **Card list `.json`**: a batch of cards named by image URL, one entry each.
+  Unlike the decklist, it is not tied to Magic - a Pokemon, Yu-Gi-Oh or
+  Riftbound order arrives in one file instead of being typed into the gallery
+  card by card, and each entry can carry its own back and a note (the paper,
+  the finish) that shows up in the queue. Saying which `game` an entry is picks
+  the right card back and moves the card size. See `cardlist.py` for the shape.
 - Local files (PNG/JPG/WEBP/AVIF/…) and drag & drop.
 - Double-faced cards fetch both faces and stay paired.
 

@@ -83,6 +83,7 @@ import applog
 import scryfall
 import sources
 import mpcfill
+import cardlist
 import ygoprodeck
 import print_sheet
 import bootstrap
@@ -919,15 +920,7 @@ class App(_Root):
                 daemon=True)
             item.back_job.start()
 
-        # A source printed at another size (Yu-Gi-Oh) has to move the card
-        # size with it, or fit-to-card stretches it into Magic proportions.
-        hint = getattr(src, "CARD_SIZE_HINT", None)
-        if hint and self.card_size_menu.get() == CARD_SIZE_DEFAULT:
-            for name in CARD_SIZES:
-                if name.startswith(hint):
-                    self.card_size_menu.set(name)
-                    self._persist_card_size(name)
-                    break
+        self._apply_card_size_hint(src)
 
     # A catalogue entry is "Card Name (MOM 75)" or "Card Name (Borderless
     # Victor Adame)": the card, then which art. Both faces of one artist's
@@ -1037,7 +1030,30 @@ class App(_Root):
         s["best_scan"] = bool(self.best_scan_switch.get())
         save_settings(s)
 
+    def _apply_card_size_hint(self, src):
+        """Move the card size when a catalogue prints at another one.
+
+        A Yu-Gi-Oh card is 59x86 mm: left on Magic's 63x88, fit-to-card
+        stretches it into the wrong proportions. Only ever moves off the
+        default, so a size the user chose themselves is never overruled.
+        """
+        hint = getattr(src, "CARD_SIZE_HINT", None)
+        if not hint or self.card_size_menu.get() != CARD_SIZE_DEFAULT:
+            return
+        for name in CARD_SIZES:
+            if name.startswith(hint):
+                self.card_size_menu.set(name)
+                self._persist_card_size(name)
+                break
+
     def _add_resolved_cards(self, cards):
+        # An imported batch can be from a catalogue that prints at another
+        # size. The gallery already moves the card size when you pick one
+        # Yu-Gi-Oh card; a list of sixty of them deserves the same, and
+        # nothing did it before because every import used to be Magic.
+        games = {c.get("src") for c in cards if c.get("src")}
+        if len(games) == 1:
+            self._apply_card_size_hint(sources.by_id(games.pop()))
         for c in cards:
             if c.get("ref"):
                 # Gatherer import: a reference, so scryfall.fetch pulls the
@@ -1266,6 +1282,40 @@ class App(_Root):
 # --------------------------------------------------------------------------
 # decklist import dialog
 # --------------------------------------------------------------------------
+
+def _queue_entry(card, src, mark=""):
+    """One parsed import entry, in the shape `_add_resolved_cards` expects.
+
+    `mark` disambiguates the download filename. An import file names every
+    entry by card alone, so an order with three different Islands repeats
+    "Island.png" three times - without this they all write the same file and
+    two of the three arts are silently lost.
+
+    A card with its own reverse downloads both faces, named so that the export
+    dialog's -front/-back pairing picks them up: the same convention Scryfall
+    double-faced cards already arrive with, so nothing downstream needs to
+    know where the card came from.
+    """
+    base = f"{card['name']}  [{card['source']}]"
+    safe = re.sub(r'[<>:"/\\|?*]', "", base)
+    if mark:
+        safe = f"{safe} {mark}"
+    if card.get("back_download"):
+        downloads = [(f"{safe}-front", card["download"]),
+                     (f"{safe}-back", card["back_download"])]
+    else:
+        downloads = [(safe, card["download"])]
+    return {
+        "display": (f"{card['qty']}x {card['name']}"
+                    if card["qty"] > 1 else card["name"]),
+        "qty": card["qty"],
+        "downloads": downloads,
+        "released_at": None,
+        "set": None,
+        "src": src,
+    }
+
+
 class ImportDialog(ctk.CTkToplevel):
     PLACEHOLDER = ("Paste a decklist, or an Archidekt or Moxfield deck URL:\n\n"
                    "1 Winota, Joiner of Forces (PRM) 80807 [matte]\n"
@@ -1341,6 +1391,11 @@ class ImportDialog(ctk.CTkToplevel):
                       hover_color=GRAY_HOVER, text_color=TEXT,
                       font=(UI, theme.TYPE["small"]),
                       command=self._load_mpc_xml).pack(side="left")
+        ctk.CTkButton(btns, text="Card list…", width=104,
+                      height=theme.H_BUTTON, corner_radius=theme.RADIUS_SM,
+                      fg_color=CONTROL_ALT, hover_color=GRAY_HOVER,
+                      text_color=TEXT, font=(UI, theme.TYPE["small"]),
+                      command=self._load_card_list).pack(side="left", padx=8)
 
         self.import_btn = ctk.CTkButton(btns, text="Resolve & add", width=140,
                                         height=theme.H_BUTTON,
@@ -1374,33 +1429,46 @@ class ImportDialog(ctk.CTkToplevel):
             messagebox.showerror("Could not read that file", str(e), parent=self)
             return
 
-        resolved = []
-        for c in cards:
-            base = f"{c['name']}  [{c['source']}]"
-            # The download name has to carry the slot. An MPC order names every
-            # entry by card alone, so an order with three different Islands
-            # repeats "Island.png" three times - without this they all write
-            # the same file and two of the three arts are silently lost.
-            safe = re.sub(r'[<>:"/\\|?*]', "", base)
-            if c.get("slot"):
-                safe = f"{safe} {c['slot']}"
-            # A double-faced card downloads both faces, named so that the
-            # export dialog's -front/-back pairing picks them up: that is the
-            # same convention Scryfall DFCs already arrive with, so nothing
-            # downstream needs to know where the card came from.
-            if c.get("back_download"):
-                downloads = [(f"{safe}-front", c["download"]),
-                             (f"{safe}-back", c["back_download"])]
-            else:
-                downloads = [(safe, c["download"])]
-            resolved.append({
-                "display": f"{c['qty']}x {c['name']}" if c["qty"] > 1 else c["name"],
-                "qty": c["qty"],
-                "downloads": downloads,
-                "released_at": None,
-                "set": None,
-                "src": "mpc",
-            })
+        # The slot is what keeps two different arts of one card apart: an
+        # MPC order names every entry by card alone.
+        resolved = [_queue_entry(c, "mpc", c.get("slot", "")) for c in cards]
+        if resolved:
+            self.on_resolved(resolved)
+
+        if problems:
+            messagebox.showwarning(
+                "Imported with issues",
+                f"Added {len(resolved)} card(s).\n\nSkipped:\n  - "
+                + "\n  - ".join(problems), parent=self)
+        if resolved:
+            self.destroy()
+
+    def _load_card_list(self):
+        """Import a card list: a batch of cards named by image url.
+
+        Why it exists: every other import here is Magic-only, so an order of
+        Pokemon or Yu-Gi-Oh cards had to be typed into the gallery one at a
+        time, even when whoever sent it already knew the exact art. See
+        `cardlist` for the format.
+        """
+        path = filedialog.askopenfilename(
+            title="Choose a card list",
+            filetypes=[("Card list", "*.json"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            cards, problems = cardlist.parse_list(
+                Path(path).read_text(encoding="utf-8", errors="replace"))
+        except Exception as e:
+            applog.log.error("Card list import failed", exc_info=e)
+            messagebox.showerror("Could not read that file", str(e), parent=self)
+            return
+
+        # An entry's position in the file is the only thing unique to it, so
+        # that is what keeps two arts of one card from overwriting each other
+        # on the way to the temp folder.
+        resolved = [_queue_entry(c, c.get("game") or "card", c["identifier"])
+                    for c in cards]
         if resolved:
             self.on_resolved(resolved)
 

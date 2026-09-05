@@ -214,6 +214,16 @@ What blocks a card slot is a **corner mark landing on a corner card** - the mark
 - The preview hint calls `best_inset()`, which returns the **largest** inset that still keeps every slot - the gentlest move that works, since a mark further from the edge is the safer one.
 - Not verified on hardware: neither the author nor this analysis has a cutter. SCM shipping 3.5 mm in production is the evidence.
 
+## Card list import: JSON, and generic on purpose
+Every import here was Magic-only: a decklist resolves through Scryfall, an MPC order carries Drive ids. So a Pokemon or Yu-Gi-Oh order had to be typed into the gallery one card at a time, even when whoever sent it already knew the exact art. `cardlist.py` closes that: one file, one entry per card, each naming the image URL to print.
+- **JSON, not a text list.** A card needs more than a name and a count - its own back, which game it is, a note for the person at the printer. A line format would have grown separators until it was a worse JSON.
+- **Generic, not shop-specific.** The format names nothing about where the file came from; anything that can produce image URLs can write one. That is also what makes it the way in for games this app has no catalogue for - `apitcg.com` still needs a key we cannot ship, but a card list does not care where the URL came from.
+- **Only `name` and `image` are required.** Everything else is a refinement, and a missing `game` costs the card back and the card size, not the card.
+- **http(s) images only.** The file comes from outside and `download_to_temp` follows whatever it is handed; a `file://` entry would be a download nobody asked for.
+- **One bad entry never throws away the file.** A sixty-card order with one broken row imports fifty-nine and says which one it dropped, the same as an MPC order.
+- **The entry's position is its identity.** Nothing in the file is guaranteed unique and two entries can name the same card with different art; without the position folded into the download filename they overwrite each other and one art is silently lost. That is the same bug the MPC importer had with three different Islands.
+- **The card size moves for a whole imported batch**, not just for a gallery pick. `_apply_card_size_hint` used to live inside the gallery path only, so importing sixty Yu-Gi-Oh cards left the size on Magic's 63x88 and fit-to-card stretched every one of them. It only ever moves off the default, so a size the user chose is never overruled, and a batch mixing games moves nothing - there is no one right answer there.
+
 ## Pokémon source: TCGdex, not pokemontcg.io (v2.15.0)
 Both were measured before choosing. Resolution did **not** decide it - every Pokémon catalogue tops out at `600×825` ("high"), confirmed identical on pokemontcg.io and TCGdex and unchanged between a 1999 and a 2020 set. That is an ecosystem ceiling, not a vendor limit.
 - **No API key.** pokemontcg.io meters unauthenticated use (1000/day) and its terms allow one key per person - unworkable in a binary handed to strangers, where a shipped key is extractable and shared by everyone. TCGdex asks for nothing.
