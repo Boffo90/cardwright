@@ -49,26 +49,20 @@ obvious end state, and large enough to want a clear run). Both are described
 under "Asked for by users".
 
 ### State of the tree
-**v2.17.12 is released and pushed** (2026-08-28), tree clean, 155 tests
+**v2.17.13 is released and pushed** (2026-09-07), tree clean, 223 tests
 passing. Releases are batched, see `release.md` for the rule and its two
 exceptions.
 
-Two releases went out that day. v2.17.11 carried multi-select in the preview,
-projects (save/load the queue), cut guides that can be turned off on the backs,
-the exact-printing search made findable, a retry around card saves that Windows
-briefly locks, 4x6 photo sheets with PNG/JPEG output, and the two-axis page
-shift. v2.17.12 followed because that page shift pushed the Layout tab past the
-bottom of the panel with no scrollbar, so two controls were invisible: it fixes
-that, opens the export dialog with an empty queue, moves the cut guides to the
-Cutting tab, and links Discussions from About.
-
-**v2.17.12 broke the batching rule on purpose**, under the "regression people
-are already hitting" exception in `release.md`: v2.17.11 shipped with a control
-you could not reach.
+It carried Riftbound as a fourth game, card list imports, the back-bleed fix
+that made double-faced cards possible at all, both faces from a Gatherer
+import, Gatherer links in the language they name, and an export dialog that
+stays open after exporting.
 
 **Owed right now, and only the author can do it:** the Microsoft
-false-positive submission, for *three* binaries. v2.17.10's hash was never
-submitted, and v2.17.11 and v2.17.12 followed. Both are in the table below. It is a web form
+false-positive submission, for *four* binaries. v2.17.10's hash was never
+submitted, and v2.17.11, v2.17.12 and v2.17.13 followed. Four in a row is
+itself the argument: the clearance is per file hash and every build is a new
+hash, so this never converges on its own. See the code-signing entry below. Both are in the table below. It is a web form
 (<https://www.microsoft.com/en-us/wdsi/filesubmission>, "Software developer" /
 "Incorrectly detected as malware"), so it cannot be automated from here.
 
@@ -174,6 +168,7 @@ Recorded so they are not re-researched from scratch:
   Submissions so far, newest first:
   | Version | SHA-256 (first 8) | Date | Submission ID |
   | --- | --- | --- | --- |
+  | 2.17.13 | `c9464846` | **not submitted** | - |
   | 2.17.12 | `baf347b3` | **not submitted** | - |
   | 2.17.11 | `cb0b7626` | **not submitted** | - |
   | 2.17.10 | `817d473f` | **not submitted** | - |
