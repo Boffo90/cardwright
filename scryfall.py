@@ -492,8 +492,10 @@ def _gatherer_parse(ref: str):
     if m and m.group(1).lower() not in ("pages", "handlers"):
         setcode, locale, number, slug = m.groups()
         lang = _GATHERER_LOCALES.get(locale.lower(), locale.lower()[:2])
+        # The URL is kept because the PAGE is the only place some printings
+        # exist at all - see _gatherer_page_image.
         return {"set": setcode.lower(), "number": number, "lang": lang,
-                "name": (slug or "").replace("-", " ").strip()}
+                "name": (slug or "").replace("-", " ").strip(), "url": ref}
 
     return None
 
@@ -566,6 +568,42 @@ def _fetch_gatherer(g: dict, status_callback=None):
             mids = card.get("multiverse_ids") or []
             mid = mids[0] if mids else None
 
+    want_lang = (g.get("lang") or "en").lower()
+    if card:
+        base = f"{_slug(card['name'])}-{card.get('set','')}-{card.get('collector_number','')}"
+        # The LINK's language, not the resolved card's: Scryfall may only know
+        # this printing in English while Gatherer serves it in Spanish, and the
+        # file about to be written is the Spanish one.
+        if want_lang != "en":
+            base += f"-{want_lang}"
+        elif card.get("lang") and card["lang"] != "en":
+            base += f"-{card['lang']}"
+        meta = {"released_at": card.get("released_at"), "set": card.get("set")}
+    elif g.get("url"):
+        base = f"{_slug(g.get('name') or 'card')}-{g.get('set','')}-{g.get('number','')}"
+        if want_lang != "en":
+            base += f"-{want_lang}"
+        meta = {"released_at": None, "set": g.get("set")}
+    else:
+        base = f"gatherer-{mid}"
+        meta = {"released_at": None, "set": None}
+
+    # A new-style link (set / language / number) is served by a page that names
+    # its own image, and that page is the only place some printings exist:
+    # Scryfall knows TLA #315 in English only, so resolving through it handed
+    # back an English card while the user was looking at the Spanish one.
+    #
+    # Skipped for a double-faced card, whose second face only the multiverse
+    # ids can reach - half a card would be the worse trade.
+    page = g.get("url")
+    if page and not (card and two_faced(card)
+                     and len(card.get("multiverse_ids") or []) >= 2):
+        try:
+            return _gatherer_page_image(page, base, status_callback), meta
+        except ScryfallError:
+            # fall through to the multiverse id / Scryfall routes below
+            pass
+
     if mid is None:
         if card:
             if status_callback:
@@ -574,15 +612,6 @@ def _fetch_gatherer(g: dict, status_callback=None):
         raise ScryfallError(
             "Could not find that card from the Gatherer link - neither "
             "Gatherer nor Scryfall recognises it.")
-
-    if card:
-        base = f"{_slug(card['name'])}-{card.get('set','')}-{card.get('collector_number','')}"
-        if card.get("lang") and card["lang"] != "en":
-            base += f"-{card['lang']}"
-        meta = {"released_at": card.get("released_at"), "set": card.get("set")}
-    else:
-        base = f"gatherer-{mid}"
-        meta = {"released_at": None, "set": None}
 
     # A double-faced card is TWO Gatherer records and Scryfall lists both ids
     # in multiverse_ids, front first. Taking only the first is how a DFC
@@ -615,6 +644,64 @@ def _fetch_gatherer(g: dict, status_callback=None):
         if status_callback:
             status_callback("Gatherer has no image - using Scryfall's...")
         return _download_card(card, status_callback)
+
+
+# The new Gatherer is a different site from the one Handlers/Image.ashx
+# belongs to: no multiverse ids, and each per-language page names its own
+# image through og:image, hashed on gatherer-static.
+_OG_IMAGE_RE = re.compile(
+    r'<meta property="og:image"[^>]*content="([^"]+)"', re.I)
+
+# Browser UA on purpose: the page is a normal web page, not an API.
+_GATHERER_PAGE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
+
+def _gatherer_page_image(page_url: str, base: str,
+                         status_callback=None) -> list[Path]:
+    """Download the image the Gatherer page itself points at.
+
+    This exists because **Scryfall does not have every printing Gatherer
+    does**. TLA #315 is on Gatherer in Spanish and on Scryfall in English
+    only, so resolving the link through Scryfall handed back an English card
+    while the user was looking at the Spanish one on screen.
+
+    Two useful facts about the asset host, measured:
+      - `medium` as PNG is 744x1039, the same as Scryfall and well above the
+        646x902 JPEG the old Handlers/Image.ashx serves.
+      - `large` and anything above it answer 403, so medium is the ceiling.
+        The .webp the page links is the same pixels at heavy compression;
+        .png is the one worth upscaling from.
+    """
+    import io
+    from PIL import Image
+
+    if status_callback:
+        status_callback("Reading the Gatherer page...")
+    try:
+        r = requests.get(page_url, headers=_GATHERER_PAGE_HEADERS, timeout=30)
+    except requests.RequestException as e:
+        raise ScryfallError(f"Could not reach Gatherer: {e}") from e
+    if r.status_code != 200:
+        raise ScryfallError(f"Gatherer page returned {r.status_code}")
+
+    m = _OG_IMAGE_RE.search(r.text)
+    if not m:
+        raise ScryfallError("That Gatherer page names no card image")
+    url = m.group(1).rsplit(".", 1)[0] + ".png"
+
+    if status_callback:
+        status_callback("Downloading from Gatherer...")
+    try:
+        img = requests.get(url, headers=_GATHERER_PAGE_HEADERS, timeout=60)
+    except requests.RequestException as e:
+        raise ScryfallError(f"Could not reach Gatherer: {e}") from e
+    if img.status_code != 200 or len(img.content) < 2000:
+        raise ScryfallError("Gatherer served no image for that page")
+
+    target = TEMP_FOLDER / f"{base}.png"
+    Image.open(io.BytesIO(img.content)).convert("RGBA").save(target, "PNG")
+    return [target]
 
 
 def _gatherer_image(mid: int, base: str, status_callback=None) -> list[Path]:

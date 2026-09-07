@@ -3,6 +3,18 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.13 (unreleased)
+- **Gatherer links in other languages now bring that language.** Pasting
+  `gatherer.wizards.com/TLA/es-es/315/fire-lord-zuko` handed back the English
+  card while the Spanish one was on screen. Reported with a screenshot, which
+  is what settled it: the printing does exist, **Scryfall just does not have
+  it**. TLA #315 is on Gatherer in Spanish and on Scryfall in English only,
+  and the app was resolving the link through Scryfall to find a multiverse id.
+- The new Gatherer has no multiverse ids at all. Its per-language pages name
+  their own image, so that is what gets downloaded now - the right language by
+  construction. It is also a much better image: **744×1039 PNG**, the same as
+  Scryfall, against the 646×902 JPEG the old handler serves.
+- Old-style `multiverseid=` links are untouched, and a double-faced card still
+  goes through them, since a page names one image and a DFC needs two.
 - **Riftbound is a catalogue now.** Riot's League of Legends TCG, in the same
   search box as everything else, through the open Riftcodex API. Asked for by
   the author.
