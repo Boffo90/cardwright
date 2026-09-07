@@ -2,7 +2,23 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.13 (unreleased)
+## v2.17.13 - four games, and the language you asked for
+- **Card list import: a batch of cards named by image URL.** One `.json` file,
+  one entry per card. Every import before this was Magic-only - a decklist
+  resolves through Scryfall, an MPC order carries Drive ids - so a Pokemon,
+  Yu-Gi-Oh or Riftbound order had to be typed into the gallery card by card
+  even when whoever sent it already knew the exact art.
+- The format names nothing about where the file came from, which is also what
+  makes it the way in for games with no catalogue here: `apitcg.com` still
+  needs a key a distributed binary cannot honour, but a card list does not care
+  who produced the URL. Only `name` and `image` are required; an entry can also
+  carry its own back, its `game`, and a note that shows in the queue. One bad
+  row never throws away the file.
+- **The card size now follows an imported batch, not only a gallery pick.**
+  Importing sixty Yu-Gi-Oh cards left the size on Magic's 63x88 and fit-to-card
+  stretched every one of them. Nothing caught it because until now every import
+  was Magic. It still only ever moves off the default, so a size you chose is
+  never overruled, and a batch mixing games moves nothing.
 - **Gatherer links in other languages now bring that language.** Pasting
   `gatherer.wizards.com/TLA/es-es/315/fire-lord-zuko` handed back the English
   card while the Spanish one was on screen. Reported with a screenshot, which
