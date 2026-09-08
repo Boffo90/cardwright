@@ -2,6 +2,20 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.14 (unreleased)
+- **A double-faced card from a new Gatherer link brings both faces.** Pasting
+  `TLA/es-es/347a/aang-swift-savior` upscaled the front alone. The `a` is the
+  face: Gatherer numbers them `347a` and `347b`, and each face's page is
+  slugged with **that face's own name**, so the back is not reachable by
+  editing the number. The back's name comes from Scryfall, which knows the
+  card even where it has no printing of it.
+- This could not be solved the way older double-faced cards are. That route
+  needs Gatherer multiverse ids and **TLA has none at all**, which is also why
+  the front was arriving on its own rather than failing outright.
+- **The filename now carries the printing the link names**, not the one
+  Scryfall resolved. `TLA 347a` lands on `TLA 204` when matched by name, so
+  the files claimed to be a printing they were not.
+
 ## v2.17.13 - four games, and the language you asked for
 - **Card list import: a batch of cards named by image URL.** One `.json` file,
   one entry per card. Every import before this was Magic-only - a decklist

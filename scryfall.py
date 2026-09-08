@@ -570,10 +570,16 @@ def _fetch_gatherer(g: dict, status_callback=None):
 
     want_lang = (g.get("lang") or "en").lower()
     if card:
-        base = f"{_slug(card['name'])}-{card.get('set','')}-{card.get('collector_number','')}"
-        # The LINK's language, not the resolved card's: Scryfall may only know
-        # this printing in English while Gatherer serves it in Spanish, and the
-        # file about to be written is the Spanish one.
+        # The LINK's set and number, not the resolved card's, whenever the link
+        # names them. Scryfall may not have this printing at all and resolve to
+        # a different one: the Spanish TLA 347a lands on TLA 204 by name, and
+        # the file would then claim to be a printing it is not. Same reasoning
+        # for the language below. The face letter is dropped so the two faces
+        # share one stem.
+        link_num = re.sub(r"[ab]$", "", str(g.get("number") or ""), flags=re.I)
+        setcode = g.get("set") or card.get("set", "")
+        number = link_num or card.get("collector_number", "")
+        base = f"{_slug(card['name'])}-{setcode}-{number}"
         if want_lang != "en":
             base += f"-{want_lang}"
         elif card.get("lang") and card["lang"] != "en":
@@ -593,13 +599,17 @@ def _fetch_gatherer(g: dict, status_callback=None):
     # Scryfall knows TLA #315 in English only, so resolving through it handed
     # back an English card while the user was looking at the Spanish one.
     #
-    # Skipped for a double-faced card, whose second face only the multiverse
-    # ids can reach - half a card would be the worse trade.
+    # A double-faced card is two of those pages, 347a and 347b. Both are
+    # fetched, because the multiverse-id route that serves older DFCs cannot
+    # help here at all: TLA has no multiverse ids.
     page = g.get("url")
-    if page and not (card and two_faced(card)
-                     and len(card.get("multiverse_ids") or []) >= 2):
+    if page:
         try:
-            return _gatherer_page_image(page, base, status_callback), meta
+            paths = []
+            for face_url, label in _gatherer_faces(page, g, card):
+                paths += _gatherer_page_image(face_url, f"{base}{label}",
+                                              status_callback)
+            return paths, meta
         except ScryfallError:
             # fall through to the multiverse id / Scryfall routes below
             pass
@@ -655,6 +665,47 @@ _OG_IMAGE_RE = re.compile(
 # Browser UA on purpose: the page is a normal web page, not an API.
 _GATHERER_PAGE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
+
+# Gatherer numbers the faces of a double-faced card separately - 347a and
+# 347b - and each face's page is slugged with THAT face's own name.
+_FACE_NUMBER_RE = re.compile(r"^(\d+)([ab])$", re.I)
+
+
+def _url_slug(name: str) -> str:
+    """A card name as Gatherer spells it in a URL path."""
+    text = unicodedata.normalize("NFKD", name)
+    text = text.encode("ascii", "ignore").decode("ascii").lower()
+    text = re.sub(r"[^a-z0-9\s-]", "", text)
+    return re.sub(r"[\s-]+", "-", text).strip("-")
+
+
+def _gatherer_faces(page_url: str, g: dict, card: dict | None):
+    """[(page url, filename label)] - one entry, or both faces of a DFC.
+
+    The back is not reachable by editing the number alone, because the slug is
+    the back face's name and the link only carries the front's. Scryfall
+    supplies both names even for a printing it does not have, and that is what
+    makes this work at all: TLA carries **no multiverse ids**, so the id route
+    that fetches both faces of an older DFC has nothing to work with here.
+    """
+    if not (card and two_faced(card)):
+        return [(page_url, "")]
+    m = _FACE_NUMBER_RE.match(str(g.get("number") or ""))
+    if not m:
+        # No a/b suffix means the link does not name a face, so there is no
+        # sibling page to derive. Better one correct face than a guess.
+        return [(page_url, "")]
+    names = [(f.get("name") or "").strip()
+             for f in (card.get("card_faces") or [])[:2]]
+    if len(names) != 2 or not all(names):
+        return [(page_url, "")]
+
+    number = m.group(1)
+    stem = page_url.rsplit("/", 2)[0]          # .../TLA/es-es
+    return [(f"{stem}/{number}{suffix}/{_url_slug(name)}", label)
+            for suffix, label, name in
+            (("a", "-front", names[0]), ("b", "-back", names[1]))]
 
 
 def _gatherer_page_image(page_url: str, base: str,
