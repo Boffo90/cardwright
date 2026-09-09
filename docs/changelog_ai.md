@@ -2,7 +2,7 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.14 (unreleased)
+## v2.17.14 - the disk stops filling, and the guides are visible
 - **Cut guides can no longer be set too thin to print.** A point is small and
   the field never said how small: the 0.4 pt default is 0.14 mm on paper, and
   the old floor of 0.1 pt came to **two ink dots** at 1200 DPI, measured on a
@@ -13,7 +13,6 @@ Registro por versión. Actualizar en cada release.
   sheet. Wanting no guides is still a real answer - it is what *Cut guides:
   None* is for, and that is the honest way to ask for it.
 
-## v2.17.14 (unreleased)
 - **Working files are deleted as each card finishes.** Nothing ever deleted
   them. Measured on a six-week-old install: `_temp` held **3049 files and
   6.6 GB** against 1.2 GB of actual output, every card ever downloaded plus
