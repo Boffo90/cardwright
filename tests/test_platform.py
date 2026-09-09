@@ -197,7 +197,9 @@ def _run_one_upscale(monkeypatch, tmp_path, no_window_kwargs):
     Image.new("RGB", (744, 1040)).save(src)
 
     monkeypatch.setattr(upscale, "REALESRGAN_EXE", engine)
-    monkeypatch.setattr(upscale, "OUTPUT_FOLDER", tmp_path)
+    # output_folder() is read per call now, so where cards land is
+    # patched as the function rather than as a constant.
+    monkeypatch.setattr(upscale, "output_folder", lambda: tmp_path)
     monkeypatch.setattr(upscale, "NO_WINDOW_KWARGS", no_window_kwargs)
     monkeypatch.setattr(upscale.subprocess, "Popen", _FakePopen)
 

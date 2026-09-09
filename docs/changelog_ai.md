@@ -3,6 +3,27 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.14 (unreleased)
+- **Working files are deleted as each card finishes.** Nothing ever deleted
+  them. Measured on a six-week-old install: `_temp` held **3049 files and
+  6.6 GB** against 1.2 GB of actual output, every card ever downloaded plus
+  two or three intermediates each. They have no use once the card is upscaled
+  - a project and *Add cards…* both read from the output folder, and the
+  downloader re-fetches rather than looking for a local copy, so a kept
+  download was not even a cache.
+- The backlog older versions left is swept in the background at startup, along
+  with the leftovers of runs that failed. The thumbnail caches are untouched:
+  YGOPRODeck and Riftcodex both ask in their terms not to keep re-fetching the
+  same images.
+- **The output folder can be moved to another drive.** *Output folder…* in the
+  footer now opens a menu: open it, change it, or reset it. Asked for by a user
+  pointing out how fast these projects grow, which the numbers above rather
+  confirm.
+- It falls back to the app's own folder whenever the chosen one cannot be
+  written to, and says so once at startup rather than on every card. An
+  external drive that is not plugged in today is the case the setting exists
+  for, so it is expected rather than exceptional - and the choice is kept, so
+  reconnecting the drive is all it takes. Cards already made stay where they
+  are; the setting changes where the next ones land.
 - **A double-faced card from a new Gatherer link brings both faces.** Pasting
   `TLA/es-es/347a/aang-swift-savior` upscaled the front alone. The `a` is the
   face: Gatherer numbers them `347a` and `347b`, and each face's page is

@@ -16,10 +16,11 @@ from pathlib import Path
 
 from PIL import Image
 
+import applog
 from config import (
     REALESRGAN_EXE,
     NO_WINDOW_KWARGS,
-    OUTPUT_FOLDER,
+    output_folder,
     TEMP_FOLDER,
     MODELS_FOLDER,
     MODELS,
@@ -133,8 +134,62 @@ def _orient_to_card(file: Path, card_px, status_callback=None) -> Path | None:
     return out
 
 
+def discard(paths) -> None:
+    """Delete working files, best effort.
+
+    Never fatal: a temp that will not go is a temp that gets swept later, and
+    failing an upscale that already succeeded over it would be absurd.
+    """
+    for p in paths:
+        try:
+            Path(p).unlink()
+        except OSError:
+            pass
+
+
+# Nothing ever deleted these. Measured on a six-week-old install: 3049 files
+# and 6.6 GB, against 1.2 GB of actual output - every card ever downloaded
+# plus two or three intermediates each. They have no use once the card is
+# upscaled: projects and "Add cards…" both read from the output folder.
+#
+# Files only, and only at the top level, so `ygo_thumbs` and
+# `riftbound_thumbs` survive. Those are deliberate caches: both catalogues
+# ask in their terms not to keep re-fetching the same images.
+SWEEP_AFTER_DAYS = 7
+
+
+def sweep_temp(older_than_days: int = SWEEP_AFTER_DAYS) -> tuple[int, int]:
+    """Delete stale working files. Returns (files removed, bytes freed).
+
+    Cleanup now happens as each card finishes, so what this catches is the
+    backlog from older versions and the leftovers of runs that failed.
+    """
+    cutoff = time.time() - older_than_days * 86400
+    removed = freed = 0
+    try:
+        entries = list(TEMP_FOLDER.iterdir())
+    except OSError:
+        return 0, 0
+    for f in entries:
+        try:
+            if not f.is_file() or f.stat().st_mtime > cutoff:
+                continue
+            size = f.stat().st_size
+            f.unlink()
+        except OSError:
+            continue
+        removed += 1
+        freed += size
+    if removed:
+        applog.log.info(
+            "Swept %d stale working file(s), freed %.1f GB",
+                 removed, freed / 1073741824)
+    return removed, freed
+
+
 def _normalize_input(file: Path, trim_bleed=False,
-                     status_callback=None, card_px=None) -> Path:
+                     status_callback=None, card_px=None,
+                     made=None) -> Path:
     """
     Real-ESRGAN reads png/jpg/webp. Anything else (or images with odd modes)
     is converted to a temporary PNG first. If trim_bleed is set and the image
@@ -146,6 +201,8 @@ def _normalize_input(file: Path, trim_bleed=False,
     """
     turned = _orient_to_card(file, card_px, status_callback)
     if turned is not None:
+        if made is not None:
+            made.append(turned)
         file = turned
 
     plain = file.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
@@ -164,6 +221,8 @@ def _normalize_input(file: Path, trim_bleed=False,
             out = _crop_mpc_bleed(im)
             temp = TEMP_FOLDER / (file.stem + "_trim.png")
             out.save(temp)
+            if made is not None:
+                made.append(temp)
             return temp
 
     if plain:
@@ -177,6 +236,8 @@ def _normalize_input(file: Path, trim_bleed=False,
         im = im.convert("RGBA")
     temp = TEMP_FOLDER / (file.stem + "_in.png")
     im.save(temp)
+    if made is not None:
+        made.append(temp)
     return temp
 
 
@@ -261,11 +322,12 @@ def upscale(
         # No compatible GPU (or engine missing): plain high-quality resize.
         # Still yields a correctly sized 1200 DPI file, just without the AI
         # detail reconstruction.
+        made = []
         source = _normalize_input(file, trim_bleed,
                                   status_callback,
-                                  (card_w_px, card_h_px))
+                                  (card_w_px, card_h_px), made)
         out_name = generate_output_name(file) if rename else file.stem + ".png"
-        output = OUTPUT_FOLDER / out_name
+        output = output_folder() / out_name
         if status_callback:
             status_callback("Resizing (no GPU - AI disabled)…")
         im = Image.open(source)
@@ -273,6 +335,7 @@ def upscale(
             im = im.convert("RGBA")
         im = im.resize((card_w_px, card_h_px), Image.LANCZOS)
         _save_png(im, output)
+        discard(made)
         if progress_callback:
             progress_callback(1.0)
         if status_callback:
@@ -303,11 +366,12 @@ def upscale(
 
     model_name, scale = MODELS.get(model_label, MODELS[AUTO_SCAN_MODEL])
 
+    made = []
     source = _normalize_input(file, trim_bleed, status_callback,
-                              (card_w_px, card_h_px))
+                              (card_w_px, card_h_px), made)
 
     out_name = generate_output_name(file) if rename else file.stem + ".png"
-    output = OUTPUT_FOLDER / out_name
+    output = output_folder() / out_name
 
     # Skip the AI when the (trimmed) source already has at least card
     # resolution. MPC art, pre-rendered high-res and previously-processed
@@ -349,6 +413,7 @@ def upscale(
         if status_callback:
             status_callback("Small source - normalizing before AI…")
         pre = TEMP_FOLDER / (source.stem + "_pre.png")
+        made.append(pre)
         with Image.open(source) as im:
             if im.mode not in ("RGB", "RGBA"):
                 im = im.convert("RGBA")

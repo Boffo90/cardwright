@@ -46,6 +46,9 @@ REALESRGAN_EXE = ROOT / ("realesrgan-ncnn-vulkan.exe" if IS_WINDOWS
 
 MODELS_FOLDER = ROOT / "models"
 
+# The default, and the fallback whenever a chosen folder cannot be used.
+# Read it through output_folder(), not directly: a card is ~29 MB and a
+# project fills a drive fast, so where finished cards land is a setting.
 OUTPUT_FOLDER = ROOT / "output"
 
 # Temp folder for downloads / format normalization
@@ -500,6 +503,63 @@ BACKS_MODES = ["No backs", "Duplex (DFC + back.png)"]
 # ==========================================
 
 SETTINGS_FILE = ROOT / "settings.json"
+
+
+def output_folder() -> Path:
+    """Where finished cards are written.
+
+    Read on every call rather than bound at import, so choosing a new folder
+    takes effect without a restart.
+
+    Falls back to the default whenever the chosen one cannot be written to.
+    An external drive that is not plugged in today is exactly the case this
+    setting exists for, and a card written beside the app is a far better
+    answer than a card that could not be written at all. `output_problem()`
+    is how the GUI notices and says so.
+    """
+    chosen = _configured_output()
+    if chosen is not None:
+        return chosen
+    OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+    return OUTPUT_FOLDER
+
+
+def _configured_output():
+    """The configured folder if it is usable right now, else None."""
+    raw = (load_settings().get("output_folder") or "").strip()
+    if not raw:
+        return None
+    try:
+        p = Path(raw)
+        p.mkdir(parents=True, exist_ok=True)
+        probe = p / ".cardwright-write-test"
+        probe.touch()
+        probe.unlink()
+        return p
+    except OSError:
+        return None
+
+
+def output_problem() -> str | None:
+    """The configured folder, when one is set and is NOT usable.
+
+    Returned rather than raised: the app keeps working off the default, and
+    the user gets told once instead of on every card.
+    """
+    raw = (load_settings().get("output_folder") or "").strip()
+    if raw and _configured_output() is None:
+        return raw
+    return None
+
+
+def set_output_folder(path) -> None:
+    """Choose a folder, or pass None/'' to go back to the default."""
+    data = load_settings()
+    if path:
+        data["output_folder"] = str(path)
+    else:
+        data.pop("output_folder", None)
+    save_settings(data)
 
 
 def load_settings() -> dict:

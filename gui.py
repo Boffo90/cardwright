@@ -28,7 +28,10 @@ from config import (
     MODELS,
     DEFAULT_MODEL,
     AUTO_MODEL,
-    OUTPUT_FOLDER,
+    output_folder,
+    output_problem,
+    set_output_folder,
+    TEMP_FOLDER,
     SUPPORTED_INPUT,
     FIT_TO_CARD_DEFAULT,
     MPC_TRIM_DEFAULT,
@@ -78,6 +81,7 @@ from config import (
     load_settings,
     save_settings,
 )
+import upscale as upscale_mod
 from upscale import upscale
 import applog
 import scryfall
@@ -339,6 +343,22 @@ class App(_Root):
 
         # a failed update leaves the download behind; don't keep 38 MB around
         app_update.cleanup_leftovers()
+
+        # An external drive is the case this setting exists for, so it not
+        # being plugged in is expected rather than exceptional. Say it once,
+        # at startup, instead of on every card.
+        _bad_output = output_problem()
+        if _bad_output:
+            self.after(600, lambda p=_bad_output: messagebox.showwarning(
+                "Output folder unavailable",
+                f"{p}\n\nCannot be written to, so cards will be saved beside "
+                f"the app instead. Reconnect the drive and restart, or pick "
+                f"another folder under \u201cOutput folder\u2026\u201d."))
+
+        # Working files are deleted as each card finishes now, so this is for
+        # the backlog older versions left and the leftovers of failed runs.
+        # In the background: it can be thousands of files.
+        threading.Thread(target=upscale_mod.sweep_temp, daemon=True).start()
 
         # silent update check
         threading.Thread(target=self._check_update, daemon=True).start()
@@ -635,8 +655,8 @@ class App(_Root):
         # from 1 and "Upscale all" stays last as the only primary action.
         self.project_btn = ghost("Project…", self._project_menu, 96)
         self.project_btn.grid(row=0, column=1, padx=pad["xs"])
-        ghost("Output folder", self._open_output, 118).grid(
-            row=0, column=2, padx=pad["xs"])
+        self.output_btn = ghost("Output folder…", self._output_menu, 128)
+        self.output_btn.grid(row=0, column=2, padx=pad["xs"])
         self.clear_btn = ghost("Clear", self._clear, 76)
         self.clear_btn.grid(row=0, column=3, padx=pad["xs"])
         ghost("PDF from files…", self._export_pdf_files, 130).grid(
@@ -700,7 +720,7 @@ class App(_Root):
             return "break"
         target = filedialog.asksaveasfilename(
             title="Save project", defaultextension=".cwproj",
-            initialdir=OUTPUT_FOLDER, initialfile="deck.cwproj",
+            initialdir=output_folder(), initialfile="deck.cwproj",
             filetypes=self.PROJECT_TYPES)
         if not target:
             return "break"
@@ -721,7 +741,7 @@ class App(_Root):
         if self.running:
             return "break"
         path = filedialog.askopenfilename(
-            title="Open project", initialdir=OUTPUT_FOLDER,
+            title="Open project", initialdir=output_folder(),
             filetypes=self.PROJECT_TYPES)
         if not path:
             return "break"
@@ -1084,7 +1104,57 @@ class App(_Root):
         self._refresh_empty()
 
     def _open_output(self):
-        _open_folder(OUTPUT_FOLDER)
+        _open_folder(output_folder())
+
+    def _output_menu(self):
+        """Open it, or move it. A card is ~29 MB and a project fills a drive
+        fast, which is why moving it is worth a menu entry at all."""
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Open", command=self._open_output)
+        menu.add_command(label="Change…", command=self._choose_output)
+        if load_settings().get("output_folder"):
+            menu.add_separator()
+            menu.add_command(label=f"Current: {output_folder()}",
+                             state="disabled")
+            menu.add_command(label="Reset to the app folder",
+                             command=self._reset_output)
+        try:
+            x = self.output_btn.winfo_rootx()
+            y = self.output_btn.winfo_rooty() + self.output_btn.winfo_height()
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def _choose_output(self):
+        chosen = filedialog.askdirectory(
+            parent=self, title="Where to save upscaled cards",
+            initialdir=str(output_folder()))
+        if not chosen:
+            return
+        set_output_folder(chosen)
+        bad = output_problem()
+        if bad:
+            set_output_folder(None)
+            messagebox.showerror(
+                "Cannot write there",
+                f"{bad}\n\nNothing could be written to that folder, so the "
+                f"output folder was left where it was. Check that the drive "
+                f"is connected and that you can write to it.", parent=self)
+            return
+        # Cards already made stay where they are: this changes where the NEXT
+        # ones land, and moving gigabytes behind the user's back would be a
+        # surprising thing for a folder picker to do.
+        messagebox.showinfo(
+            "Output folder changed",
+            f"New cards will be saved to:\n{output_folder()}\n\n"
+            f"Cards you have already upscaled stay where they are.",
+            parent=self)
+
+    def _reset_output(self):
+        set_output_folder(None)
+        messagebox.showinfo(
+            "Output folder reset",
+            f"New cards will be saved to:\n{output_folder()}", parent=self)
 
     # ============================================================ pdf export
     def _export_images(self):
@@ -1097,7 +1167,7 @@ class App(_Root):
                 for p in it.outputs if Path(p).exists()}
         source = "queue"
         if not images:
-            images = sorted(OUTPUT_FOLDER.glob("*.png"))
+            images = sorted(output_folder().glob("*.png"))
             source = "output folder"
             srcs = {}          # nothing left to tell us where these came from
         return images, source, srcs
@@ -1120,7 +1190,7 @@ class App(_Root):
             return
         files = filedialog.askopenfilenames(
             title="Choose cards for the PDF",
-            initialdir=OUTPUT_FOLDER,
+            initialdir=output_folder(),
             filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
         if not files:
             return
@@ -1238,6 +1308,18 @@ class App(_Root):
                 status_callback=lambda s, it=item: self._ui(
                     it.set_status, "processing", s),
             ))
+            # The download has done its job. Nothing reads it again: a
+            # project and "Add cards…" both work off the output folder, and
+            # download_to_temp re-fetches rather than checking for a local
+            # copy, so keeping it is not even a cache. Six weeks of not
+            # deleting these came to 6.6 GB on one machine.
+            #
+            # Only files the app put in TEMP_FOLDER: `t` is the user's own
+            # file when they dropped one in, and that is not ours to delete.
+            src = Path(t)
+            if src.parent == TEMP_FOLDER:
+                upscale_mod.discard([src])
+
             # Quantity is a count, not files. The sheet lists the same path
             # once per copy and build_pdf flattens it once, so a 4-of no longer
             # leaves four identical PNGs in the output folder.
@@ -1268,7 +1350,7 @@ class App(_Root):
                 f"the header opens it. Attach it if you report this.")
         else:
             messagebox.showinfo(
-                "Completed", f"{ok} image(s) upscaled to 1200 DPI.\nSaved to:\n{OUTPUT_FOLDER}")
+                "Completed", f"{ok} image(s) upscaled to 1200 DPI.\nSaved to:\n{output_folder()}")
 
     # ------------------------------------------------------------- ui helper
     def _ui(self, fn, *args):
@@ -3933,7 +4015,7 @@ class ExportDialog(ctk.CTkToplevel):
         doubles as another way to duplicate."""
         files = filedialog.askopenfilenames(
             parent=self, title="Add cards to the PDF",
-            initialdir=OUTPUT_FOLDER,
+            initialdir=output_folder(),
             filetypes=[("Images", "*.png *.jpg *.jpeg *.webp")])
         if not files:
             return
@@ -3960,7 +4042,7 @@ class ExportDialog(ctk.CTkToplevel):
         target = filedialog.asksaveasfilename(
             parent=self,
             defaultextension=ext,
-            initialdir=OUTPUT_FOLDER,
+            initialdir=output_folder(),
             initialfile=f"print-sheet{ext}",
             filetypes=[(label, f"*{ext}")])
         if not target:
@@ -4078,7 +4160,7 @@ class ExportDialog(ctk.CTkToplevel):
         target = filedialog.asksaveasfilename(
             parent=self,
             defaultextension=".pdf",
-            initialdir=OUTPUT_FOLDER,
+            initialdir=output_folder(),
             initialfile="calibration.pdf",
             filetypes=[("PDF", "*.pdf")])
         if not target:
@@ -4117,7 +4199,7 @@ class ExportDialog(ctk.CTkToplevel):
         target = filedialog.asksaveasfilename(
             parent=self,
             defaultextension=".pdf",
-            initialdir=OUTPUT_FOLDER,
+            initialdir=output_folder(),
             initialfile="shadow-test.pdf",
             filetypes=[("PDF", "*.pdf")])
         if not target:
@@ -4158,7 +4240,7 @@ class ExportDialog(ctk.CTkToplevel):
         target = filedialog.asksaveasfilename(
             parent=self,
             defaultextension=".pdf",
-            initialdir=OUTPUT_FOLDER,
+            initialdir=output_folder(),
             initialfile="duplex-align.pdf",
             filetypes=[("PDF", "*.pdf")])
         if not target:
