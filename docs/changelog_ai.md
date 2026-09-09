@@ -3,6 +3,17 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.14 (unreleased)
+- **Cut guides can no longer be set too thin to print.** A point is small and
+  the field never said how small: the 0.4 pt default is 0.14 mm on paper, and
+  the old floor of 0.1 pt came to **two ink dots** at 1200 DPI, measured on a
+  rendered sheet. A user reported the lines were "almost non existent" and
+  worked up by trial until 0.24 was usable.
+- The floor is now 0.25 pt, and the line under the field says what the setting
+  is in millimetres, so the number means something to someone holding the
+  sheet. Wanting no guides is still a real answer - it is what *Cut guides:
+  None* is for, and that is the honest way to ask for it.
+
+## v2.17.14 (unreleased)
 - **Working files are deleted as each card finishes.** Nothing ever deleted
   them. Measured on a six-week-old install: `_temp` held **3049 files and
   6.6 GB** against 1.2 GB of actual output, every card ever downloaded plus

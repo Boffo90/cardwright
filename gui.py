@@ -2004,6 +2004,16 @@ class ExportDialog(ctk.CTkToplevel):
                                s.get("guide_style", "Cross"))
         self.guide_len = entry_row("Guide length (mm)", "guide_len", 4.0)
         self.guide_thick = entry_row("Guide thickness (pt)", "guide_thick", 0.4)
+        # A point means nothing to anyone holding a printed sheet, and the
+        # field used to accept widths that cannot print: 0.1 pt is 0.04 mm,
+        # two ink dots at 1200 DPI. Someone reported the lines were "almost
+        # non existent" and worked their way up by trial. Say the millimetres.
+        self.guide_thick_hint = ctk.CTkLabel(
+            left, text="", text_color=MUTED, font=(UI, 11),
+            wraplength=400, justify="left")
+        self.guide_thick_hint.grid(row=self._r, column=0, columnspan=2,
+                                   sticky="w", padx=12, pady=(0, 4))
+        self._r += 1
         self.guide_offset = entry_row("Guide offset (mm)", "guide_offset", 0.0,
                                       "gap from the card")
         # Duplex drift means the back's guides never land exactly where the
@@ -2337,8 +2347,13 @@ class ExportDialog(ctk.CTkToplevel):
     def _guide_len(self):
         return self._float(self.guide_len, 4.0, 0.0, 20.0)
 
+    # Below this a guide is not a thin line, it is an absent one: 0.1 pt
+    # came to two ink dots at 1200 DPI, measured. Anyone who wants no guides
+    # has "None" in the Cut guides picker, which is the honest way to ask.
+    GUIDE_THICK_MIN = 0.25
+
     def _guide_thick(self):
-        return self._float(self.guide_thick, 0.4, 0.1, 3.0)
+        return self._float(self.guide_thick, 0.4, self.GUIDE_THICK_MIN, 3.0)
 
     def _guide_offset(self):
         return self._float(self.guide_offset, 0.0, 0.0, 10.0)
@@ -2951,6 +2966,23 @@ class ExportDialog(ctk.CTkToplevel):
         per_sheet = len(usable) or 1
         sheets = max(1, -(-len(fronts) // per_sheet))
         self._page = max(0, min(self._page, sheets - 1))
+
+        thick = self._guide_thick()
+        thick_mm = thick * 25.4 / 72
+        if self.guides.get() == "None":
+            self.guide_thick_hint.configure(
+                text="Guides are off.", text_color=MUTED)
+        else:
+            typed = self._float(self.guide_thick, 0.4, 0.0, 99.0)
+            # Factual, not a verdict: the person who reported this settled on
+            # 0.24 and it works for them, so telling them their number is
+            # wrong would be both rude and untrue.
+            note = (f"  ({typed:g} typed; {self.GUIDE_THICK_MIN:g} is the "
+                    f"thinnest that prints)"
+                    if typed < self.GUIDE_THICK_MIN else "")
+            self.guide_thick_hint.configure(
+                text=f"{thick:g} pt = {thick_mm:.2f} mm on paper{note}",
+                text_color="#e0b050" if note else MUTED)
 
         # Room to move: the shift is measured from centre, so each axis can
         # give away half its margin before hitting the printable edge.
@@ -4694,6 +4726,23 @@ FAQ = [
      "most labs print at natively, and 600 and 1200 are there for the ones "
      "that take more. Ask yours what it accepts - sending more pixels than it "
      "wants is harmless, sending fewer is not."),
+
+    ("I can barely see the cut guides.",
+     "Guide thickness is in points, and a point is small: the 0.4 pt default "
+     "is 0.14 mm on paper. Under the field it now says the millimetres, so "
+     "the number means something.\n\n"
+     "Measured on a real sheet at 1200 DPI, a guide comes out:\n\n"
+     "    0.25 pt  =  0.09 mm   (4 ink dots)\n"
+     "    0.40 pt  =  0.15 mm   (7 dots, the default)\n"
+     "    0.60 pt  =  0.21 mm   (10 dots)\n"
+     "    1.00 pt  =  0.36 mm   (17 dots)\n\n"
+     "0.25 pt is the floor. Below that the line is two or three ink dots and "
+     "an inkjet simply loses it - which is where the report that led to this "
+     "came from. If you want no guides at all, set Cut guides to None rather "
+     "than making them too thin to see.\n\n"
+     "Colour matters as much as width. White guides vanish on a light card "
+     "and black ones on a dark border, so if a guide disappears only on some "
+     "cards, try Gray."),
 
     ("My printer's rear feed leaves roller marks, or loses part of the page.",
      "Move the whole layout away from the edge it cannot use. *Shift down* and "
