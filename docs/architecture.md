@@ -16,6 +16,7 @@ All source in `C:/Users/smyo9/upscaler`.
 - `bootstrap.py` - first-run download of engine + models; `probe_gpu`. Picks the platform's engine zip; on POSIX it re-applies the exec bit, which `write_bytes` drops.
 - `update.py` - auto-update from GitHub Releases; `_write_swap_script`. Returns early off Windows: releases carry Windows assets only.
 - `tests/` - `test_platform.py` covers every platform branch, asserting the **Windows** side as well as the POSIX one, from either OS. `.github/workflows/tests.yml` runs it on windows-latest and macos-latest. Run `python -m pytest tests/` before a release.
+- `wiki/` - source of the GitHub wiki, one `.md` per page (`Home.md`, `_Sidebar.md`, `_Footer.md` included). Kept here so the guides are versioned and reviewed like the code, the same reasoning that keeps `site/` on main. The wiki repo itself (`cardwright.wiki.git`) is a push target, not a place to edit: its footer says so.
 - `installer.iss` - Inno Setup (per-user, no admin). Build with ISCC at `C:/Users/smyo9/AppData/Local/Programs/Inno Setup 6/ISCC.exe`.
 - `theme.py` - design tokens (colour ramp, spacing, radius, type). `gui.py` aliases its historical colour names onto these.
 - `icon.ico` - gold card+star (embedded).

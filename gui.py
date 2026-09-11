@@ -4643,7 +4643,7 @@ FAQ = [
      "the file that was published.\n\n"
      "The real fix is a code-signing certificate, which is being worked on. "
      "Until then, reporting the file to Microsoft as a false positive is what "
-     "clears it, and that is done for each release."),
+     "clears it one build at a time."),
 
     ("How do I set the card back, and can I mix games on one sheet?",
      "Cardwright does not ship card backs. A Magic back belongs to Wizards and "
@@ -4661,8 +4661,8 @@ FAQ = [
      "Anything without a matching file falls back to back.png, so you can add "
      "just the ones you need. A card that has its own second face, like a "
      "transforming card, always uses that instead.\n\n"
-     "To override everything for one print run, use \"Choose…\" beside Card "
-     "back in the export dialog."),
+     "To override everything for one print run, use \"File…\" beside Back "
+     "image, on the Backs tab of the export dialog."),
 
     ("My printer says \"insufficient memory\" or spits out an error page.",
      "A print sheet is a real 1200 DPI page - lossless, that is around 217 MB - "
@@ -4798,7 +4798,7 @@ FAQ = [
      "Gatherer has no entry for Secret Lairs, promos, or any foil printing. "
      "Scryfall numbers foils with a star - 198 is the normal card, 198* is the "
      "foil - and gives the starred one no Gatherer id, because Gatherer never "
-     "catalogued foils separately.\\n\\n"
+     "catalogued foils separately.\n\n"
      "Rather than drop those, the import falls back to the Scryfall image and "
      "lists which ones. You still get the whole deck; only those cards come "
      "from the other source."),
@@ -4815,7 +4815,8 @@ FAQ = [
      "wrong on artwork that reaches the cut edge.\n\n"
      "Auto-detect measures how deep the frame runs and snaps it to black. It "
      "is crisper on a normal black-bordered scan but can misjudge full-art "
-     "cards. Both take a per-card override: left-click a card in the preview."),
+     "cards. Both take a per-card override: right-click a card in the preview "
+     "and pick the mode, which the menu names."),
 
     ("A card came out cropped, or kept a bleed edge it should not have.",
      "Bleed detection works by aspect ratio, which is a good guess but still a "

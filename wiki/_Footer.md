@@ -1,0 +1,1 @@
+These pages are kept in [`wiki/`](https://github.com/Boffo90/cardwright/tree/main/wiki) in the main repository, so they are versioned and reviewed like the code. Edits made directly here are overwritten on the next sync, so propose changes there instead.

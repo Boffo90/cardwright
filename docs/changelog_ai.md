@@ -2,6 +2,19 @@
 
 Registro por versión. Actualizar en cada release.
 
+## v2.17.15 (unreleased)
+- **Four answers in the in-app FAQ were wrong, and are fixed.** Found while
+  turning the FAQ into the wiki:
+  - The Gatherer entry showed a literal `\n\n` where a paragraph break was
+    meant, the leftover of an escaped backslash in the source.
+  - The black-border entry said to *left-click* a card for the per-card
+    override. That moved to the right-click menu in v2.17.11.
+  - The card-back entry named a **Choose…** button beside *Card back*. It is
+    **File…** beside *Back image*, on the Backs tab.
+  - The antivirus entry said every release is reported to Microsoft. Five in a
+    row had not been, so it now says what is actually true: a report clears
+    one build at a time.
+
 ## v2.17.14 - the disk stops filling, and the guides are visible
 - **Cut guides can no longer be set too thin to print.** A point is small and
   the field never said how small: the 0.4 pt default is 0.14 mm on paper, and

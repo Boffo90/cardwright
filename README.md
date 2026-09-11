@@ -3,11 +3,13 @@
 # Cardwright
 
 **[Website](https://boffo90.github.io/cardwright/)** ·
-**[Download the latest release](https://github.com/Boffo90/cardwright/releases/latest)**
+**[Download the latest release](https://github.com/Boffo90/cardwright/releases/latest)** ·
+**[Guides (wiki)](https://github.com/Boffo90/cardwright/wiki)** ·
+**[Discussions](https://github.com/Boffo90/cardwright/discussions)**
 
-Desktop app that turns Magic: The Gathering card images into **true 1200 DPI
-print-ready proxies** using AI upscaling on your own GPU - free, offline
-after setup, no upload limits.
+Desktop app that turns **Magic, Pokémon, Yu-Gi-Oh and Riftbound** card images
+into **true 1200 DPI print-ready proxies** using AI upscaling on your own GPU -
+free, offline after setup, no upload limits.
 
 Unlike web-based proxy builders (which embed ~300 DPI images into a
 "1200 DPI" PDF), Cardwright reconstructs real detail with per-card AI model
@@ -31,9 +33,11 @@ with print-shop features.
   thumbnails and all - you see what you are about to upscale before
   committing to it.
 - **Switch source** without leaving the gallery: **Scryfall**, **Gatherer**,
-  **MPC Autofill**, **Pokémon** (TCGdex) and **Yu-Gi-Oh** (YGOPRODeck). MPC
-  bleed edges are trimmed automatically; picking a Yu-Gi-Oh card switches the
-  card size to 59×86 mm. Pokémon cards are 63×88 mm, the same as Magic.
+  **MPC Autofill**, **Pokémon** (TCGdex), **Yu-Gi-Oh** (YGOPRODeck) and
+  **Riftbound** (Riftcodex). MPC bleed edges are trimmed automatically; picking
+  a Yu-Gi-Oh card switches the card size to 59×86 mm. Pokémon and Riftbound
+  cards are 63×88 mm, the same as Magic - Riftbound's landscape Battlefields
+  included, which are turned upright to fit the sheet.
 - **Best scan** picks the sharpest printing of a searched name for you,
   keeping the same artwork - a weak scan is exactly what upscaling magnifies.
 - **Card language**: fetch printings in any of the 11 languages Scryfall
@@ -41,7 +45,8 @@ with print-shop features.
   language come back in English and are listed, rather than failing.
 - Pasting a **Scryfall or Gatherer link** goes straight to the queue - you
   already chose the printing, so nothing second-guesses it. Gatherer links
-  use the Gatherer image, never a substitute.
+  use the Gatherer image, never a substitute, **in the language the link
+  names** - including printings Scryfall does not carry at all.
 - **One exact printing, by name**: type `Sol Ring (SLD) 2560` and you get that
   art, not whichever one a bare name resolves to. Set code plus collector
   number, the way every deckbuilder writes it. A quantity in front, a lowercase
@@ -64,16 +69,22 @@ with print-shop features.
   the finish) that shows up in the queue. Saying which `game` an entry is picks
   the right card back and moves the card size. See `cardlist.py` for the shape.
 - Local files (PNG/JPG/WEBP/AVIF/…) and drag & drop.
-- Double-faced cards fetch both faces and stay paired.
+- Double-faced cards fetch both faces and stay paired, from Scryfall and from
+  Gatherer alike.
 
 ### Editable print preview
 The preview is a workspace, not a picture - what you see is what prints.
 
 - Scroll through **every sheet**, not just the first.
 - **Drag a card** to reorder it anywhere in the layout.
-- **Right-click** a card to duplicate it, remove it from the PDF, or delete
-  its file from the output folder.
-- **Add cards…** to pull more in mid-export.
+- **Select several** with click and shift+click, and the right-click menu acts
+  on all of them at once, as one undo step.
+- **Right-click** a card to duplicate it, change its art, remove it from the
+  sheet, or delete its file from the output folder.
+- **Add cards…** to pull more in mid-export - or open the dialog with nothing
+  queued and build a sheet entirely from cards already on disk.
+- It **stays open after exporting**, so reprinting a sheet with one card moved
+  does not mean rebuilding the arrangement.
 - Magnifier on hover to inspect detail at print resolution.
 - Build a PDF straight from picked files, without using the queue.
 - Print **only selected sheets** (e.g. `1` or `1-3,5`).
@@ -83,8 +94,6 @@ The preview is a workspace, not a picture - what you see is what prints.
 - Layouts: **3×3 portrait**, **4×2 landscape**, **7-card Silhouette**, plus
   **3×4** and **4×4** for the bigger sheets - A3 and Tabloid fit 16 cards,
   and **2×1 landscape** for the 4x6 photo print.
-- Games: **Magic** (Scryfall, Gatherer, MPC Autofill), **Pokémon**,
-  **Yu-Gi-Oh** and **Riftbound**, all from one search box.
 - Card sizes: **MTG / Pokémon (63×88)**, **Yu-Gi-Oh (59×86)**, mini (44×68),
   tarot (70×120), plus **any custom size** you enter in mm. Pokémon cards are
   the same size as Magic cards, so they work as-is.
@@ -96,7 +105,8 @@ The preview is a workspace, not a picture - what you see is what prints.
   1800×1200). PDFs are lossless or JPEG, and split into one file per N pages;
   a bitmap has no pages, so each sheet is its own file.
 - Cut guides with adjustable style (cross or corner crop marks), length,
-  thickness and offset; margin ticks; optional rounded corners.
+  thickness and offset; margin ticks; optional rounded corners. Thickness shows
+  its width in millimetres, and cannot be set thinner than an inkjet can print.
 - Edge bleed with selectable colour, and a **page shift on both axes, both directions** - move the whole layout off the strip your printer's feed cannot use, with the preview showing how far it will actually go.
 
 ### Cutting machines (Silhouette / Cricut)
@@ -136,8 +146,8 @@ The preview is a workspace, not a picture - what you see is what prints.
   is; **Auto-detect** measures the frame and snaps it to black. Both take a
   per-card override, and you choose which sources get treated at all - MPC
   art already carries a true black edge, so it is left alone by default.
-- Output sharpening. All of it is applied at PDF time - your PNG masters
-  stay untouched.
+- Output sharpening. All of it is applied at export time - your upscaled
+  masters stay untouched.
 
 ## Install (Windows)
 
@@ -147,6 +157,10 @@ The preview is a workspace, not a picture - what you see is what prints.
 2. Run it. On first launch it downloads the AI engine and models
    (one time) from their official sources and detects your GPU.
 3. The app updates itself from within.
+
+Upscaled cards are about 29 MB each, so a project fills a drive fast.
+**Output folder… > Change** moves them to another one; if that drive is not
+connected when the app starts, it falls back to its own folder and says so.
 
 Something misbehaving? The **Log** button in the header opens a log file with
 the full details of any failure - attach it to a bug report.
@@ -172,8 +186,9 @@ certutil -hashfile Cardwright.exe SHA256
 If it matches the release page, you have exactly the file that was published.
 You can also build it yourself from source, below.
 
-The real fix is a code-signing certificate, which is not yet in place. Until
-then each release is reported to Microsoft as a false positive.
+The real fix is a code-signing certificate, which is not yet in place.
+Reporting a build to Microsoft as a false positive clears only that one file,
+so it has to be repeated for every release.
 
 ## Run from source
 
@@ -216,8 +231,9 @@ version, or sell it. See [LICENSE](LICENSE).
 ## Legal
 
 - This is an unofficial Fan Content project, not affiliated with or
-  endorsed by Wizards of the Coast. It ships no Wizards assets; card
-  images are fetched at the user's request from public APIs.
+  endorsed by Wizards of the Coast, Nintendo, The Pokémon Company, Konami or
+  Riot Games. It ships no publisher assets; card images are fetched at the
+  user's request from public APIs.
 - Card data and images courtesy of [Scryfall](https://scryfall.com);
   this app is not affiliated with Scryfall.
 - Yu-Gi-Oh card data and images courtesy of
@@ -227,6 +243,10 @@ version, or sell it. See [LICENSE](LICENSE).
 - Pokémon card data and images courtesy of [TCGdex](https://tcgdex.dev);
   this app is not affiliated with them. Images are downloaded to your machine
   rather than hotlinked.
+- Riftbound card data courtesy of [Riftcodex](https://riftcodex.com), an
+  unofficial fan project; card images are Riot Games' own. This app is not
+  affiliated with either. Images are downloaded to your machine rather than
+  hotlinked.
 - AI engine: [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
   (BSD-3). Community models UltraSharp (Kim2091) and High Fidelity are
   fetched from the [Upscayl](https://github.com/upscayl/upscayl) project
@@ -241,6 +261,15 @@ version, or sell it. See [LICENSE](LICENSE).
   code is GLSL; this is an independent numpy implementation.
 - Intended for personal playtesting. You are responsible for how you use
   the output.
+
+## Community
+
+Questions, half-formed ideas and "is this supposed to work like this?" go in
+[Discussions](https://github.com/Boffo90/cardwright/discussions). Bugs go in
+[Issues](https://github.com/Boffo90/cardwright/issues), where the forms ask for
+what usually has to be guessed at - your printer and its tray for a print
+problem, the log for anything else. The
+[wiki](https://github.com/Boffo90/cardwright/wiki) has the longer guides.
 
 ## Support
 
