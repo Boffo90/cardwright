@@ -13,6 +13,12 @@ at the top switches source without leaving the gallery:
 | **Yu-Gi-Oh** | Yu-Gi-Oh | From YGOPRODeck. Picking one switches the card size to 59×86 mm. |
 | **Riftbound** | Riftbound | From Riftcodex; the images are Riot's own. |
 
+**Click a card's picture** to see it large. Click more and they line up
+side by side, up to three, so you can compare versions of the same art before
+choosing; a fourth makes the oldest give way. Each has its own **Add**. The
+enlarged image is what you would actually get from that source, not a
+stand-in.
+
 **Best scan**, on by default, picks the sharpest printing of a name you type,
 keeping the same artwork. It never swaps the art for a different one, and it
 never overrides a link or a decklist line, since those already name a printing

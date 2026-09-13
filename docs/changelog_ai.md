@@ -3,6 +3,23 @@
 Registro por versión. Actualizar en cada release.
 
 ## v2.17.15 (unreleased)
+- **Click a card in the gallery to see it large, and compare up to three.** A
+  window opens beside the gallery with the card at several times the
+  thumbnail's size; click more and they line up next to it, and a fourth
+  makes the oldest give way. Each has its own **Add** and **Remove**. Asked
+  for by a user who wanted to compare versions before choosing - at 150 px,
+  telling two scans of the same art apart is guesswork.
+- The picture was always the obvious thing to click and used to do nothing:
+  only the Add button did anything, while the status line under the gallery
+  said "Click one to add it". It now says what a click does.
+- **The preview shows what you would actually get**, without fetching the
+  whole file just to look. Scryfall's `large` (672×936, about 110 KB, against
+  760 KB for the PNG), MPC's medium thumbnail (588×800, instead of the full
+  Drive file that is often 12 MB), a JPEG scaled down by Riftbound's CDN
+  (145 KB where its PNG was 1.2 MB), and the real file for Gatherer,
+  Yu-Gi-Oh and Pokémon.
+- Adding from the comparison after switching the gallery to another source
+  still queues the card from the source it was found in.
 - **Four answers in the in-app FAQ were wrong, and are fixed.** Found while
   turning the FAQ into the wiki:
   - The Gatherer entry showed a literal `\n\n` where a paragraph break was

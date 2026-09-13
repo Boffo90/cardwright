@@ -43,6 +43,43 @@ def _png_url(card: dict) -> str:
     return uris.get("png") or uris.get("large") or ""
 
 
+def _preview_url(card: dict) -> str:
+    """Scryfall's `large`: 672x936 at ~106 KB, against 744x1040 at ~760 KB for
+    the PNG. Near full resolution for a seventh of the download, which is the
+    right trade for something you look at and may not keep."""
+    uris = _face(card).get("image_uris") or {}
+    return uris.get("large") or uris.get("normal") or uris.get("png") or ""
+
+
+# Scryfall asks every client for its own User-Agent; everything else the
+# gallery shows is happier with a browser's, which is also what the Gatherer
+# image handler wants.
+_BROWSER_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
+
+def fetch_preview(url: str) -> bytes | None:
+    """The large image for the compare window.
+
+    Deliberately NOT a source's fetch_thumb. Those cache on disk by file name,
+    and a thumbnail and a preview of the same card can share one: YGOPRODeck's
+    cards_small/1234.jpg and cards/1234.jpg, or Riftbound's same asset at
+    ?w=240 and ?w=672. Going through that cache would hand back the tiny
+    thumbnail blown up. Previews are few and on demand, so the compare window
+    keeps them in memory instead.
+    """
+    if not url:
+        return None
+    headers = SCRYFALL_HEADERS if "scryfall" in url.lower() else _BROWSER_UA
+    try:
+        r = requests.get(url, headers=headers, timeout=40,
+                         allow_redirects=True)
+    except requests.RequestException:
+        return None
+    if r.status_code != 200 or len(r.content) < 2000:
+        return None
+    return r.content
+
+
 def _printings(query: str):
     """
     Every printing of whatever `query` names, best scan first.
@@ -121,6 +158,7 @@ class _Scryfall:
                 "dpi": 0,
                 "thumb": _thumb_url(c),
                 "download": _png_url(c),
+                "preview": _preview_url(c),
                 "ext": "png",
                 "identifier": c.get("id", ""),
             })

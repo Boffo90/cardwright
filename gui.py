@@ -4392,6 +4392,183 @@ class SetupDialog(ctk.CTkToplevel):
 # --------------------------------------------------------------------------
 # MPC Autofill search dialog
 # --------------------------------------------------------------------------
+class CompareWindow(ctk.CTkToplevel):
+    """Gallery cards side by side, large enough to see the detail.
+
+    Asked for by a user who wanted to click a result, see it enlarged, and put
+    two or three next to each other before choosing. At the gallery's 150 px
+    thumbnails, telling two scans of the same art apart is guesswork.
+
+    Created as a CHILD of the gallery on purpose. The gallery holds a grab, and
+    a grab only lets events reach the grabbing window and its descendants - so
+    as a child this stays clickable, the gallery stays clickable, and the main
+    window stays blocked, with no grab juggling. Checked, not assumed: under
+    the gallery's grab a child toplevel's path is `.gallery.child` and its
+    buttons receive clicks.
+    """
+
+    # What was asked for is "two or three". A fourth would also shrink every
+    # card on a 1366 px laptop to where comparing stops being the point.
+    MAX = 3
+
+    def __init__(self, gallery, on_add):
+        super().__init__(gallery)
+        self._on_add = on_add
+        self._keys = []            # card keys, oldest first
+        self._panels = {}          # key -> frame
+        self._images = {}          # key -> CTkImage, kept alive
+        self._cache = {}           # preview url -> bytes, for this window's life
+
+        self.title("Compare")
+        self.configure(fg_color=BG)
+        self.transient(gallery)
+        self.bind("<Escape>", lambda e: self.destroy())
+
+        # One size for every panel, worked out from the screen once. Three
+        # have to fit side by side, and a card is 63 wide by 88 tall.
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        w = min(460, (sw - 120) // self.MAX - 28)
+        h = round(w * 88 / 63)
+        if h > sh - 300:
+            h = sh - 300
+            w = round(h * 63 / 88)
+        self.IMG = (max(200, w), max(280, h))
+
+        head = ctk.CTkFrame(self, fg_color="transparent")
+        head.pack(fill="x", padx=16, pady=(14, 4))
+        self.hint = ctk.CTkLabel(
+            head, text="", text_color=MUTED, font=(UI, 12), anchor="w")
+        self.hint.pack(side="left")
+
+        self.row = ctk.CTkFrame(self, fg_color="transparent")
+        self.row.pack(fill="both", expand=True, padx=10, pady=(0, 14))
+
+    # ---------------------------------------------------------------- tray
+    @staticmethod
+    def key_of(card):
+        """Which card this is. Source plus identifier: the same art in two
+        catalogues is two different downloads, and so two different cards."""
+        return (card.get("_source", ""),
+                card.get("identifier") or card.get("download", ""))
+
+    def _admit(self, key):
+        """Make room for `key`. Returns (is_new, evicted key or None).
+
+        Kept apart from the widgets so the rule itself can be tested: a card
+        already here is not added twice, and a full tray lets the OLDEST go,
+        since the one just clicked is the one being looked at now.
+        """
+        if key in self._keys:
+            return False, None
+        evicted = None
+        if len(self._keys) >= self.MAX:
+            evicted = self._keys.pop(0)
+        self._keys.append(key)
+        return True, evicted
+
+    def add(self, card):
+        key = self.key_of(card)
+        is_new, evicted = self._admit(key)
+        if evicted is not None:
+            self._drop_panel(evicted)
+        if is_new:
+            self._build_panel(key, card)
+        self._layout()
+        self.lift()
+        self.focus_force()
+
+    def _remove(self, key):
+        if key in self._keys:
+            self._keys.remove(key)
+        self._drop_panel(key)
+        if not self._keys:
+            self.destroy()
+            return
+        self._layout()
+
+    def _drop_panel(self, key):
+        panel = self._panels.pop(key, None)
+        self._images.pop(key, None)
+        if panel is not None:
+            panel.destroy()
+
+    def _layout(self):
+        for i, key in enumerate(self._keys):
+            self._panels[key].grid(row=0, column=i, padx=6, sticky="n")
+        n = len(self._keys)
+        self.hint.configure(
+            text=(f"{n} of {self.MAX}. Click another card in the gallery to "
+                  f"add it" + ("; the oldest makes room." if n >= self.MAX
+                               else ".")))
+
+    # --------------------------------------------------------------- panel
+    def _build_panel(self, key, card):
+        panel = ctk.CTkFrame(self.row, fg_color=ROW,
+                             corner_radius=theme.RADIUS_MD,
+                             border_width=1, border_color=BORDER)
+        self._panels[key] = panel
+        pic = ctk.CTkLabel(panel, text="Loading…", text_color=MUTED,
+                           width=self.IMG[0], height=self.IMG[1])
+        pic.pack(padx=8, pady=(8, 4))
+        ctk.CTkLabel(panel, text=card.get("name", "?"),
+                     font=(UI, theme.TYPE["body"], "bold"), text_color=TEXT,
+                     wraplength=self.IMG[0]).pack(padx=8)
+        ctk.CTkLabel(panel, text=card.get("source") or "",
+                     font=(UI, 11), text_color=MUTED,
+                     wraplength=self.IMG[0]).pack(padx=8, pady=(0, 6))
+        btns = ctk.CTkFrame(panel, fg_color="transparent")
+        btns.pack(pady=(0, 10))
+        ctk.CTkButton(btns, text="Add", width=88, height=30,
+                      corner_radius=theme.RADIUS_SM,
+                      fg_color=GOLD, hover_color=GOLD_HOVER,
+                      text_color=GOLD_TEXT,
+                      font=(UI, theme.TYPE["small"], "bold"),
+                      command=lambda c=card: self._on_add(c)).pack(
+            side="left", padx=4)
+        ctk.CTkButton(btns, text="Remove", width=88, height=30,
+                      corner_radius=theme.RADIUS_SM,
+                      fg_color="transparent", hover_color=GRAY_HOVER,
+                      border_width=1, border_color=BORDER_STRONG,
+                      text_color=TEXT_DIM, font=(UI, theme.TYPE["small"]),
+                      command=lambda k=key: self._remove(k)).pack(
+            side="left", padx=4)
+
+        # The preview, not the download: each source's is chosen to show what
+        # you would actually get without fetching the whole file just to look.
+        url = card.get("preview") or card.get("download") or ""
+        threading.Thread(target=self._load, args=(key, url, pic),
+                         daemon=True).start()
+
+    def _load(self, key, url, pic):
+        data = self._cache.get(url)
+        if data is None:
+            data = sources.fetch_preview(url)
+            if data:
+                self._cache[url] = data
+        if not data:
+            self.after(0, lambda: pic.winfo_exists() and pic.configure(
+                text="Could not load this image."))
+            return
+        try:
+            im = PILImage.open(io.BytesIO(data)).convert("RGB")
+        except (OSError, ValueError):
+            self.after(0, lambda: pic.winfo_exists() and pic.configure(
+                text="Could not read this image."))
+            return
+        # Fitted, never stretched: Yu-Gi-Oh is 59x86, and a Riftbound
+        # Battlefield is lying on its side.
+        im.thumbnail(self.IMG, PILImage.LANCZOS)
+
+        def show():
+            if key not in self._panels or not pic.winfo_exists():
+                return
+            cimg = ctk.CTkImage(light_image=im, dark_image=im, size=im.size)
+            self._images[key] = cimg
+            pic.configure(image=cimg, text="")
+
+        self.after(0, show)
+
+
 class CardSearchDialog(ctk.CTkToplevel):
     """Search a card catalogue and pick a version to add to the queue.
 
@@ -4444,6 +4621,7 @@ class CardSearchDialog(ctk.CTkToplevel):
         self.grid_rowconfigure(2, weight=1)
         self._thumbs = {}          # keep CTkImage refs alive
         self._token = 0            # ignore stale search threads
+        self._compare = None       # the CompareWindow, once a card is clicked
 
         ctk.CTkLabel(self, text=title,
                      font=(UI, theme.TYPE["title"], "bold"), text_color=TEXT).grid(
@@ -4554,7 +4732,8 @@ class CardSearchDialog(ctk.CTkToplevel):
             self.status.configure(text=self.empty_msg,
                                   text_color="#fca5a5")
             return
-        msg = f"{len(cards)} version(s). Click one to add it to the queue."
+        msg = (f"{len(cards)} version(s). Click a card to see it large and "
+               f"compare; Add puts it in the queue.")
         note = getattr(self.backend, "NOTE", None)
         self.status.configure(text=f"{msg}  {note}" if note else msg,
                               text_color=MUTED)
@@ -4567,8 +4746,12 @@ class CardSearchDialog(ctk.CTkToplevel):
                             border_width=1, border_color=BORDER)
         tile.grid(row=r, column=c, padx=6, pady=6, sticky="n")
         ph = ctk.CTkLabel(tile, text="…", width=self.THUMB[0],
-                          height=self.THUMB[1], text_color=MUTED)
+                          height=self.THUMB[1], text_color=MUTED,
+                          cursor="hand2")
         ph.pack(padx=6, pady=(6, 2))
+        # The picture is the obvious thing to click, and it used to do
+        # nothing at all: only the Add button did anything.
+        ph.bind("<Button-1>", lambda e, ca=card: self._open_compare(ca))
         name = card["name"]
         short = name if len(name) <= 26 else name[:25] + "…"
         ctk.CTkLabel(tile, text=short, font=(UI, 11),
@@ -4606,12 +4789,31 @@ class CardSearchDialog(ctk.CTkToplevel):
 
         threading.Thread(target=load, daemon=True).start()
 
-    def _pick(self, card):
+    def _tag(self, card):
         # Tell the handler which catalogue this came from - with the source
         # switcher the dialog is no longer tied to one backend.
-        card = {**card, "_source": getattr(self.backend, "ID", "mpc")}
+        return {**card, "_source": getattr(self.backend, "ID", "mpc")}
+
+    def _pick(self, card):
+        self._add_tagged(self._tag(card))
+
+    def _add_tagged(self, card):
+        """Queue a card that already knows its source. The compare window
+        comes through here too, and by the time Add is pressed there the
+        user may have switched the gallery to another catalogue - so the
+        source has to travel with the card, not be read off the dialog."""
         self.on_pick(card)
         self.status.configure(text=f"Added: {card['name']}", text_color=GOLD)
+
+    def _open_compare(self, card):
+        if self._compare is None or not self._compare.winfo_exists():
+            self._compare = CompareWindow(self, self._add_tagged)
+        self._compare.add(self._tag(card))
+
+    def destroy(self):
+        if self._compare is not None and self._compare.winfo_exists():
+            self._compare.destroy()
+        super().destroy()
 
 
 # --------------------------------------------------------------------------

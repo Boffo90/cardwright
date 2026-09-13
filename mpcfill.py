@@ -100,6 +100,9 @@ def search(query: str, limit: int = 60) -> list[dict]:
             "size": c.get("size", 0),
             "thumb": c.get("smallThumbnailUrl", ""),
             "download": c.get("downloadLink", ""),
+            # 588x800 at ~570 KB. The download is the full Drive file, often
+            # 12 MB, which is far too much to fetch just to look at.
+            "preview": c.get("mediumThumbnailUrl", ""),
             "ext": (c.get("extension") or "png").lstrip("."),
             "identifier": c.get("identifier", cid),
         })

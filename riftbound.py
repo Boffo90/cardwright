@@ -43,6 +43,8 @@ _MIN_INTERVAL = 0.12
 # from 13.17 to 4.41 - it would hand the AI a blurred image dressed as detail.
 # Take the native size for the real download and let our own pipeline upscale.
 _THUMB_WIDTH = 240
+# For the compare window: the native width is 744, so this stays below it.
+_PREVIEW_WIDTH = 672
 
 
 class RiftboundError(Exception):
@@ -104,6 +106,10 @@ def _entry(card: dict) -> dict | None:
         "size": 0,
         "thumb": _thumb_url(url),
         "download": url,
+        # The same asset scaled DOWN by the CDN, which is what ?w= is fit for,
+        # and as JPEG: left as PNG it came back at 1.2 MB, barely lighter than
+        # the full file, while fm=jpg&q=90 is 145 KB at the same 672x938.
+        "preview": f"{url}?w={_PREVIEW_WIDTH}&fm=jpg&q=90",
         "ext": "png",
         "identifier": str(card.get("id") or card.get("riftbound_id") or ""),
     }

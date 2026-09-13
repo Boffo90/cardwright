@@ -31,7 +31,8 @@ with print-shop features.
 ### Getting cards in
 - Type a **card name** and a gallery opens with every printing of it,
   thumbnails and all - you see what you are about to upscale before
-  committing to it.
+  committing to it. **Click a picture to see it large**, and click up to
+  three to compare them side by side.
 - **Switch source** without leaving the gallery: **Scryfall**, **Gatherer**,
   **MPC Autofill**, **Pokémon** (TCGdex), **Yu-Gi-Oh** (YGOPRODeck) and
   **Riftbound** (Riftcodex). MPC bleed edges are trimmed automatically; picking
