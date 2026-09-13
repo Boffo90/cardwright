@@ -70,7 +70,8 @@ def main():
         git("commit", "--quiet", "-m",
             f"Sync from wiki/ at {head}", cwd=dest)
         git("push", "--quiet", "origin", "HEAD", cwd=dest)
-        print(f"\nPushed {len(pages)} page(s).")
+        changed = len(diff.splitlines())
+        print(f"\nPushed {changed} changed page(s) of {len(pages)}.")
 
 
 if __name__ == "__main__":
