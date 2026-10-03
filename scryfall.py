@@ -11,6 +11,7 @@ import time
 import unicodedata
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import requests
 
@@ -1029,6 +1030,15 @@ def download_to_temp(basename: str, url: str) -> Path:
     so it uses a generous timeout and follows redirects.
     """
     target = TEMP_FOLDER / f"{basename}.png"
+    if url.startswith("file://"):
+        # A card list's own images (cardlist._local_image only lets through
+        # image files inside the list's folder): copied, not fetched.
+        source = Path(url2pathname(urlparse(url).path))
+        data = source.read_bytes()
+        if len(data) < 2000:
+            raise ScryfallError(f"Local image too small: {source.name}")
+        target.write_bytes(data)
+        return target
     time.sleep(SCRYFALL_DELAY)
     r = requests.get(url, headers={"User-Agent": SCRYFALL_HEADERS["User-Agent"]},
                      timeout=120, allow_redirects=True)
