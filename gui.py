@@ -1539,8 +1539,11 @@ class ImportDialog(ctk.CTkToplevel):
         if not path:
             return
         try:
+            # The folder the list lives in: a rendered batch (a zip of PNGs
+            # plus the list) names its images by path relative to it.
             cards, problems = cardlist.parse_list(
-                Path(path).read_text(encoding="utf-8", errors="replace"))
+                Path(path).read_text(encoding="utf-8", errors="replace"),
+                base_dir=Path(path).parent)
         except Exception as e:
             applog.log.error("Card list import failed", exc_info=e)
             messagebox.showerror("Could not read that file", str(e), parent=self)

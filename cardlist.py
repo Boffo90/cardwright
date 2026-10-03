@@ -25,6 +25,11 @@ the image to print:
       ]
     }
 
+`image` (and `back`) can also be a path relative to the list's own folder,
+such as "cards/001-badlands.png": that is how a batch rendered elsewhere
+(Card Conjurer's batch export, a zip of PNGs plus this file) comes in without
+uploading anything. Only image files inside that folder are accepted.
+
 Only `name` and `image` are required. `game` is any catalogue id from
 `sources` (mtg is accepted as an alias for scryfall) and decides the card back
 and the card size; `back` is that card's own reverse, the same thing a
@@ -36,6 +41,7 @@ importer treats both the same way.
 """
 
 import json
+from pathlib import Path
 
 # The largest quantity worth believing. A hand-written file with a stray zero
 # should not queue ten thousand downloads.
@@ -70,6 +76,39 @@ def _url(value) -> str:
     return v if v.startswith("https://") or v.startswith("http://") else ""
 
 
+# What a local image may be. A path in a file from outside is read from disk,
+# so it is limited to pictures.
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def _local_image(value, base_dir) -> str:
+    """A `file://` url for a path relative to the list's folder, or "".
+
+    Only relative paths that stay inside `base_dir` and name an existing
+    image: a list must not be able to point the app at anything else on the
+    disk (an absolute path, or "../" climbing out of its folder).
+    """
+    if base_dir is None or not isinstance(value, str):
+        return ""
+    v = value.strip()
+    if not v or "://" in v or v.startswith(("/", "\\")) or Path(v).is_absolute() \
+            or Path(v).drive:
+        return ""
+    base = Path(base_dir).resolve()
+    try:
+        target = (base / v).resolve()
+        target.relative_to(base)
+    except (ValueError, OSError):
+        return ""
+    if target.suffix.lower() not in _IMAGE_SUFFIXES or not target.is_file():
+        return ""
+    return target.as_uri()
+
+
+def _image(value, base_dir) -> str:
+    return _url(value) or _local_image(value, base_dir)
+
+
 def _qty(value) -> int:
     try:
         n = int(value)
@@ -95,9 +134,12 @@ def _game(value) -> str:
     return v if any(s.ID == v for s in sources.ALL) else ""
 
 
-def parse_list(text: str) -> tuple[list[dict], list[str]]:
+def parse_list(text: str, base_dir=None) -> tuple[list[dict], list[str]]:
     """
     Parse a card list into (cards, problems).
+
+    `base_dir` is the folder the list was read from. With it, images can be
+    paths relative to that folder; without it, only http(s) urls count.
 
     Each card: {name, qty, download, game, note, source, dpi, size, thumb,
     ext, identifier}, plus {back_download, back_name} when it has its own
@@ -133,7 +175,7 @@ def parse_list(text: str) -> tuple[list[dict], list[str]]:
 
         name = (row.get("name") or "").strip() if isinstance(
             row.get("name"), str) else ""
-        image = _url(row.get("image"))
+        image = _image(row.get("image"), base_dir)
         if not name:
             problems.append(f"entry {i} - no name")
             continue
@@ -165,7 +207,7 @@ def parse_list(text: str) -> tuple[list[dict], list[str]]:
             "identifier": f"{i}",
         }
 
-        back = _url(row.get("back"))
+        back = _image(row.get("back"), base_dir)
         if back:
             entry["back_download"] = back
             entry["back_identifier"] = f"{i}-back"
