@@ -123,6 +123,103 @@ def _open_folder(path):
     if subprocess.run(["open", str(path)]).returncode != 0:
         raise OSError(f"could not open {path}")
 
+
+# ---- scrolling on macOS -------------------------------------------------
+# Tk 8.7 changed what a scroll looks like on macOS, and Homebrew's python-tk
+# (the README's macOS setup) is Tk 9:
+#   - a wheel notch reports delta ±120, as on Windows. Tk 8.6 reported ±1..±n,
+#     which is what customtkinter's darwin branch scrolls by, in units, so one
+#     notch threw a list about 960 px;
+#   - trackpads and the Magic Mouse arrive as <TouchpadScroll>, with pixel
+#     deltas packed into one int, which nothing was bound to: they did not
+#     scroll at all.
+# Windows keeps the handling it always had.
+_MAC_TK9 = not IS_WINDOWS and tk.TkVersion >= 8.7
+WHEEL_STEP_PX = 48     # one wheel notch, about three rows of text
+
+
+def wheel_pixels(delta: int) -> float:
+    """Pixels one <MouseWheel> event scrolls on macOS; positive is down."""
+    if _MAC_TK9:
+        return -delta / 120 * WHEEL_STEP_PX
+    # Tk 8.6: small raw deltas, 8 px each (customtkinter's own increment)
+    return -delta * 8
+
+
+def touchpad_pixels(delta: int) -> tuple[int, int]:
+    """
+    Pixels to scroll (x, y) for a <TouchpadScroll> event; positive is
+    right/down. The delta packs x in the high 16 bits and a signed y in the
+    low 16, the same unpacking as Tk's own tk::PreciseScrollDeltas.
+    """
+    dx = delta >> 16
+    low = delta & 0xFFFF
+    dy = low - 0x10000 if low >= 0x8000 else low
+    return -dx, -dy
+
+
+def _scroll_canvas_px(canvas, dx, dy):
+    """Scroll a canvas by pixels, whatever its scroll increment is."""
+    for view, d, size in ((canvas.xview, dx, canvas.winfo_width()),
+                          (canvas.yview, dy, canvas.winfo_height())):
+        first, last = view()
+        if not d or last - first >= 1.0:
+            continue
+        view("moveto", first + d * (last - first) / size)
+
+
+def _window_configure_only(window):
+    """
+    Run a CTk window's own <Configure> handler for the window alone.
+
+    customtkinter binds it on the window, and a binding on a toplevel fires for
+    every widget inside it too. On macOS, Tk sends <Configure> to every widget
+    in a frame that moves, so each scroll step ran it once per widget in the
+    list - 570 times over a 60-card queue, about half the cost of a step,
+    making scrolling stutter. It only ever re-reads the window's own size, so
+    Tk is told to skip the call for anything else. Other <Configure> bindings
+    on the window are left as they are.
+    """
+    if getattr(window, "_configure_filtered", False):
+        return
+    script = window.bind("<Configure>")
+    window.bind("<Configure>", "\n".join(
+        f'if {{"%W" eq "{window._w}"}} {{{line}}}'
+        if "_update_dimensions_event" in line else line
+        for line in script.splitlines()))
+    window._configure_filtered = True
+
+
+class ScrollableFrame(ctk.CTkScrollableFrame):
+    """CTkScrollableFrame that also scrolls on macOS with Tk 9 (see above)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not IS_WINDOWS:
+            _window_configure_only(self.winfo_toplevel())
+        if _MAC_TK9:
+            # bind_all, like customtkinter's own wheel binding: the event goes
+            # to the widget under the pointer, usually a child of this frame.
+            self.bind_all("<TouchpadScroll>", self._touchpad_all, add=True)
+
+    def _owns(self, widget):
+        # Tk widgets tkinter did not create come through as a path string.
+        return not isinstance(widget, str) and self._check_if_valid_scroll(widget)
+
+    def _mouse_wheel_all(self, event):
+        if not _MAC_TK9:
+            return super()._mouse_wheel_all(event)
+        if self._owns(event.widget):
+            px = wheel_pixels(event.delta)
+            if self._shift_pressed:
+                _scroll_canvas_px(self._parent_canvas, px, 0)
+            else:
+                _scroll_canvas_px(self._parent_canvas, 0, px)
+
+    def _touchpad_all(self, event):
+        if self._owns(event.widget):
+            _scroll_canvas_px(self._parent_canvas, *touchpad_pixels(event.delta))
+
 # ---- palette ------------------------------------------------------------
 # Everything comes from theme.py so the whole app shares one set of tokens.
 # These aliases keep the historical names used throughout this file.
@@ -525,7 +622,7 @@ class App(_Root):
         self.filter_btn.set("All")
         self.filter_btn.pack(side="right")
 
-        self.queue_frame = ctk.CTkScrollableFrame(
+        self.queue_frame = ScrollableFrame(
             wrap, corner_radius=10, fg_color=PANEL)
         self.queue_frame.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
         self.queue_frame.grid_columnconfigure(0, weight=1)
@@ -1876,7 +1973,7 @@ class ExportDialog(ctk.CTkToplevel):
             holder = self.tabs.tab(_name)
             holder.grid_columnconfigure(0, weight=1)
             holder.grid_rowconfigure(0, weight=1)
-            body = ctk.CTkScrollableFrame(holder, fg_color="transparent",
+            body = ScrollableFrame(holder, fg_color="transparent",
                                           corner_radius=0)
             body.grid(row=0, column=0, sticky="nsew")
             body.grid_columnconfigure(1, weight=1)
@@ -2256,9 +2353,10 @@ class ExportDialog(ctk.CTkToplevel):
         self.canvas.bind("<Button-3>", self._preview_rclick)
         self.canvas.bind("<Motion>", self._preview_motion)
         self.canvas.bind("<Leave>", self._preview_leave)
-        self.canvas.bind("<MouseWheel>",
-                         lambda e: self.canvas.yview_scroll(
-                             int(-e.delta / 120), "units"))
+        self.canvas.bind("<MouseWheel>", self._preview_wheel)
+        if _MAC_TK9:
+            self.canvas.bind("<TouchpadScroll>", lambda e: _scroll_canvas_px(
+                self.canvas, 0, touchpad_pixels(e.delta)[1]))
         self.canvas.bind("<Configure>", self._recenter_preview)
         for seq in ("<Control-z>", "<Control-Z>"):
             self.bind(seq, self._undo)
@@ -3423,6 +3521,14 @@ class ExportDialog(ctk.CTkToplevel):
         self.canvas.delete("loupe")
         self._loupe_item = None
         self._loupephoto = None
+
+    def _preview_wheel(self, e):
+        if IS_WINDOWS:
+            self.canvas.yview_scroll(int(-e.delta / 120), "units")
+        else:
+            # On Tk 8.6 a macOS notch is ±1, which the division above rounds
+            # to nothing.
+            _scroll_canvas_px(self.canvas, 0, wheel_pixels(e.delta))
 
     def _back_label(self):
         if self._custom_back:
@@ -4672,7 +4778,7 @@ class CardSearchDialog(ctk.CTkToplevel):
             self.grid_rowconfigure(3, weight=1)
 
         grid_row = 3 if self.switchable else 2
-        self.grid_frame = ctk.CTkScrollableFrame(self, fg_color=PANEL,
+        self.grid_frame = ScrollableFrame(self, fg_color=PANEL,
                                                  corner_radius=theme.RADIUS_LG)
         self.grid_frame.grid(row=grid_row, column=0, sticky="nsew",
                              padx=16, pady=8)
@@ -5102,7 +5208,7 @@ class HelpDialog(ctk.CTkToplevel):
     def _build_faq(self, parent):
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(0, weight=1)
-        box = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+        box = ScrollableFrame(parent, fg_color="transparent")
         box.grid(row=0, column=0, sticky="nsew")
         box.grid_columnconfigure(0, weight=1)
 
@@ -5119,7 +5225,7 @@ class HelpDialog(ctk.CTkToplevel):
     def _build_about(self, parent):
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(0, weight=1)
-        box = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+        box = ScrollableFrame(parent, fg_color="transparent")
         box.grid(row=0, column=0, sticky="nsew")
         box.grid_columnconfigure(0, weight=1)
 
