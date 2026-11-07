@@ -38,6 +38,13 @@ Registro por versión. Actualizar en cada release.
   Yu-Gi-Oh and Pokémon.
 - Adding from the comparison after switching the gallery to another source
   still queues the card from the source it was found in.
+- **A card list can now point at image files sitting next to it**, not only at
+  `http(s)` urls. A batch rendered somewhere else - Card Conjurer's batch
+  export is a zip of PNGs plus the list - had no way in without uploading
+  every image first. An image or back can be a path relative to the list's own
+  folder, like `cards/001-badlands.png`. Only real image files inside that
+  folder count: absolute paths and `../` are refused, and a `file://` url
+  written into the list is still refused, as before.
 - **Four answers in the in-app FAQ were wrong, and are fixed.** Found while
   turning the FAQ into the wiki:
   - The Gatherer entry showed a literal `\n\n` where a paragraph break was
