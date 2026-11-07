@@ -38,6 +38,20 @@ Registro por versión. Actualizar en cada release.
   Yu-Gi-Oh and Pokémon.
 - Adding from the comparison after switching the gallery to another source
   still queues the card from the source it was found in.
+- **Scrolling works on macOS again**, contributed by Martin Schwitalla. The
+  README's macOS setup installs Homebrew's `python-tk`, which is Tk 9, and
+  Tk 8.7 changed how scrolling arrives there: a wheel notch now reports ±120
+  instead of ±1, and trackpads send `<TouchpadScroll>` rather than
+  `<MouseWheel>`. So one notch of the wheel jumped about 960 px and the
+  trackpad did not scroll at all. Both are handled now, in the card queue and
+  in the export preview; on Tk 8.6 the preview's wheel works again too, where
+  `int(-1 / 120)` had been rounding every notch to zero.
+- Scrolling also stuttered on macOS: Tk sends `<Configure>` to every widget in
+  a frame that moves, and customtkinter's window-level handler, which only
+  ever reads the window's own size, was running once for each - about 570
+  times per scroll step over a 60-card queue. Filtered to the window itself:
+  16 to 10 ms per frame at 60 cards, 38 to 23 ms at 150. Windows keeps exactly
+  the handling it had.
 - **A card list can now point at image files sitting next to it**, not only at
   `http(s)` urls. A batch rendered somewhere else - Card Conjurer's batch
   export is a zip of PNGs plus the list - had no way in without uploading
