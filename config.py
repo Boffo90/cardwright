@@ -1,3 +1,4 @@
+import io as _io
 import json
 import sys
 from pathlib import Path
@@ -475,6 +476,30 @@ GAME_BACKS = {
     "ygo": "back-yugioh",
     "riftbound": "back-riftbound",
 }
+
+
+def image_kind(data: bytes) -> str:
+    """"image", or a plain-language name for whatever this is instead.
+
+    A source that will not serve a file often answers 200 with a web page.
+    Google Drive does it while rate-limiting or asking for a confirmation,
+    and such a page is comfortably past any size floor, so it used to be
+    written straight out as a .png. The card then failed much later, inside
+    the AI pipeline, with "cannot identify image file" - which names neither
+    the cause nor the cure. Ten cards failed that way in one reported log.
+    """
+    if not data:
+        return "an empty file"
+    head = data[:512].lstrip()[:64].lower()
+    if head.startswith((b"<!doctype html", b"<html", b"<?xml", b"<head")):
+        return "a web page"
+    try:
+        # Opening parses the header only; the pixels are never decoded.
+        with _PILImage.open(_io.BytesIO(data)) as probe:
+            probe.size
+        return "image"
+    except Exception:
+        return "not an image"
 
 
 def find_back_image(source_id=None):

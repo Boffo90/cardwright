@@ -2,7 +2,25 @@
 
 Registro por versión. Actualizar en cada release.
 
-## v2.17.15 (unreleased)
+## v2.17.15 - see it large before you choose
+- **A download that is not an image now says so, instead of crashing the
+  card.** From the log attached to issue #8: ten MPC cards failed in one
+  evening with Pillow's `cannot identify image file`, blaming the Riftbound
+  orientation probe, which was only the first thing to open the file. The
+  cards downloaded fine later, so Google Drive had been refusing them for a
+  while and answering 200 with a web page. That page is comfortably past the
+  2000-byte floor the downloader checked, so it was written out as a `.png`
+  and failed three functions later, under a message that named neither the
+  cause nor the cure.
+- Downloads are now checked where they arrive, in both Scryfall and MPC: a
+  card that came back as a web page says exactly that, says Drive does this
+  when it is rate-limiting, and says to press **Upscale all** again to retry
+  only what failed. Nothing is written to disk. The check parses the header
+  only, so a 12 MB card is not decoded twice.
+- The orientation probe no longer brings a card down; it only decides which
+  way up to turn one. An unreadable input is reported once, by name, before
+  the pipeline starts, and the message separates the two real cases: a failed
+  download, or your own file that will not open in an image viewer either.
 - **Click a card in the gallery to see it large, and compare up to three.** A
   window opens beside the gallery with the card at several times the
   thumbnail's size; click more and they line up next to it, and a fourth

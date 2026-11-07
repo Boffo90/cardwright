@@ -110,8 +110,18 @@ def _orient_to_card(file: Path, card_px, status_callback=None) -> Path | None:
     card_w, card_h = card_px
     if not card_w or not card_h or card_w == card_h:
         return None
-    with Image.open(file) as probe:
-        w, h = probe.size
+    try:
+        with Image.open(file) as probe:
+            w, h = probe.size
+    except (OSError, ValueError):
+        # Not a readable image. That is a real problem, but not this
+        # function's to report: it only decides which way up to turn a card.
+        # Reported from a log where ten MPC downloads came back as something
+        # Pillow could not open, and every one of them died here with
+        # "cannot identify image file" - the orientation probe being simply
+        # the first thing to touch the file. _check_readable below says what
+        # actually went wrong.
+        return None
     if not w or not h or w == h:
         return None
     if (w > h) == (card_w > card_h):
@@ -187,6 +197,26 @@ def sweep_temp(older_than_days: int = SWEEP_AFTER_DAYS) -> tuple[int, int]:
     return removed, freed
 
 
+def _check_readable(file: Path) -> None:
+    """Fail early, and in words, when the input is not an image.
+
+    A download that arrived as a web page, a truncated file, a renamed PDF:
+    all of them used to surface deep inside the pipeline as Pillow's "cannot
+    identify image file", which tells the person neither what happened nor
+    what to do. Downloads are checked as they arrive now, so what reaches
+    here is mostly a file from the user's own disk.
+    """
+    try:
+        with Image.open(file) as probe:
+            probe.size
+    except (OSError, ValueError) as e:
+        raise RuntimeError(
+            f"{file.name} is not an image Cardwright can read. If it came "
+            f"from a catalogue, the download failed and running Upscale all "
+            f"again will retry it; if it is your own file, check it opens in "
+            f"an image viewer. (underlying error: {e})") from e
+
+
 def _normalize_input(file: Path, trim_bleed=False,
                      status_callback=None, card_px=None,
                      made=None) -> Path:
@@ -199,6 +229,7 @@ def _normalize_input(file: Path, trim_bleed=False,
     below sees the portrait shape it expects and the AI gets the same input it
     would from any other source.
     """
+    _check_readable(file)
     turned = _orient_to_card(file, card_px, status_callback)
     if turned is not None:
         if made is not None:

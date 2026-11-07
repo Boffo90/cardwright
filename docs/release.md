@@ -49,3 +49,13 @@ Steps for each version:
    hash, and every build is a new hash. Until a code-signing certificate is in
    place there is no way around that. See `decisions.md` for why Azure Trusted
    Signing is not an option for this author.
+9. **Sync the wiki last**: `python tools/sync_wiki.py`.
+
+   Last, not first. The wiki describes the app people can download, and `main`
+   is normally ahead of that. Syncing from `main` before releasing is how the
+   card-comparison feature came to be documented while every published build
+   still lacked it; someone followed the wiki, nothing happened, and they
+   filed it as a bug (#8). The script now refuses to push while
+   `version.py` is ahead of the newest published tag, which is exactly this
+   mistake. `--ahead` overrides it, for pages that only describe what the
+   released build already does.

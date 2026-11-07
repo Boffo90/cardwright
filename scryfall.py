@@ -20,6 +20,7 @@ from config import (
     SCRYFALL_HEADERS,
     SCRYFALL_DELAY,
     TEMP_FOLDER,
+    image_kind,
 )
 
 
@@ -1023,6 +1024,16 @@ def resolve_decklist(text: str, status_callback=None, lang: str | None = None,
     return cards, not_found, bad, english_only, from_scryfall
 
 
+def _not_an_image(name: str, url: str, kind: str) -> str:
+    """Why a download is useless, in terms the person can act on."""
+    where = ("Google Drive does this when it is busy or rate-limiting"
+             if "drive.google.com" in url
+             else "the source sent this instead of the file")
+    return (f"{name}: the download came back as {kind}, not an image. "
+            f"{where}. Press Upscale all again to retry just the cards that "
+            f"failed.")
+
+
 def download_to_temp(basename: str, url: str) -> Path:
     """Download a resolved image url into TEMP_FOLDER as <basename>.png.
 
@@ -1044,6 +1055,9 @@ def download_to_temp(basename: str, url: str) -> Path:
                      timeout=120, allow_redirects=True)
     if r.status_code != 200 or len(r.content) < 2000:
         raise ScryfallError(f"Download failed ({r.status_code})")
+    kind = image_kind(r.content)
+    if kind != "image":
+        raise ScryfallError(_not_an_image(basename, url, kind))
     target.write_bytes(r.content)
     return target
 

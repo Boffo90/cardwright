@@ -13,6 +13,8 @@ import time
 
 import requests
 
+from config import image_kind
+
 API = "https://mpcfill.com"
 
 _HEADERS = {
@@ -120,6 +122,12 @@ def download(card: dict, target) -> "Path":
                      timeout=120, allow_redirects=True)
     if r.status_code != 200 or len(r.content) < 2000:
         raise MPCError(f"Could not download '{card.get('name')}' from MPC")
+    kind = image_kind(r.content)
+    if kind != "image":
+        raise MPCError(
+            f"{card.get('name')}: the download came back as {kind}, not an "
+            f"image. Google Drive does this when it is busy or rate-limiting. "
+            f"Press Upscale all again to retry just the cards that failed.")
     target.write_bytes(r.content)
     return target
 
